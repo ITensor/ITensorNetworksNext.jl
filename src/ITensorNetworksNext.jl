@@ -1,5 +1,6 @@
 module ITensorNetworksNext
 
-# Write your package code here.
+include("abstracttensornetwork.jl")
+include("tensornetwork.jl")
 
 end

@@ -1,7 +1,31 @@
 name = "ITensorNetworksNext"
 uuid = "302f2e75-49f0-4526-aef7-d8ba550cb06c"
 authors = ["ITensor developers <support@itensor.org> and contributors"]
-version = "0.1.0"
+version = "0.1.1"
+
+[deps]
+Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
+BackendSelection = "680c2d7c-f67a-4cc9-ae9c-da132b1447a5"
+DataGraphs = "b5a273c3-7e6c-41f6-98bd-8d7f1525a36a"
+Dictionaries = "85a47980-9c8c-11e8-2b9f-f7ca1fa99fb4"
+Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
+NamedDimsArrays = "60cbd0c0-df58-4cb7-918c-6f5607b73fde"
+NamedGraphs = "678767b0-92e7-4007-89e4-4527a8725b19"
+SimpleTraits = "699a6c99-e7fa-54fc-8d76-47d257e15c1d"
+SplitApplyCombine = "03a91e81-4c3e-53e1-a0a4-9c0c8f19dd66"
 
 [compat]
+Adapt = "4.3.0"
+BackendSelection = "0.1.6"
+DataGraphs = "0.2.7"
+Dictionaries = "0.4.5"
+Graphs = "1.13.1"
+LinearAlgebra = "1.10"
+MacroTools = "0.5.16"
+NamedDimsArrays = "0.7.13"
+NamedGraphs = "0.6.9"
+SimpleTraits = "0.9.5"
+SplitApplyCombine = "1.2.3"
 julia = "1.10"
