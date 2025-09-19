@@ -3,7 +3,7 @@ using Dictionaries: AbstractDictionary, Indices, dictionary
 using Graphs: AbstractSimpleGraph
 using NamedDimsArrays: AbstractNamedDimsArray, dimnames, nameddimsarray
 using NamedGraphs: NamedGraphs, NamedEdge, NamedGraph, vertextype
-using NamedGraphs.GraphsExtensions: vertextype
+using NamedGraphs.GraphsExtensions: arranged_edges, vertextype
 
 function _TensorNetwork end
 

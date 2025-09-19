@@ -31,7 +31,7 @@ using MacroTools: @capture
 using NamedDimsArrays: dimnames
 using NamedGraphs: NamedGraphs, NamedGraph, not_implemented, steiner_tree
 using NamedGraphs.GraphsExtensions:
-  ⊔, directed_graph, incident_edges, rename_vertices, vertextype
+  ⊔, directed_graph, incident_edges, rem_edges!, rename_vertices, vertextype
 using SplitApplyCombine: flatten
 
 abstract type AbstractTensorNetwork{V,VD} <: AbstractDataGraph{V,VD,Nothing} end
@@ -203,6 +203,7 @@ end
 # the tensor connectivity at vertex `v`.
 function fix_edges!(tn::AbstractTensorNetwork, v)
   rem_incident_edges!(tn, v)
+  rem_edges!(tn, incident_edges(tn, v))
   add_missing_edges!(tn, v)
   return tn
 end
