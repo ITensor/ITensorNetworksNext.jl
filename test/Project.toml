@@ -1,9 +1,9 @@
 [deps]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
-Dictionaries = "85a47980-9c8c-11e8-2b9f-f7ca1fa99fb4"
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
 ITensorBase = "4795dd04-0d67-49bb-8f44-b89c448a1dc7"
 ITensorNetworksNext = "302f2e75-49f0-4526-aef7-d8ba550cb06c"
+NamedDimsArrays = "60cbd0c0-df58-4cb7-918c-6f5607b73fde"
 NamedGraphs = "678767b0-92e7-4007-89e4-4527a8725b19"
 SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
 Suppressor = "fd094767-a336-5f1f-9728-57cf17d0bbfb"

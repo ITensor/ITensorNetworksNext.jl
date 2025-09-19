@@ -1,7 +1,6 @@
 module ITensorNetworksNext
 
-include("abstractindsnetwork.jl")
-include("indsnetwork.jl")
+include("graphsextensions.jl")
 include("abstracttensornetwork.jl")
 include("tensornetwork.jl")
 
