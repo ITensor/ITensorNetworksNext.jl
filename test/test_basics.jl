@@ -1,10 +1,9 @@
 using Dictionaries: Indices
 using Graphs: dst, edges, has_edge, ne, nv, src, vertices
-# TODO: Move `arranged_edges` to `NamedGraphs.GraphsExtensions`.
-using ITensorNetworksNext: TensorNetwork, arranged_edges, linkaxes, linkinds, siteinds
+using ITensorNetworksNext: TensorNetwork, linkinds, siteinds
 using ITensorBase: Index
 using NamedDimsArrays: dimnames
-using NamedGraphs.GraphsExtensions: incident_edges
+using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges
 using NamedGraphs.NamedGraphGenerators: named_grid
 using Test: @test, @testset
 
@@ -31,18 +30,16 @@ using Test: @test, @testset
       end
     end
     for e in edges(tn)
-      @test isone(length(linkaxes(tn, e)))
+      @test isone(length(only(linkinds(tn, e))))
     end
   end
   @testset "Construct TensorNetwork partition function" begin
     dims = (3, 3)
     g = named_grid(dims)
     l = Dict(e => Index(2) for e in edges(g))
+    l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
     tn = TensorNetwork(g) do v
-      is = map(incident_edges(g, v)) do e
-        # TODO: Use `dual` on reverse edges.
-        return haskey(l, e) ? l[e] : l[reverse(e)]
-      end
+      is = map(e -> l[e], incident_edges(g, v))
       return randn(Tuple(is))
     end
     @test nv(tn) == 9
@@ -60,7 +57,7 @@ using Test: @test, @testset
       end
     end
     for e in edges(tn)
-      @test isone(length(linkaxes(tn, e)))
+      @test only(linkinds(tn, e)) == l[e]
     end
   end
 end
