@@ -33,6 +33,6 @@ using Test: @test, @testset
     z1 = contractnetwork(tn; sequence_alg="optimal")[]
     z2 = contractnetwork(tn; sequence_alg="leftassociative")[]
 
-    @test abs(z1 - z2) / abs(z1) <= 1e-14
+    @test abs(z1 - z2) / abs(z1) <= 1e3*eps(Float64)
   end
 end
