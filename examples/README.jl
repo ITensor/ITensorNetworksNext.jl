@@ -1,5 +1,5 @@
 # # ITensorNetworksNext.jl
-# 
+#
 # [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://itensor.github.io/ITensorNetworksNext.jl/stable/)
 # [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://itensor.github.io/ITensorNetworksNext.jl/dev/)
 # [![Build Status](https://github.com/ITensor/ITensorNetworksNext.jl/actions/workflows/Tests.yml/badge.svg?branch=main)](https://github.com/ITensor/ITensorNetworksNext.jl/actions/workflows/Tests.yml?query=branch%3Amain)
