@@ -15,8 +15,8 @@ using Test: @test, @testset
     C = ITensor([5.0, 1.0], j)
     D = ITensor([-2.0, 3.0, 4.0, 5.0, 1.0], k)
 
-    ABCD_1 = contractnetwork([A, B, C, D]; sequence="leftassociative")
-    ABCD_2 = contractnetwork([A, B, C, D]; sequence="optimal")
+    ABCD_1 = contractnetwork([A, B, C, D]; alg = "exact", sequence="leftassociative")
+    ABCD_2 = contractnetwork([A, B, C, D]; alg = "exact", sequence="optimal")
 
     @test ABCD_1 == ABCD_2
   end
@@ -31,8 +31,8 @@ using Test: @test, @testset
       return randn(Tuple(is))
     end
 
-    z1 = contractnetwork(tn; sequence="optimal")[]
-    z2 = contractnetwork(tn; sequence="leftassociative")[]
+    z1 = contractnetwork(tn; alg = "exact", sequence="optimal")[]
+    z2 = contractnetwork(tn; alg = "exact", sequence="leftassociative")[]
 
     @test abs(z1 - z2) / abs(z1) <= 1e3*eps(Float64)
   end
