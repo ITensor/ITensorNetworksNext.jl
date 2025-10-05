@@ -1,4 +1,4 @@
-using ITensorBase: inds, dim
+using BackendSelection: @Algorithm_str, Algorithm
 
 default_sequence_alg = "leftassociative"
 

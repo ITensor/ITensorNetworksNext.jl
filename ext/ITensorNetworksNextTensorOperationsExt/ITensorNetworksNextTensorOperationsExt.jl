@@ -1,5 +1,7 @@
-module ITensorNetworksTensorOperationsExt
+module ITensorNetworksNextTensorOperationsExt
 
+using BackendSelection: @Algorithm_str, Algorithm
+using ITensorBase: inds, dim
 using ITensorNetworksNext: ITensorNetworksNext
 using TensorOperations: TensorOperations, optimaltree
 

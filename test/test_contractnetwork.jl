@@ -4,7 +4,7 @@ using NamedGraphs.NamedGraphGenerators: named_grid
 using ITensorBase: Index, ITensor
 using ITensorNetworksNext:
   TensorNetwork, linkinds, siteinds, contractnetwork, contraction_sequence
-using TensorOperations
+using TensorOperations: TensorOperations
 using Test: @test, @testset
 
 @testset "ContractNetwork" begin
