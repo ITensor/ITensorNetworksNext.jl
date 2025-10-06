@@ -35,6 +35,3 @@ SimpleTraits = "0.9.5"
 SplitApplyCombine = "1.2.3"
 TensorOperations = "5.3.1"
 julia = "1.10"
-
-[extras]
-TensorOperations = "6aa20fa7-93e2-5fca-9bc0-fbd0db3c71a2"
