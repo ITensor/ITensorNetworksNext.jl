@@ -28,7 +28,7 @@ using Graphs:
     vertices
 using LinearAlgebra: LinearAlgebra, factorize
 using MacroTools: @capture
-using NamedDimsArrays: dimnames
+using NamedDimsArrays: dimnames, inds
 using NamedGraphs: NamedGraphs, NamedGraph, not_implemented, steiner_tree
 using NamedGraphs.GraphsExtensions:
     ⊔, directed_graph, incident_edges, rem_edges!, rename_vertices, vertextype
@@ -105,7 +105,7 @@ function linkinds(tn::AbstractTensorNetwork, edge::Pair)
     return linkinds(tn, edgetype(tn)(edge))
 end
 function linkinds(tn::AbstractTensorNetwork, edge::AbstractEdge)
-    return nameddimsindices(tn[src(edge)]) ∩ nameddimsindices(tn[dst(edge)])
+    return inds(tn[src(edge)]) ∩ inds(tn[dst(edge)])
 end
 function linkaxes(tn::AbstractTensorNetwork, edge::Pair)
     return linkaxes(tn, edgetype(tn)(edge))
@@ -121,9 +121,9 @@ function linknames(tn::AbstractTensorNetwork, edge::AbstractEdge)
 end
 
 function siteinds(tn::AbstractTensorNetwork, v)
-    s = nameddimsindices(tn[v])
+    s = inds(tn[v])
     for v′ in neighbors(tn, v)
-        s = setdiff(s, nameddimsindices(tn[v′]))
+        s = setdiff(s, inds(tn[v′]))
     end
     return s
 end
@@ -221,10 +221,9 @@ end
 
 dag(x) = x
 
-using NamedDimsArrays: nameddimsindices
 function insert_trivial_link!(tn, e)
     add_edge!(tn, e)
-    l = rand_trivial_namedunitrange(eltype(nameddimsindices(tn[src(e)])))
+    l = rand_trivial_namedunitrange(eltype(inds(tn[src(e)])))
     x = similar(tn[src(e)], (l,))
     x[1] = 1
     @preserve_graph tn[src(e)] = tn[src(e)] * x
