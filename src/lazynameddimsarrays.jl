@@ -10,31 +10,7 @@ using NamedDimsArrays:
     dename,
     dimnames,
     inds
-using ..SymbolicArrays: SymbolicArrays, SymbolicArray
 using TermInterface: TermInterface, arguments, iscall, maketerm, operation, sorted_arguments
-
-const SymbolicNamedDimsArray{T, N, Parent <: SymbolicArray{T, N}, DimNames} =
-    NamedDimsArray{T, N, Parent, DimNames}
-function symnameddims(name)
-    return lazy(NamedDimsArray(SymbolicArray(name), ()))
-end
-function printnode(io::IO, a::SymbolicNamedDimsArray)
-    print(io, SymbolicArrays.name(dename(a)))
-    print(io, "[", join(dimnames(a), ","), "]")
-    return nothing
-end
-function Base.:(==)(a::SymbolicNamedDimsArray, b::SymbolicNamedDimsArray)
-    return issetequal(inds(a), inds(b)) && dename(a) == dename(b)
-end
-function Base.:*(a::SymbolicNamedDimsArray, b::SymbolicNamedDimsArray)
-    return lazy(a) * lazy(b)
-end
-function Base.:*(a::SymbolicNamedDimsArray, b::LazyNamedDimsArray)
-    return lazy(a) * b
-end
-function Base.:*(a::LazyNamedDimsArray, b::SymbolicNamedDimsArray)
-    return a * lazy(b)
-end
 
 # Custom version of `AbstractTrees.printnode` to
 # avoid type piracy when overloading on `AbstractNamedDimsArray`.
@@ -279,6 +255,69 @@ function Broadcast.broadcasted(::LazyNamedDimsArrayStyle, ::typeof(/), a, c::Num
 end
 function Broadcast.broadcasted(::LazyNamedDimsArrayStyle, ::typeof(-), a)
     return -a
+end
+
+struct SymbolicArray{T, N, Name, Axes <: NTuple{N, AbstractUnitRange{<:Integer}}} <: AbstractArray{T, N}
+    name::Name
+    axes::Axes
+    function SymbolicArray{T}(name, ax::Tuple{Vararg{AbstractUnitRange{<:Integer}}}) where {T}
+        N = length(ax)
+        return new{T, N, typeof(name), typeof(ax)}(name, ax)
+    end
+end
+function SymbolicArray(name, ax::Tuple{Vararg{AbstractUnitRange{<:Integer}}})
+    return SymbolicArray{Any}(name, ax)
+end
+function SymbolicArray{T}(name, ax::AbstractUnitRange...) where {T}
+    return SymbolicArray{T}(name, ax)
+end
+function SymbolicArray(name, ax::AbstractUnitRange...)
+    return SymbolicArray{Any}(name, ax)
+end
+symname(a::SymbolicArray) = getfield(a, :name)
+Base.axes(a::SymbolicArray) = getfield(a, :axes)
+Base.size(a::SymbolicArray) = length.(axes(a))
+function Base.:(==)(a::SymbolicArray, b::SymbolicArray)
+    return symname(a) == symname(b) && axes(a) == axes(b)
+end
+function Base.show(io::IO, mime::MIME"text/plain", a::SymbolicArray)
+    Base.summary(io, a)
+    println(io, ":")
+    print(io, repr(symname(a)))
+    return nothing
+end
+function Base.show(io::IO, a::SymbolicArray)
+    print(io, "SymbolicArray(", symname(a), ", ", size(a), ")")
+    return nothing
+end
+using AbstractTrees: AbstractTrees
+function AbstractTrees.printnode(io::IO, a::SymbolicArray)
+    print(io, repr(symname(a)))
+    return nothing
+end
+const SymbolicNamedDimsArray{T, N, Parent <: SymbolicArray{T, N}, DimNames} =
+    NamedDimsArray{T, N, Parent, DimNames}
+function symnameddims(name)
+    return lazy(NamedDimsArray(SymbolicArray(name), ()))
+end
+function printnode(io::IO, a::SymbolicNamedDimsArray)
+    print(io, symname(dename(a)))
+    if ndims(a) > 0
+        print(io, "[", join(dimnames(a), ","), "]")
+    end
+    return nothing
+end
+function Base.:(==)(a::SymbolicNamedDimsArray, b::SymbolicNamedDimsArray)
+    return issetequal(inds(a), inds(b)) && dename(a) == dename(b)
+end
+function Base.:*(a::SymbolicNamedDimsArray, b::SymbolicNamedDimsArray)
+    return lazy(a) * lazy(b)
+end
+function Base.:*(a::SymbolicNamedDimsArray, b::LazyNamedDimsArray)
+    return lazy(a) * b
+end
+function Base.:*(a::LazyNamedDimsArray, b::SymbolicNamedDimsArray)
+    return a * lazy(b)
 end
 
 end

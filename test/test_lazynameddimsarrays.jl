@@ -1,8 +1,7 @@
 using AbstractTrees: AbstractTrees, print_tree, printnode
 using Base.Broadcast: materialize
 using ITensorNetworksNext.LazyNamedDimsArrays:
-    LazyNamedDimsArray, Mul, ismul, lazy, symnameddims
-using ITensorNetworksNext.SymbolicArrays: SymbolicArray
+    LazyNamedDimsArray, Mul, SymbolicArray, ismul, lazy, symnameddims
 using NamedDimsArrays: NamedDimsArray, dename, dimnames, inds, nameddims
 using TermInterface:
     arguments,
@@ -104,7 +103,7 @@ using WrappedUnions: unwrap
         @test copy(ex) == ex
         @test arguments(ex) == [a * b, c]
         @test operation(ex) ≡ *
-        @test sprint(show, ex) == "((a[] * b[]) * c[])"
-        @test sprint(show, MIME"text/plain"(), ex) == "((a[] * b[]) * c[])"
+        @test sprint(show, ex) == "((a * b) * c)"
+        @test sprint(show, MIME"text/plain"(), ex) == "((a * b) * c)"
     end
 end
