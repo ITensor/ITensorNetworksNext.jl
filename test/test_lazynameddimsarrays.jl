@@ -1,7 +1,8 @@
 using Base.Broadcast: materialize
 using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArray, Prod, lazy
 using NamedDimsArrays: NamedDimsArray, inds, nameddims
-using TermInterface: arguments, arity, children, head, iscall, isexpr, maketerm, operation
+using TermInterface:
+    arguments, arity, children, head, iscall, isexpr, maketerm, operation, sorted_arguments
 using Test: @test, @test_throws, @testset
 using WrappedUnions: unwrap
 
