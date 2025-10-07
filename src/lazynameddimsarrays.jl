@@ -1,13 +1,24 @@
 module LazyNamedDimsArrays
 
+using AbstractTrees: AbstractTrees
 using WrappedUnions: @wrapped, unwrap
 using NamedDimsArrays:
     NamedDimsArrays,
     AbstractNamedDimsArray,
     AbstractNamedDimsArrayStyle,
+    NamedDimsArray,
     dename,
+    dimnames,
     inds
 using TermInterface: TermInterface, arguments, iscall, maketerm, operation, sorted_arguments
+
+# Custom version of `AbstractTrees.printnode` to
+# avoid type piracy when overloading on `AbstractNamedDimsArray`.
+printnode(io::IO, x) = AbstractTrees.printnode(io, x)
+function printnode(io::IO, a::AbstractNamedDimsArray)
+    show(io, collect(dimnames(a)))
+    return nothing
+end
 
 struct Mul{A}
     arguments::Vector{A}
@@ -21,6 +32,13 @@ TermInterface.maketerm(::Type{Mul}, head::typeof(*), args, metadata) = Mul(args)
 TermInterface.operation(m::Mul) = *
 TermInterface.sorted_arguments(m::Mul) = arguments(m)
 TermInterface.sorted_children(m::Mul) = sorted_arguments(a)
+ismul(x) = false
+ismul(m::Mul) = true
+function Base.show(io::IO, m::Mul)
+    args = map(arg -> sprint(printnode, arg), arguments(m))
+    print(io, "(", join(args, " $(operation(m)) "), ")")
+    return nothing
+end
 
 @wrapped struct LazyNamedDimsArray{
         T, A <: AbstractNamedDimsArray{T},
@@ -30,9 +48,9 @@ end
 
 function NamedDimsArrays.inds(a::LazyNamedDimsArray)
     u = unwrap(a)
-    if u isa AbstractNamedDimsArray
+    if !iscall(u)
         return inds(u)
-    elseif u isa Mul
+    elseif ismul(u)
         return mapreduce(inds, symdiff, arguments(u))
     else
         return error("Variant not supported.")
@@ -40,10 +58,8 @@ function NamedDimsArrays.inds(a::LazyNamedDimsArray)
 end
 function NamedDimsArrays.dename(a::LazyNamedDimsArray)
     u = unwrap(a)
-    if u isa AbstractNamedDimsArray
+    if !iscall(u)
         return dename(u)
-    elseif u isa Mul
-        return dename(materialize(a), inds(a))
     else
         return error("Variant not supported.")
     end
@@ -51,9 +67,9 @@ end
 
 function TermInterface.arguments(a::LazyNamedDimsArray)
     u = unwrap(a)
-    if u isa AbstractNamedDimsArray
+    if !iscall(u)
         return error("No arguments.")
-    elseif u isa Mul
+    elseif ismul(u)
         return arguments(u)
     else
         return error("Variant not supported.")
@@ -75,14 +91,14 @@ function TermInterface.maketerm(::Type{LazyNamedDimsArray}, head, args, metadata
     if head ≡ *
         return LazyNamedDimsArray(maketerm(Mul, head, args, metadata))
     else
-        return error("Only product terms supported right now.")
+        return error("Only mul supported right now.")
     end
 end
 function TermInterface.operation(a::LazyNamedDimsArray)
     u = unwrap(a)
-    if u isa AbstractNamedDimsArray
+    if !iscall(u)
         return error("No operation.")
-    elseif u isa Mul
+    elseif ismul(u)
         return operation(u)
     else
         return error("Variant not supported.")
@@ -90,9 +106,9 @@ function TermInterface.operation(a::LazyNamedDimsArray)
 end
 function TermInterface.sorted_arguments(a::LazyNamedDimsArray)
     u = unwrap(a)
-    if u isa AbstractNamedDimsArray
+    if !iscall(u)
         return error("No arguments.")
-    elseif u isa Mul
+    elseif ismul(u)
         return sorted_arguments(u)
     else
         return error("Variant not supported.")
@@ -101,13 +117,29 @@ end
 function TermInterface.sorted_children(a::LazyNamedDimsArray)
     return sorted_arguments(a)
 end
+ismul(a::LazyNamedDimsArray) = ismul(unwrap(a))
+
+function AbstractTrees.children(a::LazyNamedDimsArray)
+    if !iscall(a)
+        return ()
+    else
+        return arguments(a)
+    end
+end
+function AbstractTrees.nodevalue(a::LazyNamedDimsArray)
+    if !iscall(a)
+        return unwrap(a)
+    else
+        return operation(a)
+    end
+end
 
 using Base.Broadcast: materialize
 function Base.Broadcast.materialize(a::LazyNamedDimsArray)
     u = unwrap(a)
-    if u isa AbstractNamedDimsArray
+    if !iscall(u)
         return u
-    elseif u isa Mul
+    elseif ismul(u)
         return mapfoldl(materialize, operation(u), arguments(u))
     else
         return error("Variant not supported.")
@@ -115,11 +147,45 @@ function Base.Broadcast.materialize(a::LazyNamedDimsArray)
 end
 Base.copy(a::LazyNamedDimsArray) = materialize(a)
 
+function Base.:(==)(a1::LazyNamedDimsArray, a2::LazyNamedDimsArray)
+    u1, u2 = unwrap.((a1, a2))
+    if !iscall(u1) && !iscall(u2)
+        return u1 == u2
+    elseif ismul(u1) && ismul(u2)
+        return arguments(u1) == arguments(u2)
+    else
+        return false
+    end
+end
+
+function printnode(io::IO, a::LazyNamedDimsArray)
+    return printnode(io, unwrap(a))
+end
+function AbstractTrees.printnode(io::IO, a::LazyNamedDimsArray)
+    return printnode(io, a)
+end
+function Base.show(io::IO, a::LazyNamedDimsArray)
+    if !iscall(a)
+        return show(io, unwrap(a))
+    else
+        return printnode(io, a)
+    end
+end
+function Base.show(io::IO, mime::MIME"text/plain", a::LazyNamedDimsArray)
+    if !iscall(a)
+        @invoke show(io, mime, a::AbstractNamedDimsArray)
+        return nothing
+    else
+        show(io, a)
+        return nothing
+    end
+end
+
 function Base.:*(a::LazyNamedDimsArray)
     u = unwrap(a)
-    if u isa AbstractNamedDimsArray
+    if !iscall(u)
         return LazyNamedDimsArray(Mul([lazy(u)]))
-    elseif u isa Mul
+    elseif ismul(u)
         return a
     else
         return error("Variant not supported.")
@@ -189,6 +255,69 @@ function Broadcast.broadcasted(::LazyNamedDimsArrayStyle, ::typeof(/), a, c::Num
 end
 function Broadcast.broadcasted(::LazyNamedDimsArrayStyle, ::typeof(-), a)
     return -a
+end
+
+struct SymbolicArray{T, N, Name, Axes <: NTuple{N, AbstractUnitRange{<:Integer}}} <: AbstractArray{T, N}
+    name::Name
+    axes::Axes
+    function SymbolicArray{T}(name, ax::Tuple{Vararg{AbstractUnitRange{<:Integer}}}) where {T}
+        N = length(ax)
+        return new{T, N, typeof(name), typeof(ax)}(name, ax)
+    end
+end
+function SymbolicArray(name, ax::Tuple{Vararg{AbstractUnitRange{<:Integer}}})
+    return SymbolicArray{Any}(name, ax)
+end
+function SymbolicArray{T}(name, ax::AbstractUnitRange...) where {T}
+    return SymbolicArray{T}(name, ax)
+end
+function SymbolicArray(name, ax::AbstractUnitRange...)
+    return SymbolicArray{Any}(name, ax)
+end
+symname(a::SymbolicArray) = getfield(a, :name)
+Base.axes(a::SymbolicArray) = getfield(a, :axes)
+Base.size(a::SymbolicArray) = length.(axes(a))
+function Base.:(==)(a::SymbolicArray, b::SymbolicArray)
+    return symname(a) == symname(b) && axes(a) == axes(b)
+end
+function Base.show(io::IO, mime::MIME"text/plain", a::SymbolicArray)
+    Base.summary(io, a)
+    println(io, ":")
+    print(io, repr(symname(a)))
+    return nothing
+end
+function Base.show(io::IO, a::SymbolicArray)
+    print(io, "SymbolicArray(", symname(a), ", ", size(a), ")")
+    return nothing
+end
+using AbstractTrees: AbstractTrees
+function AbstractTrees.printnode(io::IO, a::SymbolicArray)
+    print(io, repr(symname(a)))
+    return nothing
+end
+const SymbolicNamedDimsArray{T, N, Parent <: SymbolicArray{T, N}, DimNames} =
+    NamedDimsArray{T, N, Parent, DimNames}
+function symnameddims(name)
+    return lazy(NamedDimsArray(SymbolicArray(name), ()))
+end
+function printnode(io::IO, a::SymbolicNamedDimsArray)
+    print(io, symname(dename(a)))
+    if ndims(a) > 0
+        print(io, "[", join(dimnames(a), ","), "]")
+    end
+    return nothing
+end
+function Base.:(==)(a::SymbolicNamedDimsArray, b::SymbolicNamedDimsArray)
+    return issetequal(inds(a), inds(b)) && dename(a) == dename(b)
+end
+function Base.:*(a::SymbolicNamedDimsArray, b::SymbolicNamedDimsArray)
+    return lazy(a) * lazy(b)
+end
+function Base.:*(a::SymbolicNamedDimsArray, b::LazyNamedDimsArray)
+    return lazy(a) * b
+end
+function Base.:*(a::LazyNamedDimsArray, b::SymbolicNamedDimsArray)
+    return a * lazy(b)
 end
 
 end
