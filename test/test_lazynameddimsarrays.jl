@@ -33,7 +33,8 @@ using WrappedUnions: unwrap
         @test materialize(l) ≈ a1 * a2 * a3
         @test issetequal(inds(l), symdiff(inds.((a1, a2, a3))...))
         @test unwrap(l) isa Mul
-        @test unwrap(l).arguments == [l1 * l2, l3]
+        @test operation(unwrap(l)) ≡ *
+        @test arguments(unwrap(l)) == [l1 * l2, l3]
     end
 
     @testset "TermInterface" begin
