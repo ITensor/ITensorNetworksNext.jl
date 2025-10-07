@@ -1,8 +1,17 @@
 using Base.Broadcast: materialize
-using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArray, Prod, lazy
+using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArray, Mul, lazy
 using NamedDimsArrays: NamedDimsArray, inds, nameddims
 using TermInterface:
-    arguments, arity, children, head, iscall, isexpr, maketerm, operation, sorted_arguments
+    arguments,
+    arity,
+    children,
+    head,
+    iscall,
+    isexpr,
+    maketerm,
+    operation,
+    sorted_arguments,
+    sorted_children
 using Test: @test, @test_throws, @testset
 using WrappedUnions: unwrap
 
@@ -23,8 +32,11 @@ using WrappedUnions: unwrap
         @test copy(l) ≈ a1 * a2 * a3
         @test materialize(l) ≈ a1 * a2 * a3
         @test issetequal(inds(l), symdiff(inds.((a1, a2, a3))...))
-        @test unwrap(l) isa Prod
-        @test unwrap(l).factors == [l1 * l2, l3]
+        @test unwrap(l) isa Mul
+        @test unwrap(l).arguments == [l1 * l2, l3]
+        # TermInterface.jl
+        @test operation(unwrap(l)) ≡ *
+        @test arguments(unwrap(l)) == [l1 * l2, l3]
     end
 
     @testset "TermInterface" begin
@@ -41,16 +53,18 @@ using WrappedUnions: unwrap
         @test !isexpr(l1)
         @test_throws ErrorException operation(l1)
         @test_throws ErrorException sorted_arguments(l1)
+        @test_throws ErrorException sorted_children(l1)
 
         l = l1 * l2 * l3
         @test arguments(l) == [l1 * l2, l3]
         @test arity(l) == 2
         @test children(l) == [l1 * l2, l3]
-        @test head(l) ≡ prod
+        @test head(l) ≡ *
         @test iscall(l)
         @test isexpr(l)
-        @test l == maketerm(LazyNamedDimsArray, prod, [l1 * l2, l3], nothing)
-        @test operation(l) ≡ prod
+        @test l == maketerm(LazyNamedDimsArray, *, [l1 * l2, l3], nothing)
+        @test operation(l) ≡ *
         @test sorted_arguments(l) == [l1 * l2, l3]
+        @test sorted_children(l) == [l1 * l2, l3]
     end
 end
