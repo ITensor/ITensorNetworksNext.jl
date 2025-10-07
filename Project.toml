@@ -1,7 +1,7 @@
 name = "ITensorNetworksNext"
 uuid = "302f2e75-49f0-4526-aef7-d8ba550cb06c"
 authors = ["ITensor developers <support@itensor.org> and contributors"]
-version = "0.1.4"
+version = "0.1.5"
 
 [deps]
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
@@ -24,7 +24,7 @@ Dictionaries = "0.4.5"
 Graphs = "1.13.1"
 LinearAlgebra = "1.10"
 MacroTools = "0.5.16"
-NamedDimsArrays = "0.7.13"
+NamedDimsArrays = "0.8"
 NamedGraphs = "0.6.9, 0.7"
 SimpleTraits = "0.9.5"
 SplitApplyCombine = "1.2.3"
