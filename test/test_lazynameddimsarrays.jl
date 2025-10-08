@@ -94,7 +94,7 @@ using WrappedUnions: unwrap
         @test dename(a1) isa SymbolicArray
         @test dename(unwrap(a1)) isa SymbolicArray
         @test dename(unwrap(a1)) == SymbolicArray(:a1)
-        @test inds(a) == ()
+        @test inds(a1) == ()
         @test dimnames(a1) == ()
 
         ex = a1 * a2 * a3
