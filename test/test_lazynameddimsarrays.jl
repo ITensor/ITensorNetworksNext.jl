@@ -1,23 +1,18 @@
 using AbstractTrees: AbstractTrees, print_tree, printnode
 using Base.Broadcast: materialize
-using ITensorNetworksNext.LazyNamedDimsArrays:
-    LazyNamedDimsArray, Mul, SymbolicArray, ismul, lazy, substitute, symnameddims
+using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArrays, LazyNamedDimsArray,
+    Mul, SymbolicArray, ismul, lazy, substitute, symnameddims
 using NamedDimsArrays: NamedDimsArray, @names, dename, dimnames, inds, nameddims, namedoneto
-using TermInterface:
-    arguments,
-    arity,
-    children,
-    head,
-    iscall,
-    isexpr,
-    maketerm,
-    operation,
-    sorted_arguments,
-    sorted_children
+using TermInterface: arguments, arity, children, head, iscall, isexpr, maketerm, operation,
+    sorted_arguments, sorted_children
 using Test: @test, @test_throws, @testset
 using WrappedUnions: unwrap
 
 @testset "LazyNamedDimsArrays" begin
+    function sprint_namespaced(x)
+        context = (:module => LazyNamedDimsArrays)
+        return sprint(show, MIME"text/plain"(), x; context)
+    end
     @testset "Basics" begin
         i, j, k, l = namedoneto.(2, (:i, :j, :k, :l))
         a1 = randn(i, j)
@@ -63,8 +58,8 @@ using WrappedUnions: unwrap
         @test sprint(show, l1) == sprint(show, a1)
         # TODO: Fix this test, it is basically correct but the type parameters
         # print in a different way.
-        # @test sprint(show, MIME"text/plain"(), l1) ==
-        #     replace(sprint(show, MIME"text/plain"(), a1), "NamedDimsArray" => "LazyNamedDimsArray")
+        # @test sprint_namespaced(l1) ==
+        #     replace(sprint_namespaced(a1), "NamedDimsArray" => "LazyNamedDimsArray")
         @test sprint(printnode, l1) == "[:i, :j]"
         @test sprint(print_tree, l1) == "[:i, :j]\n"
 
@@ -82,7 +77,7 @@ using WrappedUnions: unwrap
         @test AbstractTrees.children(l) == [l1 * l2, l3]
         @test AbstractTrees.nodevalue(l) ≡ *
         @test sprint(show, l) == "(([:i, :j] * [:j, :k]) * [:k, :l])"
-        @test sprint(show, MIME"text/plain"(), l) ==
+        @test sprint_namespaced(l) ==
             "named(Base.OneTo(2), :i)×named(Base.OneTo(2), :l) LazyNamedDimsArray{Float64, …}:\n(([:i, :j] * [:j, :k]) * [:k, :l])"
         @test sprint(printnode, l) == "(([:i, :j] * [:j, :k]) * [:k, :l])"
         @test sprint(print_tree, l) ==
@@ -104,7 +99,7 @@ using WrappedUnions: unwrap
         @test arguments(ex) == [a1 * a2, a3]
         @test operation(ex) ≡ *
         @test sprint(show, ex) == "((a1 * a2) * a3)"
-        @test sprint(show, MIME"text/plain"(), ex) ==
+        @test sprint_namespaced(ex) ==
             "0-dimensional LazyNamedDimsArray{Any, …}:\n((a1 * a2) * a3)"
     end
 
