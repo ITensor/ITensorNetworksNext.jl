@@ -2,7 +2,7 @@ using AbstractTrees: AbstractTrees, print_tree, printnode
 using Base.Broadcast: materialize
 using ITensorNetworksNext.LazyNamedDimsArrays:
     LazyNamedDimsArray, Mul, SymbolicArray, ismul, lazy, substitute, symnameddims
-using NamedDimsArrays: NamedDimsArray, @names, dename, dimnames, inds, nameddims
+using NamedDimsArrays: NamedDimsArray, @names, dename, dimnames, inds, nameddims, namedoneto
 using TermInterface:
     arguments,
     arity,
@@ -19,9 +19,10 @@ using WrappedUnions: unwrap
 
 @testset "LazyNamedDimsArrays" begin
     @testset "Basics" begin
-        a1 = nameddims(randn(2, 2), (:i, :j))
-        a2 = nameddims(randn(2, 2), (:j, :k))
-        a3 = nameddims(randn(2, 2), (:k, :l))
+        i, j, k, l = namedoneto.(2, (:i, :j, :k, :l))
+        a1 = randn(i, j)
+        a2 = randn(j, k)
+        a3 = randn(k, l)
         l1, l2, l3 = lazy.((a1, a2, a3))
         for li in (l1, l2, l3)
             @test li isa LazyNamedDimsArray
@@ -81,7 +82,8 @@ using WrappedUnions: unwrap
         @test AbstractTrees.children(l) == [l1 * l2, l3]
         @test AbstractTrees.nodevalue(l) ≡ *
         @test sprint(show, l) == "(([:i, :j] * [:j, :k]) * [:k, :l])"
-        @test sprint(show, MIME"text/plain"(), l) == "(([:i, :j] * [:j, :k]) * [:k, :l])"
+        @test sprint(show, MIME"text/plain"(), l) ==
+            "named(Base.OneTo(2), :i)×named(Base.OneTo(2), :l) LazyNamedDimsArray{Float64, …}:\n(([:i, :j] * [:j, :k]) * [:k, :l])"
         @test sprint(printnode, l) == "(([:i, :j] * [:j, :k]) * [:k, :l])"
         @test sprint(print_tree, l) ==
             "(([:i, :j] * [:j, :k]) * [:k, :l])\n├─ ([:i, :j] * [:j, :k])\n│  ├─ [:i, :j]\n│  └─ [:j, :k]\n└─ [:k, :l]\n"
@@ -102,7 +104,8 @@ using WrappedUnions: unwrap
         @test arguments(ex) == [a1 * a2, a3]
         @test operation(ex) ≡ *
         @test sprint(show, ex) == "((a1 * a2) * a3)"
-        @test sprint(show, MIME"text/plain"(), ex) == "((a1 * a2) * a3)"
+        @test sprint(show, MIME"text/plain"(), ex) ==
+            "0-dimensional LazyNamedDimsArray{Any, …}:\n((a1 * a2) * a3)"
     end
 
     @testset "substitute" begin

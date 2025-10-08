@@ -37,8 +37,8 @@ end
 
 # Custom version of `AbstractTrees.printnode` to
 # avoid type piracy when overloading on `AbstractNamedDimsArray`.
-printnode(io::IO, x) = AbstractTrees.printnode(io, x)
-function printnode(io::IO, a::AbstractNamedDimsArray)
+printnode_nameddims(io::IO, x) = AbstractTrees.printnode(io, x)
+function printnode_nameddims(io::IO, a::AbstractNamedDimsArray)
     show(io, collect(dimnames(a)))
     return nothing
 end
@@ -149,6 +149,37 @@ function map_arguments_lazy(f, a)
         return error("Variant not supported.")
     end
 end
+function substitute_lazy(a, substitutions::AbstractDict)
+    haskey(substitutions, a) && return substitutions[a]
+    !iscall(a) && return a
+    return map_arguments(arg -> substitute(arg, substitutions), a)
+end
+function substitute_lazy(a, substitutions)
+    return substitute(a, Dict(substitutions))
+end
+function printnode_lazy(io, a)
+    # Use `printnode_nameddims` to avoid type piracy,
+    # since it overloads on `AbstractNamedDimsArray`.
+    return printnode_nameddims(io, unwrap(a))
+end
+function show_lazy(io::IO, a)
+    if !iscall(a)
+        return show(io, unwrap(a))
+    else
+        return AbstractTrees.printnode(io, a)
+    end
+end
+function show_lazy(io::IO, mime::MIME"text/plain", a)
+    summary(io, a)
+    println(io, ":")
+    if !iscall(a)
+        show(io, mime, unwrap(a))
+        return nothing
+    else
+        show(io, a)
+        return nothing
+    end
+end
 
 # Lazy broadcasting.
 struct LazyNamedDimsArrayStyle <: AbstractNamedDimsArrayStyle{Any} end
@@ -185,7 +216,7 @@ TermInterface.head(m::Applied) = operation(m)
 TermInterface.iscall(m::Applied) = true
 TermInterface.isexpr(m::Applied) = iscall(m)
 function Base.show(io::IO, m::Applied)
-    args = map(arg -> sprint(printnode, arg), arguments(m))
+    args = map(arg -> sprint(AbstractTrees.printnode, arg), arguments(m))
     print(io, "(", join(args, " $(operation(m)) "), ")")
     return nothing
 end
@@ -301,37 +332,20 @@ end
 function map_arguments(f, a::LazyNamedDimsArray)
     return map_arguments_lazy(f, a)
 end
-
-function substitute(a::LazyNamedDimsArray, substitutions::AbstractDict)
-    haskey(substitutions, a) && return substitutions[a]
-    !iscall(a) && return a
-    return map_arguments(arg -> substitute(arg, substitutions), a)
-end
 function substitute(a::LazyNamedDimsArray, substitutions)
-    return substitute(a, Dict(substitutions))
-end
-
-function printnode(io::IO, a::LazyNamedDimsArray)
-    return printnode(io, unwrap(a))
+    return substitute_lazy(a, substitutions)
 end
 function AbstractTrees.printnode(io::IO, a::LazyNamedDimsArray)
-    return printnode(io, a)
+    return printnode_lazy(io, a)
+end
+function printnode_nameddims(io::IO, a::LazyNamedDimsArray)
+    return printnode_lazy(io, a)
 end
 function Base.show(io::IO, a::LazyNamedDimsArray)
-    if !iscall(a)
-        return show(io, unwrap(a))
-    else
-        return printnode(io, a)
-    end
+    return show_lazy(io, a)
 end
 function Base.show(io::IO, mime::MIME"text/plain", a::LazyNamedDimsArray)
-    if !iscall(a)
-        @invoke show(io, mime, a::AbstractNamedDimsArray)
-        return nothing
-    else
-        show(io, a)
-        return nothing
-    end
+    return show_lazy(io, mime, a)
 end
 
 function Base.:*(a::LazyNamedDimsArray)
@@ -427,12 +441,15 @@ const SymbolicNamedDimsArray{T, N, Parent <: SymbolicArray{T, N}, DimNames} =
 function symnameddims(name)
     return lazy(NamedDimsArray(SymbolicArray(name), ()))
 end
-function printnode(io::IO, a::SymbolicNamedDimsArray)
+function AbstractTrees.printnode(io::IO, a::SymbolicNamedDimsArray)
     print(io, symname(dename(a)))
     if ndims(a) > 0
         print(io, "[", join(dimnames(a), ","), "]")
     end
     return nothing
+end
+function printnode_nameddims(io::IO, a::SymbolicNamedDimsArray)
+    return AbstractTrees.printnode(io, a)
 end
 function Base.:(==)(a::SymbolicNamedDimsArray, b::SymbolicNamedDimsArray)
     return issetequal(inds(a), inds(b)) && dename(a) == dename(b)
