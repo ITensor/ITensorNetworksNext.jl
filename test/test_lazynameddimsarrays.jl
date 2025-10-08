@@ -1,8 +1,8 @@
 using AbstractTrees: AbstractTrees, print_tree, printnode
 using Base.Broadcast: materialize
 using ITensorNetworksNext.LazyNamedDimsArrays:
-    LazyNamedDimsArray, Mul, SymbolicArray, ismul, lazy, symnameddims
-using NamedDimsArrays: NamedDimsArray, dename, dimnames, inds, nameddims
+    LazyNamedDimsArray, Mul, SymbolicArray, ismul, lazy, substitute, symnameddims
+using NamedDimsArrays: NamedDimsArray, @names, dename, dimnames, inds, nameddims
 using TermInterface:
     arguments,
     arity,
@@ -88,22 +88,32 @@ using WrappedUnions: unwrap
     end
 
     @testset "symnameddims" begin
-        a = symnameddims(:a)
-        b = symnameddims(:b)
-        c = symnameddims(:c)
-        @test a isa LazyNamedDimsArray
-        @test unwrap(a) isa NamedDimsArray
-        @test dename(a) isa SymbolicArray
-        @test dename(unwrap(a)) isa SymbolicArray
-        @test dename(unwrap(a)) == SymbolicArray(:a)
+        a1, a2, a3 = symnameddims.((:a1, :a2, :a3))
+        @test a1 isa LazyNamedDimsArray
+        @test unwrap(a1) isa NamedDimsArray
+        @test dename(a1) isa SymbolicArray
+        @test dename(unwrap(a1)) isa SymbolicArray
+        @test dename(unwrap(a1)) == SymbolicArray(:a1)
         @test inds(a) == ()
-        @test dimnames(a) == ()
+        @test dimnames(a1) == ()
 
-        ex = a * b * c
+        ex = a1 * a2 * a3
         @test copy(ex) == ex
-        @test arguments(ex) == [a * b, c]
+        @test arguments(ex) == [a1 * a2, a3]
         @test operation(ex) ≡ *
-        @test sprint(show, ex) == "((a * b) * c)"
-        @test sprint(show, MIME"text/plain"(), ex) == "((a * b) * c)"
+        @test sprint(show, ex) == "((a1 * a2) * a3)"
+        @test sprint(show, MIME"text/plain"(), ex) == "((a1 * a2) * a3)"
+    end
+
+    @testset "substitute" begin
+        s = symnameddims.((:a1, :a2, :a3))
+        i = @names i[1:4]
+        a = (randn(2, 2)[i[1], i[2]], randn(2, 2)[i[2], i[3]], randn(2, 2)[i[3], i[4]])
+        l = lazy.(a)
+
+        seq = s[1] * (s[2] * s[3])
+        net = substitute(seq, s .=> l)
+        @test net == l[1] * (l[2] * l[3])
+        @test arguments(net) == [l[1], l[2] * l[3]]
     end
 end

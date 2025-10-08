@@ -39,6 +39,16 @@ function Base.show(io::IO, m::Mul)
     print(io, "(", join(args, " $(operation(m)) "), ")")
     return nothing
 end
+function Base.hash(m::Mul, h::UInt64)
+    h = hash(:Mul, h)
+    for arg in arguments(m)
+        h = hash(arg, h)
+    end
+    return h
+end
+function map_arguments(f, m::Mul)
+    return Mul(map(f, arguments(m)))
+end
 
 @wrapped struct LazyNamedDimsArray{
         T, A <: AbstractNamedDimsArray{T},
@@ -63,6 +73,18 @@ function NamedDimsArrays.dename(a::LazyNamedDimsArray)
     else
         return error("Variant not supported.")
     end
+end
+
+function getindex_lazy(a::AbstractArray, I...)
+    u = unwrap(a)
+    if !iscall(u)
+        return u[I...]
+    else
+        return error("Indexing into expression not supported.")
+    end
+end
+function Base.getindex(a::LazyNamedDimsArray, I::Int...)
+    return getindex_lazy(a, I...)
 end
 
 function TermInterface.arguments(a::LazyNamedDimsArray)
@@ -156,6 +178,49 @@ function Base.:(==)(a1::LazyNamedDimsArray, a2::LazyNamedDimsArray)
     else
         return false
     end
+end
+
+# Defined to avoid type piracy.
+# TODO: Define a proper hash function
+# in NamedDimsArrays.jl, maybe one that is
+# independent of the order of dimensions.
+function _hash(a::NamedDimsArray, h::UInt64)
+    h = hash(:NamedDimsArray, h)
+    h = hash(dename(a), h)
+    for i in inds(a)
+        h = hash(i, h)
+    end
+    return h
+end
+function _hash(x, h::UInt64)
+    return hash(x, h)
+end
+function Base.hash(a::LazyNamedDimsArray, h::UInt64)
+    h = hash(:LazyNamedDimsArray, h)
+    # Use `_hash`, which defines a custom hash for NamedDimsArray.
+    return _hash(unwrap(a), h)
+end
+
+generic_map(f, v) = map(f, v)
+generic_map(f, v::AbstractDict) = Dict(eachindex(v) .=> map(f, values(v)))
+generic_map(f, v::AbstractSet) = Set([f(x) for x in v])
+function map_arguments(f, a::LazyNamedDimsArray)
+    u = unwrap(a)
+    if !iscall(u)
+        return error("No arguments to map.")
+    elseif ismul(u)
+        return LazyNamedDimsArray(map_arguments(f, u))
+    else
+        return error("Variant not supported.")
+    end
+end
+function substitute(a::LazyNamedDimsArray, substitutions::AbstractDict)
+    haskey(substitutions, a) && return substitutions[a]
+    !iscall(a) && return a
+    return map_arguments(arg -> substitute(arg, substitutions), a)
+end
+function substitute(a::LazyNamedDimsArray, substitutions)
+    return substitute(a, Dict(substitutions))
 end
 
 function printnode(io::IO, a::LazyNamedDimsArray)
@@ -279,6 +344,17 @@ Base.axes(a::SymbolicArray) = getfield(a, :axes)
 Base.size(a::SymbolicArray) = length.(axes(a))
 function Base.:(==)(a::SymbolicArray, b::SymbolicArray)
     return symname(a) == symname(b) && axes(a) == axes(b)
+end
+function Base.hash(a::SymbolicArray, h::UInt64)
+    h = hash(:SymbolicArray, h)
+    h = hash(symname(a), h)
+    return hash(size(a), h)
+end
+function Base.getindex(a::SymbolicArray, I...)
+    return error("Indexing into SymbolicArray not supported.")
+end
+function Base.setindex!(a::SymbolicArray, value, I...)
+    return error("Indexing into SymbolicArray not supported.")
 end
 function Base.show(io::IO, mime::MIME"text/plain", a::SymbolicArray)
     Base.summary(io, a)
