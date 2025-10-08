@@ -202,9 +202,10 @@ function mul_lazy(a)
 end
 # Note that this is nested by default.
 mul_lazy(a1, a2) = lazy(Mul([a1, a2]))
-mul_lazy(c::Number, a) = error("Not implemented.")
-mul_lazy(a, c::Number) = error("Not implemented.")
-div_lazy(a, c::Number) = error("Not implemented.")
+mul_lazy(a1::Number, a2) = error("Not implemented.")
+mul_lazy(a1, a2::Number) = error("Not implemented.")
+mul_lazy(a1::Number, a2::Number) = a1 * a2
+div_lazy(a1, a2::Number) = error("Not implemented.")
 
 # NamedDimsArrays.jl interface.
 function inds_lazy(a)
@@ -340,9 +341,9 @@ Base.:*(a::LazyNamedDimsArray) = mul_lazy(a)
 Base.:*(a1::LazyNamedDimsArray, a2::LazyNamedDimsArray) = mul_lazy(a1, a2)
 Base.:+(a1::LazyNamedDimsArray, a2::LazyNamedDimsArray) = add_lazy(a1, a2)
 Base.:-(a1::LazyNamedDimsArray, a2::LazyNamedDimsArray) = sub_lazy(a1, a2)
-Base.:*(c::Number, a::LazyNamedDimsArray) = mul_lazy(c, a)
-Base.:*(a::LazyNamedDimsArray, c::Number) = mul_lazy(a, c)
-Base.:/(a::LazyNamedDimsArray, c::Number) = div_lazy(a, c)
+Base.:*(a1::Number, a2::LazyNamedDimsArray) = mul_lazy(a1, a2)
+Base.:*(a1::LazyNamedDimsArray, a2::Number) = mul_lazy(a1, a2)
+Base.:/(a1::LazyNamedDimsArray, a2::Number) = div_lazy(a1, a2)
 Base.:-(a::LazyNamedDimsArray) = sub_lazy(a)
 
 struct SymbolicArray{T, N, Name, Axes <: NTuple{N, AbstractUnitRange{<:Integer}}} <: AbstractArray{T, N}
