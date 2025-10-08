@@ -11,7 +11,8 @@ using WrappedUnions: unwrap
 @testset "LazyNamedDimsArrays" begin
     function sprint_namespaced(x)
         context = (:module => LazyNamedDimsArrays)
-        return sprint(show, MIME"text/plain"(), x; context)
+        module_prefix = "ITensorNetworksNext.LazyNamedDimsArrays."
+        return replace(sprint(show, MIME"text/plain"(), x; context), module_prefix => "")
     end
     @testset "Basics" begin
         i, j, k, l = namedoneto.(2, (:i, :j, :k, :l))
@@ -78,10 +79,14 @@ using WrappedUnions: unwrap
         @test AbstractTrees.nodevalue(l) ≡ *
         @test sprint(show, l) == "(([:i, :j] * [:j, :k]) * [:k, :l])"
         @test sprint_namespaced(l) ==
-            "named(Base.OneTo(2), :i)×named(Base.OneTo(2), :l) LazyNamedDimsArray{Float64, …}:\n(([:i, :j] * [:j, :k]) * [:k, :l])"
+            "named(Base.OneTo(2), :i)×named(Base.OneTo(2), :l) " *
+            "LazyNamedDimsArray{Float64, …}:\n(([:i, :j] * [:j, :k]) * [:k, :l])"
         @test sprint(printnode, l) == "(([:i, :j] * [:j, :k]) * [:k, :l])"
         @test sprint(print_tree, l) ==
-            "(([:i, :j] * [:j, :k]) * [:k, :l])\n├─ ([:i, :j] * [:j, :k])\n│  ├─ [:i, :j]\n│  └─ [:j, :k]\n└─ [:k, :l]\n"
+            "(([:i, :j] * [:j, :k]) * [:k, :l])\n" *
+            "├─ ([:i, :j] * [:j, :k])\n" *
+            "│  ├─ [:i, :j]\n│  └─ [:j, :k]\n" *
+            "└─ [:k, :l]\n"
     end
 
     @testset "symnameddims" begin
