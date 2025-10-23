@@ -1,4 +1,5 @@
 using BackendSelection: @Algorithm_str, Algorithm
+using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArray, nested_array_to_lazy_multiply, substitute_lazy, materialize
 
 default_contract_alg = nothing
 
@@ -10,26 +11,20 @@ function set_default_kwargs(alg::Algorithm"exact")
 end
 
 function contraction_sequence(::Algorithm"leftassociative", tn::Vector{<:AbstractArray})
-    return Any[i for i in 1:length(tn)]
+    return nested_array_to_lazy_multiply(collect.(1:length(tn)))
 end
 
 function contraction_sequence(tn::Vector{<:AbstractArray}; alg = default_sequence_alg)
     return contraction_sequence(Algorithm(alg), tn)
 end
 
-# Internal recursive worker
-function recursive_contractnetwork(tn::Union{AbstractVector, AbstractNamedDimsArray})
-    tn isa AbstractVector && return prod(recursive_contractnetwork, tn)
-    return tn
-end
-
-# Recursive worker for ordering the tensors according to the sequence
-rearrange(tn::Vector{<:AbstractArray}, i::Integer) = tn[i]
-rearrange(tn::Vector{<:AbstractArray}, v::AbstractVector) = [rearrange(tn, s) for s in v]
-
 function contractnetwork(alg::Algorithm"exact", tn::Vector{<:AbstractArray})
     contract_sequence = isa(alg.sequence, String) ? contraction_sequence(tn; alg = alg.sequence) : sequence
-    return recursive_contractnetwork(rearrange(tn, contract_sequence))
+    @show contract_sequence
+    @show materialize(contract_sequence)
+    contract_sequence = substitute_lazy(contract_sequence, Dict(i => lazy(tn[i]) for i in 1:length(tn)))
+    @show contract_sequence
+    #return materialize(substitute_lazy(contract_sequence, Dict(i => tn[i] for i in 1:length(tn))))
 end
 
 function contractnetwork(alg::Algorithm"exact", tn::AbstractTensorNetwork)

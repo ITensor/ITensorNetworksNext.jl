@@ -1,9 +1,10 @@
 name = "ITensorNetworksNext"
 uuid = "302f2e75-49f0-4526-aef7-d8ba550cb06c"
 authors = ["ITensor developers <support@itensor.org> and contributors"]
-version = "0.1.7"
+version = "0.1.9"
 
 [deps]
+AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 BackendSelection = "680c2d7c-f67a-4cc9-ae9c-da132b1447a5"
 DataGraphs = "b5a273c3-7e6c-41f6-98bd-8d7f1525a36a"
@@ -23,9 +24,11 @@ TensorOperations = "6aa20fa7-93e2-5fca-9bc0-fbd0db3c71a2"
 [extensions]
 ITensorNetworksNextTensorOperationsExt = "TensorOperations"
 TermInterface = "8ea1fca8-c5ef-4a55-8b96-4e9afe9c9a3c"
+TypeParameterAccessors = "7e5a90cf-f82e-492e-a09b-e3e26432c138"
 WrappedUnions = "325db55a-9c6c-5b90-b1a2-ec87e7a38c44"
 
 [compat]
+AbstractTrees = "0.4.5"
 Adapt = "4.3"
 BackendSelection = "0.1.6"
 DataGraphs = "0.2.7"
@@ -39,6 +42,7 @@ NamedGraphs = "0.6.9, 0.7"
 SimpleTraits = "0.9.5"
 SplitApplyCombine = "1.2.3"
 TermInterface = "2"
+TypeParameterAccessors = "0.4.4"
 WrappedUnions = "0.3"
 TensorOperations = "5.3.1"
 julia = "1.10"
