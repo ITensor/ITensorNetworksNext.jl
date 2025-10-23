@@ -2,8 +2,7 @@ module ITensorNetworksNextTensorOperationsExt
 
 using BackendSelection: @Algorithm_str, Algorithm
 using NamedDimsArrays: inds
-using ITensorNetworksNext: ITensorNetworksNext
-using ITensorNetworksNext.LazyNamedDimsArrays: nested_array_to_lazy_multiply
+using ITensorNetworksNext: ITensorNetworksNext, contraction_sequence_to_expr
 using TensorOperations: TensorOperations, optimaltree
 
 function ITensorNetworksNext.contraction_sequence(::Algorithm"optimal", tn::Vector{<:AbstractArray})
@@ -11,7 +10,7 @@ function ITensorNetworksNext.contraction_sequence(::Algorithm"optimal", tn::Vect
     #Converting dims to Float64 to minimize overflow issues
     inds_to_dims = Dict(i => Float64(length(i)) for i in unique(reduce(vcat, network)))
     seq, _ = optimaltree(network, inds_to_dims)
-    return nested_array_to_lazy_multiply(seq)
+    return contraction_sequence_to_expr(seq)
 end
 
 end

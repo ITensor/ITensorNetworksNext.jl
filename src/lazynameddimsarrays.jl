@@ -417,12 +417,4 @@ Base.:*(a::SymbolicNamedDimsArray, b::SymbolicNamedDimsArray) = lazy(a) * lazy(b
 Base.:*(a::SymbolicNamedDimsArray, b::LazyNamedDimsArray) = lazy(a) * b
 Base.:*(a::LazyNamedDimsArray, b::SymbolicNamedDimsArray) = a * lazy(b)
 
-function contraction_sequence_to_expr(seq)
-    if seq isa AbstractVector
-        return prod(contraction_sequence_to_expr, seq)
-    else
-        return symnameddims(seq)
-    end
-end
-
 end
