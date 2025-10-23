@@ -1,5 +1,6 @@
 using BackendSelection: @Algorithm_str, Algorithm
-using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArray, nested_array_to_lazy_multiply, substitute_lazy, materialize
+using ITensorNetworksNext.LazyNamedDimsArrays: nested_array_to_lazy_multiply, substitute_lazy, materialize, lazy,
+    symnameddims
 
 default_contract_alg = nothing
 
@@ -20,11 +21,8 @@ end
 
 function contractnetwork(alg::Algorithm"exact", tn::Vector{<:AbstractArray})
     contract_sequence = isa(alg.sequence, String) ? contraction_sequence(tn; alg = alg.sequence) : sequence
-    @show contract_sequence
-    @show materialize(contract_sequence)
-    contract_sequence = substitute_lazy(contract_sequence, Dict(i => lazy(tn[i]) for i in 1:length(tn)))
-    @show contract_sequence
-    #return materialize(substitute_lazy(contract_sequence, Dict(i => tn[i] for i in 1:length(tn))))
+    contract_sequence = substitute_lazy(contract_sequence, Dict(symnameddims(i) => lazy(tn[i]) for i in 1:length(tn)))
+    return materialize(contract_sequence)
 end
 
 function contractnetwork(alg::Algorithm"exact", tn::AbstractTensorNetwork)

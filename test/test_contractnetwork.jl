@@ -3,7 +3,7 @@ using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges
 using NamedGraphs.NamedGraphGenerators: named_grid
 using ITensorBase: Index, ITensor
 using ITensorNetworksNext:
-    TensorNetwork, linkinds, siteinds, contractnetwork, contraction_sequence, symnameddims, lazy
+    TensorNetwork, linkinds, siteinds, contractnetwork, contraction_sequence, symnameddims, lazy, substitute_lazy, materialize
 using TensorOperations: TensorOperations
 using Test: @test, @testset
 
@@ -15,14 +15,10 @@ using Test: @test, @testset
         C = ITensor([5.0, 1.0], j)
         D = ITensor([-2.0, 3.0, 4.0, 5.0, 1.0], k)
 
-        #@show s1 * s2
-        #seq = contraction_sequence([A, B, C, D]; alg = "optimal")
-        #@show seq
+        ABCD_1 = contractnetwork([A, B, C, D]; alg = "exact", sequence = "leftassociative")
+        ABCD_2 = contractnetwork([A, B, C, D]; alg = "exact", sequence = "optimal")
 
-        #ABCD_1 = contractnetwork([A, B, C, D]; alg = "exact", sequence = "leftassociative")
-        # ABCD_2 = contractnetwork([A, B, C, D]; alg = "exact", sequence = "optimal")
-
-        # @test ABCD_1 == ABCD_2
+        @test ABCD_1 == ABCD_2
     end
 
     @testset "Contract One Dimensional Network" begin
