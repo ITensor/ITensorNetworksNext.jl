@@ -417,11 +417,11 @@ Base.:*(a::SymbolicNamedDimsArray, b::SymbolicNamedDimsArray) = lazy(a) * lazy(b
 Base.:*(a::SymbolicNamedDimsArray, b::LazyNamedDimsArray) = lazy(a) * b
 Base.:*(a::LazyNamedDimsArray, b::SymbolicNamedDimsArray) = a * lazy(b)
 
-function nested_array_to_lazy_multiply(arr)
-    if arr isa AbstractVector
-        return mapreduce(x -> nested_array_to_lazy_multiply(x), *, arr)
+function contraction_sequence_to_expr(seq)
+    if seq isa AbstractVector
+        return prod(contraction_sequence_to_expr, seq)
     else
-        return symnameddims.(arr)
+        return symnameddims(seq)
     end
 end
 
