@@ -294,6 +294,8 @@ TermInterface.operation(m::Mul) = *
     union::Union{A, Mul{LazyNamedDimsArray{T, A}}}
 end
 function LazyNamedDimsArray(a::AbstractNamedDimsArray)
+    # Use `eltype(typeof(a))` for arrays that have different
+    # runtime and compile time eltypes, like `ITensor`.
     return LazyNamedDimsArray{eltype(typeof(a)), typeof(a)}(a)
 end
 function LazyNamedDimsArray(a::Mul{LazyNamedDimsArray{T, A}}) where {T, A}
