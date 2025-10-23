@@ -1,7 +1,7 @@
 module ITensorNetworksNextTensorOperationsExt
 
 using BackendSelection: @Algorithm_str, Algorithm
-using ITensorBase: inds
+using NamedDimsArrays: inds
 using ITensorNetworksNext: ITensorNetworksNext
 using ITensorNetworksNext.LazyNamedDimsArrays: nested_array_to_lazy_multiply
 using TensorOperations: TensorOperations, optimaltree
