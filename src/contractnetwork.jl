@@ -23,7 +23,7 @@ function contraction_sequence(::Algorithm"leftassociative", tn::Vector{<:Abstrac
     return prod(symnameddims, 1:length(tn))
 end
 
-function contraction_sequence(tn::Vector{<:AbstractArray}; sequence_alg = default_sequence_alg)
+function contraction_sequence(tn::Vector{<:AbstractArray}; sequence_alg = default_sequence_alg(Algorithm("exact")))
     return contraction_sequence(Algorithm(sequence_alg), tn)
 end
 
@@ -31,7 +31,7 @@ function contractnetwork(alg::Algorithm"exact", tn::Vector{<:AbstractArray})
     if !isnothing(alg.sequence)
         sequence = alg.sequence
     else
-        sequence = contraction_sequence(tn; alg.sequence_alg)
+        sequence = contraction_sequence(tn; sequence_alg = alg.sequence_alg)
     end
 
     sequence = substitute(sequence, Dict(symnameddims(i) => lazy(tn[i]) for i in 1:length(tn)))
