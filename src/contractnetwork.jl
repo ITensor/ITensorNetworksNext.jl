@@ -27,7 +27,7 @@ end
 
 function contractnetwork(alg::Algorithm"exact", tn::Vector{<:AbstractArray})
     contract_sequence = isa(alg.sequence, String) ? contraction_sequence(tn; alg = alg.sequence) : sequence
-    contract_sequence = substitute_lazy(contract_sequence, Dict(symnameddims(i) => lazy(tn[i]) for i in 1:length(tn)))
+    contract_sequence = substitute(contract_sequence, Dict(symnameddims(i) => lazy(tn[i]) for i in 1:length(tn)))
     return materialize(contract_sequence)
 end
 
