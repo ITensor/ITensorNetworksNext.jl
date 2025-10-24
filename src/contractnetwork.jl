@@ -23,8 +23,8 @@ function contraction_sequence(::Algorithm"leftassociative", tn::Vector{<:Abstrac
     return prod(symnameddims, 1:length(tn))
 end
 
-function contraction_sequence(tn::Vector{<:AbstractArray}; alg = default_sequence_alg)
-    return contraction_sequence(Algorithm(alg), tn)
+function contraction_sequence(tn::Vector{<:AbstractArray}; sequence_alg = default_sequence_alg)
+    return contraction_sequence(Algorithm(sequence_alg), tn)
 end
 
 function contractnetwork(alg::Algorithm"exact", tn::Vector{<:AbstractArray})
