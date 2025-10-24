@@ -3,7 +3,7 @@ using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges
 using NamedGraphs.NamedGraphGenerators: named_grid
 using ITensorBase: Index, ITensor
 using ITensorNetworksNext:
-    TensorNetwork, linkinds, siteinds, contractnetwork, contraction_sequence, symnameddims, lazy, substitute_lazy, materialize
+    TensorNetwork, linkinds, siteinds, contractnetwork
 using TensorOperations: TensorOperations
 using Test: @test, @testset
 

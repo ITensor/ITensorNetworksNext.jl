@@ -1,6 +1,6 @@
 using BackendSelection: @Algorithm_str, Algorithm
 using ITensorNetworksNext.LazyNamedDimsArrays: substitute, materialize, lazy,
-    symnameddims
+    symnameddims, substitute_lazy
 
 #Algorithmic defaults
 default_sequence(::Algorithm"exact") = "leftassociative"
@@ -18,7 +18,7 @@ function contraction_sequence_to_expr(seq)
 end
 
 function contraction_sequence(::Algorithm"leftassociative", tn::Vector{<:AbstractArray})
-    return contraction_sequence_to_expr(collect.(1:length(tn)))
+    return contraction_sequence_to_expr(collect(1:length(tn)))
 end
 
 function contraction_sequence(tn::Vector{<:AbstractArray}; alg = default_sequence_alg)
@@ -27,7 +27,7 @@ end
 
 function contractnetwork(alg::Algorithm"exact", tn::Vector{<:AbstractArray})
     contract_sequence = isa(alg.sequence, String) ? contraction_sequence(tn; alg = alg.sequence) : sequence
-    contract_sequence = substitute(contract_sequence, Dict(symnameddims(i) => lazy(tn[i]) for i in 1:length(tn)))
+    contract_sequence = substitute_lazy(contract_sequence, Dict(symnameddims(i) => lazy(tn[i]) for i in 1:length(tn)))
     return materialize(contract_sequence)
 end
 
