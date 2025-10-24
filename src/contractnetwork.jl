@@ -3,10 +3,12 @@ using ITensorNetworksNext.LazyNamedDimsArrays: substitute, materialize, lazy,
     symnameddims
 
 #Algorithmic defaults
-default_sequence(::Algorithm"exact") = "leftassociative"
+default_sequence_alg(::Algorithm"exact") = "leftassociative"
+default_sequence(::Algorithm"exact") = nothing
 function set_default_kwargs(alg::Algorithm"exact")
-    sequence = get(alg, :sequence, default_sequence(alg))
-    return Algorithm("exact"; sequence)
+    sequence = get(alg, :sequence, nothing)
+    sequence_alg = get(alg, :sequence_alg, default_sequence_alg(alg))
+    return Algorithm("exact"; sequence, sequence_alg)
 end
 
 function contraction_sequence_to_expr(seq)
@@ -26,9 +28,14 @@ function contraction_sequence(tn::Vector{<:AbstractArray}; alg = default_sequenc
 end
 
 function contractnetwork(alg::Algorithm"exact", tn::Vector{<:AbstractArray})
-    contract_sequence = isa(alg.sequence, String) ? contraction_sequence(tn; alg = alg.sequence) : sequence
-    contract_sequence = substitute(contract_sequence, Dict(symnameddims(i) => lazy(tn[i]) for i in 1:length(tn)))
-    return materialize(contract_sequence)
+    if haskey(alg, :sequence) && !isnothing(alg.sequence)
+        sequence = alg.sequence
+    else
+        sequence = contraction_sequence(tn; alg.sequence_alg)
+    end
+
+    sequence = substitute(sequence, Dict(symnameddims(i) => lazy(tn[i]) for i in 1:length(tn)))
+    return materialize(sequence)
 end
 
 function contractnetwork(alg::Algorithm"exact", tn::AbstractTensorNetwork)
