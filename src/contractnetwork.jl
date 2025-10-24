@@ -18,7 +18,7 @@ function contraction_sequence_to_expr(seq)
 end
 
 function contraction_sequence(::Algorithm"leftassociative", tn::Vector{<:AbstractArray})
-    return contraction_sequence_to_expr(collect(1:length(tn)))
+    return prod(symnameddims, 1:length(tn))
 end
 
 function contraction_sequence(tn::Vector{<:AbstractArray}; alg = default_sequence_alg)
