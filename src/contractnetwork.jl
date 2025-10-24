@@ -1,6 +1,6 @@
 using BackendSelection: @Algorithm_str, Algorithm
 using ITensorNetworksNext.LazyNamedDimsArrays: substitute, materialize, lazy,
-    symnameddims, substitute_lazy
+    symnameddims
 
 #Algorithmic defaults
 default_sequence(::Algorithm"exact") = "leftassociative"
