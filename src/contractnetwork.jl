@@ -28,7 +28,7 @@ function contraction_sequence(tn::Vector{<:AbstractArray}; sequence_alg = defaul
 end
 
 function contractnetwork(alg::Algorithm"exact", tn::Vector{<:AbstractArray})
-    if haskey(alg, :sequence) && !isnothing(alg.sequence)
+    if !isnothing(alg.sequence)
         sequence = alg.sequence
     else
         sequence = contraction_sequence(tn; alg.sequence_alg)
