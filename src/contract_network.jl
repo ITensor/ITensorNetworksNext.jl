@@ -27,7 +27,7 @@ function contraction_sequence(tn::Vector{<:AbstractArray}; sequence_alg = defaul
     return contraction_sequence(Algorithm(sequence_alg), tn)
 end
 
-function contractnetwork(alg::Algorithm"exact", tn::Vector{<:AbstractArray})
+function contract_network(alg::Algorithm"exact", tn::Vector{<:AbstractArray})
     if !isnothing(alg.sequence)
         sequence = alg.sequence
     else
@@ -38,10 +38,10 @@ function contractnetwork(alg::Algorithm"exact", tn::Vector{<:AbstractArray})
     return materialize(sequence)
 end
 
-function contractnetwork(alg::Algorithm"exact", tn::AbstractTensorNetwork)
-    return contractnetwork(alg, [tn[v] for v in vertices(tn)])
+function contract_network(alg::Algorithm"exact", tn::AbstractTensorNetwork)
+    return contract_network(alg, [tn[v] for v in vertices(tn)])
 end
 
-function contractnetwork(tn; alg, kwargs...)
-    return contractnetwork(set_default_kwargs(Algorithm(alg; kwargs...)), tn)
+function contract_network(tn; alg, kwargs...)
+    return contract_network(set_default_kwargs(Algorithm(alg; kwargs...)), tn)
 end

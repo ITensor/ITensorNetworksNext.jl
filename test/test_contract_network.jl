@@ -3,11 +3,11 @@ using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges
 using NamedGraphs.NamedGraphGenerators: named_grid
 using ITensorBase: Index, ITensor
 using ITensorNetworksNext:
-    TensorNetwork, linkinds, siteinds, contractnetwork
+    TensorNetwork, linkinds, siteinds, contract_network
 using TensorOperations: TensorOperations
 using Test: @test, @testset
 
-@testset "ContractNetwork" begin
+@testset "contract_network" begin
     @testset "Contract Vectors of ITensors" begin
         i, j, k = Index(2), Index(2), Index(5)
         A = ITensor([1.0 1.0; 0.5 1.0], i, j)
@@ -15,8 +15,8 @@ using Test: @test, @testset
         C = ITensor([5.0, 1.0], j)
         D = ITensor([-2.0, 3.0, 4.0, 5.0, 1.0], k)
 
-        ABCD_1 = contractnetwork([A, B, C, D]; alg = "exact", sequence_alg = "leftassociative")
-        ABCD_2 = contractnetwork([A, B, C, D]; alg = "exact", sequence_alg = "optimal")
+        ABCD_1 = contract_network([A, B, C, D]; alg = "exact", sequence_alg = "leftassociative")
+        ABCD_2 = contract_network([A, B, C, D]; alg = "exact", sequence_alg = "optimal")
 
         @test ABCD_1 == ABCD_2
     end
@@ -31,8 +31,8 @@ using Test: @test, @testset
             return randn(Tuple(is))
         end
 
-        z1 = contractnetwork(tn; alg = "exact", sequence_alg = "optimal")[]
-        z2 = contractnetwork(tn; alg = "exact", sequence_alg = "leftassociative")[]
+        z1 = contract_network(tn; alg = "exact", sequence_alg = "optimal")[]
+        z2 = contract_network(tn; alg = "exact", sequence_alg = "leftassociative")[]
 
         @test abs(z1 - z2) / abs(z1) <= 1.0e3 * eps(Float64)
     end

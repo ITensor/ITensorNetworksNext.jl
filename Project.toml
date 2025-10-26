@@ -1,7 +1,7 @@
 name = "ITensorNetworksNext"
 uuid = "302f2e75-49f0-4526-aef7-d8ba550cb06c"
 authors = ["ITensor developers <support@itensor.org> and contributors"]
-version = "0.1.10"
+version = "0.1.11"
 
 [deps]
 AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
