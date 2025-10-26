@@ -1,7 +1,7 @@
 name = "ITensorNetworksNext"
 uuid = "302f2e75-49f0-4526-aef7-d8ba550cb06c"
 authors = ["ITensor developers <support@itensor.org> and contributors"]
-version = "0.1.10"
+version = "0.1.11"
 
 [deps]
 AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
@@ -20,6 +20,12 @@ TermInterface = "8ea1fca8-c5ef-4a55-8b96-4e9afe9c9a3c"
 TypeParameterAccessors = "7e5a90cf-f82e-492e-a09b-e3e26432c138"
 WrappedUnions = "325db55a-9c6c-5b90-b1a2-ec87e7a38c44"
 
+[weakdeps]
+TensorOperations = "6aa20fa7-93e2-5fca-9bc0-fbd0db3c71a2"
+
+[extensions]
+ITensorNetworksNextTensorOperationsExt = "TensorOperations"
+
 [compat]
 AbstractTrees = "0.4.5"
 Adapt = "4.3"
@@ -33,6 +39,7 @@ NamedDimsArrays = "0.8"
 NamedGraphs = "0.6.9, 0.7"
 SimpleTraits = "0.9.5"
 SplitApplyCombine = "1.2.3"
+TensorOperations = "5.3.1"
 TermInterface = "2"
 TypeParameterAccessors = "0.4.4"
 WrappedUnions = "0.3"
