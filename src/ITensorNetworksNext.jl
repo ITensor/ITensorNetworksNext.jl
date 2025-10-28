@@ -7,5 +7,6 @@ include("iterators.jl")
 
 include("beliefpropagation/abstractbeliefpropagationcache.jl")
 include("beliefpropagation/beliefpropagationcache.jl")
+include("beliefpropagation/beliefpropagationproblem.jl")
 
 end
