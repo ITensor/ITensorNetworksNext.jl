@@ -30,6 +30,14 @@ function setmessage!(bp_cache::BeliefPropagationCache, e::AbstractEdge, message)
     return bp_cache
 end
 
+function setmessages!(bpc_dst::BeliefPropagationCache, bpc_src::BeliefPropagationCache, edges)
+    ms_dst = messages(bpc_dst)
+    for e in edges
+        set!(ms_dst, e, message(bpc_src, e))
+    end
+    return bpc_dst
+end
+
 function message(bp_cache::BeliefPropagationCache, edge::AbstractEdge; kwargs...)
     ms = messages(bp_cache)
     return get(() -> default_message(bp_cache, edge; kwargs...), ms, edge)
