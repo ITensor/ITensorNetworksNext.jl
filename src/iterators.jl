@@ -59,10 +59,6 @@ function RegionIterator(problem; sweep, sweep_kwargs...)
     return RegionIterator(problem, plan, sweep)
 end
 
-function new_region_iterator(iterator::RegionIterator; sweep_kwargs...)
-    return RegionIterator(iterator.problem; sweep_kwargs...)
-end
-
 state(region_iter::RegionIterator) = region_iter.which_region
 Base.length(region_iter::RegionIterator) = length(region_iter.region_plan)
 
@@ -155,7 +151,7 @@ end
 
 function update_region_iterator!(iterator::SweepIterator; kwargs...)
     sweep = state(iterator)
-    iterator.region_iter = new_region_iterator(iterator.region_iter; sweep, kwargs...)
+    iterator.region_iter = RegionIterator(problem(iterator); sweep, kwargs...)
     return iterator
 end
 
