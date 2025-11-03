@@ -24,7 +24,7 @@ function Base.iterate(iterator::AbstractNetworkIterator, init = true)
     return rv, false
 end
 
-function increment! end
+increment!(iterator::AbstractNetworkIterator) = throw(MethodError(increment!, Tuple{typeof(iterator)}))
 compute!(iterator::AbstractNetworkIterator) = iterator
 
 step!(iterator::AbstractNetworkIterator) = step!(identity, iterator)
