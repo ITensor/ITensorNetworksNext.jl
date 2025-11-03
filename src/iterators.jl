@@ -47,13 +47,8 @@ mutable struct RegionIterator{Problem, RegionPlan} <: AbstractNetworkIterator
     which_region::Int
     const which_sweep::Int
     function RegionIterator(problem::P, region_plan::R, sweep::Int) where {P, R}
-        try
-            first(region_plan)
-        catch e
-            if e isa BoundsError
-                throw(ArgumentError("Cannot construct a region iterator with 0 elements."))
-            end
-            rethrow()
+        if isempty(region_plan)
+            throw(ArgumentError("Cannot construct a region iterator with 0 elements."))
         end
         return new{P, R}(problem, region_plan, 1, sweep)
     end
