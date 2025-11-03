@@ -6,5 +6,6 @@ include("tensornetwork.jl")
 include("contract_network.jl")
 include("abstract_problem.jl")
 include("iterators.jl")
+include("adapters.jl")
 
 end

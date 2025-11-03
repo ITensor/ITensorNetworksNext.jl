@@ -1,6 +1,6 @@
 using Test: @test, @testset, @test_throws
 import ITensorNetworksNext as ITensorNetworks
-using .ITensorNetworks: RegionIterator, SweepIterator, compute!, increment!, islaststep, state
+using .ITensorNetworks: RegionIterator, SweepIterator, IncrementOnly, compute!, increment!, islaststep, state, eachregion
 
 module TestIteratorUtils
 
@@ -155,6 +155,66 @@ end
             @test SA_c isa Vector
             @test length(SA_c) == 5
             @test SA_c == [1, 4, 9, 16, 25]
+
+        end
+
+        @testset "IncrementOnly" begin
+            TI = TestIteratorUtils.TestIterator(1, 5, [])
+            NI = IncrementOnly(TI)
+
+            NI_c = []
+
+            for _ in IncrementOnly(TI)
+                push!(NI_c, state(TI))
+            end
+
+            @test length(NI_c) == 5
+            @test isempty(TI.output)
+        end
+
+        @testset "EachRegion" begin
+            prob = TestIteratorUtils.TestProblem([])
+            prob_region = TestIteratorUtils.TestProblem([])
+
+            SI = SweepIterator(prob, 5)
+            SI_region = SweepIterator(prob_region, 5)
+
+            callback = []
+            callback_region = []
+
+            let i = 1
+                for _ in SI
+                    push!(callback, i)
+                    i += 1
+                end
+            end
+
+            @test length(callback) == 5
+
+            let i = 1
+                for _ in eachregion(SI_region)
+                    push!(callback_region, i)
+                    i += 1
+                end
+            end
+
+            @test length(callback_region) == 10
+
+            @test prob.data == prob_region.data
+
+            @test prob.data[1:2:end] == fill(1, 5)
+            @test prob.data[2:2:end] == fill(2, 5)
+
+
+            let i = 1, prob = TestIteratorUtils.TestProblem([])
+                SI = SweepIterator(prob, 1)
+                cb = []
+                for _ in eachregion(SI)
+                    push!(cb, i)
+                    i += 1
+                end
+                @test length(cb) == 2
+            end
 
         end
     end
