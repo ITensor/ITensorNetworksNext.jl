@@ -1,6 +1,6 @@
 using Test: @test, @testset, @test_throws
 import ITensorNetworksNext as ITensorNetworks
-using .ITensorNetworks: SweepIterator, RegionIterator, islaststep, state, increment!, compute!, eachregion
+using .ITensorNetworks: RegionIterator, SweepIterator, compute!, increment!, islaststep, state
 
 module TestIteratorUtils
 
