@@ -65,8 +65,8 @@ end
             @test only(cb) == 1
 
             prob = TestIteratorUtils.TestProblem([])
-            @test_throws BoundsError SweepIterator(prob, 0)
-            @test_throws BoundsError RegionIterator(prob, [], 1)
+            @test_throws ArgumentError SweepIterator(prob, 0)
+            @test_throws ArgumentError RegionIterator(prob, [], 1)
         end
 
         TI = TestIteratorUtils.TestIterator(1, 4, [])
