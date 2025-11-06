@@ -1,47 +1,56 @@
 using BackendSelection: @Algorithm_str, Algorithm
-using ITensorNetworksNext.LazyNamedDimsArrays: substitute, materialize, lazy,
-    symnameddims
+using Base.Broadcast: materialize
+using ITensorNetworksNext.LazyNamedDimsArrays: lazy, substitute, symnameddims
 
-#Algorithmic defaults
-default_sequence_alg(::Algorithm"exact") = "leftassociative"
-default_sequence(::Algorithm"exact") = nothing
-function set_default_kwargs(alg::Algorithm"exact")
-    sequence = get(alg, :sequence, nothing)
-    sequence_alg = get(alg, :sequence_alg, default_sequence_alg(alg))
-    return Algorithm("exact"; sequence, sequence_alg)
+# This is based on `MatrixAlgebraKit.select_algorithm`.
+# TODO: Define this in BackendSelection.jl.
+function select_algorithm(alg; kwargs...)
+    if alg isa Algorithm
+        @assert isempty(kwargs) "Cannot pass keyword arguments when `alg` is an `Algorithm`."
+        return alg
+    else
+        return Algorithm(alg; kwargs...)
+    end
 end
 
-function contraction_sequence_to_expr(seq)
+# TODO: Use more general `default_kwargs(...)` here?
+function default_kwargs(::typeof(contract_network), tn)
+    return (; alg = Algorithm"exact"(; evaluation_order_alg = Algorithm"eager"()))
+end
+function contract_network(tn; alg = default_kwargs(contract_network, tn).alg, kwargs...)
+    return contract_network(select_algorithm(alg; kwargs...), tn)
+end
+
+function contract_network(alg::Algorithm, tn::AbstractTensorNetwork)
+    return error("Not implemented.")
+end
+function contract_network(alg::Algorithm"exact", tn)
+    evaluation_order = @something begin
+        get(alg, :evaluation_order, nothing)
+        contraction_order(tn; alg = alg.evaluation_order_alg)
+    end
+    syms_to_ts = Dict(symnameddims(i) => lazy(tn[i]) for i in eachindex(tn))
+    tn_expression = substitute(evaluation_order, syms_to_ts)
+    return materialize(tn_expression)
+end
+
+# TODO: Move to TensorOperationsExt.
+function contraction_order_to_expr(seq)
     if seq isa AbstractVector
-        return prod(contraction_sequence_to_expr, seq)
+        return prod(contraction_order_to_expr, seq)
     else
         return symnameddims(seq)
     end
 end
 
-function contraction_sequence(::Algorithm"leftassociative", tn::Vector{<:AbstractArray})
-    return prod(symnameddims, 1:length(tn))
+# TODO: Use more general `default_kwargs(...)` here?
+default_kwargs(::typeof(contraction_order), tn) = (; alg = Algorithm"eager"())
+function contraction_order(tn; alg = default_kwargs(contraction_order, tn).alg, kwargs...)
+    return contraction_order(select_algorithm(alg; kwargs...), tn)
 end
-
-function contraction_sequence(tn::Vector{<:AbstractArray}; sequence_alg = default_sequence_alg(Algorithm("exact")))
-    return contraction_sequence(Algorithm(sequence_alg), tn)
+function contraction_order(alg::Algorithm, tn)
+    return error("Not implemented.")
 end
-
-function contract_network(alg::Algorithm"exact", tn::Vector{<:AbstractArray})
-    if !isnothing(alg.sequence)
-        sequence = alg.sequence
-    else
-        sequence = contraction_sequence(tn; sequence_alg = alg.sequence_alg)
-    end
-
-    sequence = substitute(sequence, Dict(symnameddims(i) => lazy(tn[i]) for i in 1:length(tn)))
-    return materialize(sequence)
-end
-
-function contract_network(alg::Algorithm"exact", tn::AbstractTensorNetwork)
-    return contract_network(alg, [tn[v] for v in vertices(tn)])
-end
-
-function contract_network(tn; alg, kwargs...)
-    return contract_network(set_default_kwargs(Algorithm(alg; kwargs...)), tn)
+function contraction_order(alg::Algorithm"eager", tn)
+    return error("Eager not implemented.")
 end
