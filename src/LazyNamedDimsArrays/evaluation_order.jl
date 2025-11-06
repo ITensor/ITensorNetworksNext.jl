@@ -1,0 +1,113 @@
+using NamedDimsArrays: dename, inds
+using TermInterface: arguments, arity, operation
+
+# The time complexity of evaluating `f(args...)`.
+function time_complexity(f, args...)
+    return error("Not implemented.")
+end
+# The space complexity of evaluating `f(args...)`.
+function space_complexity(f, args...)
+    return error("Not implemented.")
+end
+# The space complexity of `args`.
+function input_space_complexity(f, args...)
+    return error("Not implemented.")
+end
+
+using NamedDimsArrays: AbstractNamedDimsArray
+function time_complexity(
+        ::typeof(*), t1::AbstractNamedDimsArray, t2::AbstractNamedDimsArray
+    )
+    return prod(length ∘ dename, (inds(t1) ∪ inds(t2)))
+end
+function time_complexity(
+        ::typeof(+), t1::AbstractNamedDimsArray, t2::AbstractNamedDimsArray
+    )
+    @assert issetequal(inds(t1), inds(t2))
+    return prod(dename, size(t1))
+end
+function time_complexity(::typeof(*), c::Number, t::AbstractNamedDimsArray)
+    return prod(dename, size(t))
+end
+function time_complexity(::typeof(*), t::AbstractNamedDimsArray, c::Number)
+    return time_complexity(*, c, t)
+end
+
+function evaluation_time_complexity(a)
+    t = Ref(0)
+    opwalk(a) do f
+        return function (args...)
+            t[] += time_complexity(f, args...)
+            return f(args...)
+        end
+    end
+    return t[]
+end
+
+# The workspace complexity of evaluating expression.
+function evaluation_space_complexity(a)
+    # TODO: Walk the expression and call `space_complexity` on each node.
+    return error("Not implemented.")
+end
+# The complexity of storing the arguments of the expression.
+function argument_space_complexity(a)
+    # TODO: Walk the expression and call `input_space_complexity` on each node.
+    return error("Not implemented.")
+end
+
+# Flatten a nested expression down to a flat expression,
+# removing information about the order of operations.
+function flatten_expression(a)
+    if !iscall(a)
+        return a
+    elseif ismul(a)
+        flattened_arguments = mapreduce(vcat, arguments(a)) do arg
+            return ismul(arg) ? arguments(arg) : [arg]
+        end
+        return lazy(Mul(flattened_arguments))
+    else
+        return error("Variant not supported.")
+    end
+end
+
+function optimize_evaluation_order(alg, a)
+    return optimize_evaluation_order_flattened(alg, flatten_expression(a))
+end
+
+function optimize_evaluation_order_flattened(alg, a)
+    if !iscall(a)
+        return a
+    elseif ismul(a)
+        return optimize_contraction_order_flattened(alg, a)
+    else
+        # TODO: Recurse into other operations, calling `optimize_evaluation_order_flattened`.
+        return error("Variant not supported.")
+    end
+end
+
+function optimize_evaluation_order(
+        a; alg = default_optimize_evaluation_order_alg(a)
+    )
+    return optimize_evaluation_order(alg, a)
+end
+
+struct Eager end
+
+default_optimize_evaluation_order_alg(a) = Eager()
+
+function optimize_contraction_order_flattened(alg, a)
+    return error("Alg $alg not supported.")
+end
+
+using Combinatorics: combinations
+function optimize_contraction_order_flattened(alg::Eager, a)
+    @assert ismul(a)
+    arity(a) in (1, 2) && return a
+    a1, a2 = argmin(combinations(arguments(a), 2)) do (a1, a2)
+        # Penalize outer product contractions.
+        isdisjoint(inds(a1), inds(a2)) && return typemax(Int)
+        return time_complexity(*, a1, a2)
+    end
+    contracted_arguments = [filter(∉((a1, a2)), arguments(a)); [a1 * a2]]
+    return optimize_contraction_order_flattened(alg, lazy(Mul(contracted_arguments)))
+end

@@ -4,6 +4,22 @@ using WrappedUnions: unwrap
 
 lazy(x) = error("Not defined.")
 
+# Walk the expression `ex`, modifying the
+# operations by `opmap` and the arguments by `argmap`.
+function walk(opmap, argmap, ex)
+    if !iscall(ex)
+        return argmap(ex)
+    else
+        return mapfoldl((args...) -> walk(opmap, argmap, args...), opmap(operation(ex)), arguments(ex))
+    end
+end
+# Walk the expression `ex`, modifying the
+# operations by `opmap`.
+opwalk(opmap, a) = walk(opmap, identity, a)
+# Walk the expression `ex`, modifying the
+# arguments by `argmap`.
+argwalk(argmap, a) = walk(identity, argmap, a)
+
 # Generic lazy functionality.
 function maketerm_lazy(type::Type, head, args, metadata)
     if head ≡ *
@@ -80,17 +96,8 @@ function nodevalue_lazy(a)
         return operation(a)
     end
 end
+materialize_lazy(a) = argwalk(unwrap, a)
 using Base.Broadcast: materialize
-function materialize_lazy(a)
-    u = unwrap(a)
-    if !iscall(u)
-        return u
-    elseif ismul(u)
-        return mapfoldl(materialize, operation(u), arguments(u))
-    else
-        return error("Variant not supported.")
-    end
-end
 copy_lazy(a) = materialize(a)
 function equals_lazy(a1, a2)
     u1, u2 = unwrap.((a1, a2))
