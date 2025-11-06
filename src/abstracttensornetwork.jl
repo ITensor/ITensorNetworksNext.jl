@@ -1,37 +1,16 @@
 using Adapt: Adapt, adapt, adapt_structure
 using BackendSelection: @Algorithm_str, Algorithm
-using DataGraphs:
-    DataGraphs,
-    AbstractDataGraph,
-    edge_data,
-    underlying_graph,
-    underlying_graph_type,
-    vertex_data
+using DataGraphs: DataGraphs, AbstractDataGraph, edge_data, underlying_graph,
+    underlying_graph_type, vertex_data
 using Dictionaries: Dictionary
-using Graphs:
-    Graphs,
-    AbstractEdge,
-    AbstractGraph,
-    Graph,
-    add_edge!,
-    add_vertex!,
-    bfs_tree,
-    center,
-    dst,
-    edges,
-    edgetype,
-    ne,
-    neighbors,
-    nv,
-    rem_edge!,
-    src,
-    vertices
+using Graphs: Graphs, AbstractEdge, AbstractGraph, Graph, add_edge!, add_vertex!,
+    bfs_tree, center, dst, edges, edgetype, ne, neighbors, nv, rem_edge!, src, vertices
 using LinearAlgebra: LinearAlgebra, factorize
 using MacroTools: @capture
 using NamedDimsArrays: dimnames, inds
 using NamedGraphs: NamedGraphs, NamedGraph, not_implemented, steiner_tree
-using NamedGraphs.GraphsExtensions:
-    ⊔, directed_graph, incident_edges, rem_edges!, rename_vertices, vertextype
+using NamedGraphs.GraphsExtensions: ⊔, directed_graph, incident_edges, rem_edges!,
+    rename_vertices, vertextype
 using SplitApplyCombine: flatten
 
 abstract type AbstractTensorNetwork{V, VD} <: AbstractDataGraph{V, VD, Nothing} end
@@ -202,7 +181,6 @@ end
 # Fix the edges of the TensorNetwork `tn` to match
 # the tensor connectivity at vertex `v`.
 function fix_edges!(tn::AbstractTensorNetwork, v)
-    rem_incident_edges!(tn, v)
     rem_edges!(tn, incident_edges(tn, v))
     add_missing_edges!(tn, v)
     return tn
