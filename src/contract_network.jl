@@ -26,7 +26,7 @@ end
 function contract_network(alg::Algorithm"exact", tn)
     order = @something begin
         get(alg, :order, nothing)
-        contraction_order(tn; alg = alg.order_alg)
+        contraction_order(tn; alg = get(alg, :order_alg, default_kwargs(contraction_order, tn).alg))
     end
     syms_to_ts = Dict(symnameddims(i) => lazy(tn[i]) for i in eachindex(tn))
     tn_expression = substitute(order, syms_to_ts)
