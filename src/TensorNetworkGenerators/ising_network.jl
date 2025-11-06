@@ -3,7 +3,7 @@ using Graphs: degree, dst, edges, src
 using LinearAlgebra: Diagonal, eigen
 using NamedDimsArrays: apply, dename, inds, operator, randname
 
-function sqrt_ising_bonds(β; h1 = zero(typeof(β)), h2 = zero(typeof(β)))
+function sqrt_ising_bond(β; h1 = zero(typeof(β)), h2 = zero(typeof(β)))
     f11 = exp(β * (1 + h1 + h2))
     f12 = exp(β * (-1 + h1 - h2))
     f21 = exp(β * (-1 - h1 + h2))
@@ -38,7 +38,7 @@ function ising_network(
         v2 = dst(e)
         deg1 = degree(tn, v1)
         deg2 = degree(tn, v2)
-        m = sqrt_ising_bonds(β; h1 = h / deg1, h2 = h / deg2)
+        m = sqrt_ising_bond(β; h1 = h / deg1, h2 = h / deg2)
         t = operator(m, (f̃(e),), (f(e),))
         tn[v1] = apply(t, tn[v1])
         tn[v2] = apply(t, tn[v2])
