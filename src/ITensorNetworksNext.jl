@@ -1,6 +1,6 @@
 module ITensorNetworksNext
 
-include("lazynameddimsarrays.jl")
+include("LazyNamedDimsArrays/LazyNamedDimsArrays.jl")
 include("abstracttensornetwork.jl")
 include("tensornetwork.jl")
 include("TensorNetworkGenerators/TensorNetworkGenerators.jl")
