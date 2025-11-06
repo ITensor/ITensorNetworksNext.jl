@@ -2,16 +2,17 @@ using DiagonalArrays: DiagonalArray
 using Graphs: degree, dst, edges, src
 using LinearAlgebra: Diagonal, eigen
 using NamedDimsArrays: apply, dename, inds, operator, randname
+using NamedGraphs.GraphsExtensions: vertextype
 
-function sqrt_ising_bond(β; h1 = zero(typeof(β)), h2 = zero(typeof(β)))
-    f11 = exp(β * (1 + h1 + h2))
-    f12 = exp(β * (-1 + h1 - h2))
-    f21 = exp(β * (-1 - h1 + h2))
-    f22 = exp(β * (1 - h1 - h2))
-    m² = eltype(β)[f11 f12; f21 f22]
-    d², v = eigen(m²)
-    d = sqrt.(d²)
-    return v * Diagonal(d) * inv(v)
+function sqrt_ising_bond(β; J = one(β), h = zero(β), deg1::Integer, deg2::Integer)
+    h1 = h / deg1
+    h2 = h / deg2
+    m = [
+        exp(β * (J + h1 + h2)) exp(β * (-J + h1 - h2));
+        exp(β * (-J - h1 + h2)) exp(β * (J - h1 - h2));
+    ]
+    d, v = eigen(m)
+    return v * √(Diagonal(d)) * inv(v)
 end
 
 """
@@ -23,7 +24,8 @@ partition function tensors on each vertex. Link dimensions are defined using the
 edge.
 """
 function ising_network(
-        f, β::Number, g::AbstractGraph; h::Number = zero(eltype(β)), sz_vertices = []
+        f, β::Number, g::AbstractGraph; J::Number = one(β), h::Number = zero(β),
+        sz_vertices = vertextype(g)[]
     )
     elt = typeof(β)
     l̃ = Dict(e => randname(f(e)) for e in edges(g))
@@ -38,7 +40,7 @@ function ising_network(
         v2 = dst(e)
         deg1 = degree(tn, v1)
         deg2 = degree(tn, v2)
-        m = sqrt_ising_bond(β; h1 = h / deg1, h2 = h / deg2)
+        m = sqrt_ising_bond(β; J, h, deg1, deg2)
         t = operator(m, (f̃(e),), (f(e),))
         tn[v1] = apply(t, tn[v1])
         tn[v2] = apply(t, tn[v2])
