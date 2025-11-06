@@ -14,14 +14,12 @@ function select_algorithm(alg; kwargs...)
 end
 
 # `contract_network`
+contract_network(alg::Algorithm, tn) = error("Not implemented.")
 function default_kwargs(::typeof(contract_network), tn)
     return (; alg = Algorithm"exact"(; order_alg = Algorithm"eager"()))
 end
 function contract_network(tn; alg = default_kwargs(contract_network, tn).alg, kwargs...)
     return contract_network(select_algorithm(alg; kwargs...), tn)
-end
-function contract_network(alg::Algorithm, tn::AbstractTensorNetwork)
-    return error("Not implemented.")
 end
 
 # `contract_network(::Algorithm"exact", ...)`
@@ -36,12 +34,10 @@ function contract_network(alg::Algorithm"exact", tn)
 end
 
 # `contraction_order`
+contraction_order(alg::Algorithm, tn) = error("Not implemented.")
 default_kwargs(::typeof(contraction_order), tn) = (; alg = Algorithm"eager"())
 function contraction_order(tn; alg = default_kwargs(contraction_order, tn).alg, kwargs...)
     return contraction_order(select_algorithm(alg; kwargs...), tn)
-end
-function contraction_order(alg::Algorithm, tn)
-    return error("Not implemented.")
 end
 
 # `contraction_order(::Algorithm"eager", ...)`
