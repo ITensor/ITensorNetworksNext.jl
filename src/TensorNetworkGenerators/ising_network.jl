@@ -12,7 +12,7 @@ function sqrt_ising_bond(β; J = one(β), h = zero(β), deg1::Integer, deg2::Int
         exp(β * (-J - h1 + h2)) exp(β * (J - h1 - h2));
     ]
     d, v = eigen(m)
-    return v * sqrt(Diagonal(d)) * inv(v)
+    return v * √(Diagonal(d)) * inv(v)
 end
 
 """
