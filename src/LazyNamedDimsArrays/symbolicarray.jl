@@ -9,12 +9,6 @@ end
 function SymbolicArray(name, ax::Tuple{Vararg{AbstractUnitRange{<:Integer}}})
     return SymbolicArray{Any}(name, ax)
 end
-function SymbolicArray{T}(name, ax::AbstractUnitRange...) where {T}
-    return SymbolicArray{T}(name, ax)
-end
-function SymbolicArray(name, ax::AbstractUnitRange...)
-    return SymbolicArray{Any}(name, ax)
-end
 symname(a::SymbolicArray) = getfield(a, :name)
 Base.axes(a::SymbolicArray) = getfield(a, :axes)
 Base.size(a::SymbolicArray) = length.(axes(a))

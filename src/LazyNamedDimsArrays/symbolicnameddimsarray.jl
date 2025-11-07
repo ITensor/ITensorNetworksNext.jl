@@ -2,9 +2,10 @@ using NamedDimsArrays: NamedDimsArray, dename, inds
 
 const SymbolicNamedDimsArray{T, N, Parent <: SymbolicArray{T, N}, DimNames} =
     NamedDimsArray{T, N, Parent, DimNames}
-function symnameddims(name)
-    return lazy(NamedDimsArray(SymbolicArray(name), ()))
+function symnameddims(name, dims)
+    return lazy(NamedDimsArray(SymbolicArray(name, dename.(dims)), dims))
 end
+symnameddims(name) = symnameddims(name, ())
 using AbstractTrees: AbstractTrees
 function AbstractTrees.printnode(io::IO, a::SymbolicNamedDimsArray)
     print(io, symname(dename(a)))

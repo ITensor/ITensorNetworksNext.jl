@@ -40,6 +40,7 @@ Base.copy(tn::AbstractTensorNetwork) = error("Not implemented")
 
 # Iteration
 Base.iterate(tn::AbstractTensorNetwork, args...) = iterate(vertex_data(tn), args...)
+Base.keys(tn::AbstractTensorNetwork) = vertices(tn)
 
 # TODO: This contrasts with the `DataGraphs.AbstractDataGraph` definition,
 # where it is defined as the `vertextype`. Does that cause problems or should it be changed?

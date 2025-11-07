@@ -91,16 +91,15 @@ function optimize_evaluation_order(
     return optimize_evaluation_order(alg, a)
 end
 
-struct Eager end
-
-default_optimize_evaluation_order_alg(a) = Eager()
+using BackendSelection: @Algorithm_str, Algorithm
+default_optimize_evaluation_order_alg(a) = Algorithm"eager"()
 
 function optimize_contraction_order_flattened(alg, a)
-    return error("Alg $alg not supported.")
+    return error("`alg = $alg` not supported.")
 end
 
 using Combinatorics: combinations
-function optimize_contraction_order_flattened(alg::Eager, a)
+function optimize_contraction_order_flattened(alg::Algorithm"eager", a)
     @assert ismul(a)
     arity(a) in (1, 2) && return a
     a1, a2 = argmin(combinations(arguments(a), 2)) do (a1, a2)
