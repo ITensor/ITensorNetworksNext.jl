@@ -109,6 +109,16 @@ function equals_lazy(a1, a2)
         return false
     end
 end
+function isequal_lazy(a1, a2)
+    u1, u2 = unwrap.((a1, a2))
+    if !iscall(u1) && !iscall(u2)
+        return isequal(u1, u2)
+    elseif ismul(u1) && ismul(u2)
+        return isequal(arguments(u1), arguments(u2))
+    else
+        return false
+    end
+end
 function hash_lazy(a, h::UInt64)
     h = hash(Symbol(unspecify_type_parameters(typeof(a))), h)
     # Use `_hash`, which defines a custom hash for NamedDimsArray.

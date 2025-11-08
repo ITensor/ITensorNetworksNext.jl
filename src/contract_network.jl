@@ -42,7 +42,7 @@ function contraction_order(tn; alg = default_kwargs(contraction_order, tn).alg, 
     return contraction_order(to_algorithm(alg; kwargs...), tn)
 end
 function contraction_order(alg::Algorithm"left_associative", tn)
-    return prod(i -> symnameddims(i, Tuple(inds(tn[i]))), eachindex(tn))
+    return prod(i -> symnameddims(i, Tuple(inds(tn[i]))), keys(tn))
 end
 function contraction_order(alg::Algorithm, tn)
     s = contraction_order(tn; alg = Algorithm"left_associative"())

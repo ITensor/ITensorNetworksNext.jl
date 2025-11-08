@@ -1,3 +1,4 @@
+# TODO: Allow dynamic/unknown number of dimensions by supporting vector axes.
 struct SymbolicArray{T, N, Name, Axes <: NTuple{N, AbstractUnitRange{<:Integer}}} <: AbstractArray{T, N}
     name::Name
     axes::Axes
@@ -25,6 +26,12 @@ function Base.getindex(a::SymbolicArray{<:Any, N}, I::Vararg{Int, N}) where {N}
 end
 function Base.setindex!(a::SymbolicArray{<:Any, N}, value, I::Vararg{Int, N}) where {N}
     return error("Indexing into SymbolicArray not supported.")
+end
+using DerivableInterfaces: DerivableInterfaces
+DerivableInterfaces.permuteddims(a::SymbolicArray, p) = permutedims(a, p)
+function Base.permutedims(a::SymbolicArray, p)
+    @assert ndims(a) == length(p) && isperm(p)
+    return SymbolicArray(symname(a), ntuple(i -> axes(a)[p[i]], ndims(a)))
 end
 function Base.show(io::IO, mime::MIME"text/plain", a::SymbolicArray)
     Base.summary(io, a)
