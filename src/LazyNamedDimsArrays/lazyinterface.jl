@@ -4,6 +4,22 @@ using WrappedUnions: unwrap
 
 lazy(x) = error("Not defined.")
 
+# Walk the expression `ex`, modifying the
+# operations by `opmap` and the arguments by `argmap`.
+function walk(opmap, argmap, ex)
+    if !iscall(ex)
+        return argmap(ex)
+    else
+        return mapfoldl((args...) -> walk(opmap, argmap, args...), opmap(operation(ex)), arguments(ex))
+    end
+end
+# Walk the expression `ex`, modifying the
+# operations by `opmap`.
+opwalk(opmap, a) = walk(opmap, identity, a)
+# Walk the expression `ex`, modifying the
+# arguments by `argmap`.
+argwalk(argmap, a) = walk(identity, argmap, a)
+
 # Generic lazy functionality.
 function maketerm_lazy(type::Type, head, args, metadata)
     if head ≡ *
@@ -80,17 +96,8 @@ function nodevalue_lazy(a)
         return operation(a)
     end
 end
+materialize_lazy(a) = argwalk(unwrap, a)
 using Base.Broadcast: materialize
-function materialize_lazy(a)
-    u = unwrap(a)
-    if !iscall(u)
-        return u
-    elseif ismul(u)
-        return mapfoldl(materialize, operation(u), arguments(u))
-    else
-        return error("Variant not supported.")
-    end
-end
 copy_lazy(a) = materialize(a)
 function equals_lazy(a1, a2)
     u1, u2 = unwrap.((a1, a2))
@@ -98,6 +105,16 @@ function equals_lazy(a1, a2)
         return u1 == u2
     elseif ismul(u1) && ismul(u2)
         return arguments(u1) == arguments(u2)
+    else
+        return false
+    end
+end
+function isequal_lazy(a1, a2)
+    u1, u2 = unwrap.((a1, a2))
+    if !iscall(u1) && !iscall(u2)
+        return isequal(u1, u2)
+    elseif ismul(u1) && ismul(u2)
+        return isequal(arguments(u1), arguments(u2))
     else
         return false
     end
@@ -140,13 +157,8 @@ end
 function show_lazy(io::IO, mime::MIME"text/plain", a)
     summary(io, a)
     println(io, ":")
-    if !iscall(a)
-        show(io, mime, unwrap(a))
-        return nothing
-    else
-        show(io, a)
-        return nothing
-    end
+    !iscall(a) ? show(io, mime, unwrap(a)) : show(io, a)
+    return nothing
 end
 add_lazy(a1, a2) = error("Not implemented.")
 sub_lazy(a) = error("Not implemented.")
@@ -162,7 +174,12 @@ function mul_lazy(a)
     end
 end
 # Note that this is nested by default.
-mul_lazy(a1, a2) = lazy(Mul([a1, a2]))
+function mul_lazy(a1, a2; flatten::Bool = false)
+    return flatten ? mul_lazy_flattened(a1, a2) : mul_lazy_nested(a1, a2)
+end
+mul_lazy_nested(a1, a2) = lazy(Mul([a1, a2]))
+to_mul_arguments(a) = ismul(a) ? arguments(a) : [a]
+mul_lazy_flattened(a1, a2) = lazy(Mul([to_mul_arguments(a1); to_mul_arguments(a2)]))
 mul_lazy(a1::Number, a2) = error("Not implemented.")
 mul_lazy(a1, a2::Number) = error("Not implemented.")
 mul_lazy(a1::Number, a2::Number) = a1 * a2

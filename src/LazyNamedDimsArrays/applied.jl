@@ -3,7 +3,7 @@ using TermInterface: TermInterface, arguments, iscall, operation
 using TypeParameterAccessors: unspecify_type_parameters
 
 # Generic functionality for Applied types, like `Mul`, `Add`, etc.
-ismul(a) = operation(a) ≡ *
+ismul(a) = iscall(a) && operation(a) ≡ *
 head_applied(a) = operation(a)
 iscall_applied(a) = true
 isexpr_applied(a) = iscall(a)

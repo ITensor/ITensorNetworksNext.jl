@@ -82,8 +82,7 @@ end
                 @test issetequal(is, inds(tn[v]))
                 @test tn[v] ≠ δ(Tuple(is))
             end
-            # TODO: Use eager contraction sequence finding.
-            z = contract_network(tn; alg = "exact")[]
+            z = contract_network(tn)[]
             f = -log(z) / (β * nv(g))
             f_analytic = TestUtils.f_1d_ising(β, 4; periodic)
             @test f ≈ f_analytic
@@ -104,8 +103,7 @@ end
                 @test issetequal(is, inds(tn[v]))
                 @test tn[v] ≠ δ(Tuple(is))
             end
-            # TODO: Use eager contraction sequence finding.
-            z = contract_network(tn; alg = "exact")[]
+            z = contract_network(tn)[]
             f = -log(z) / (β * nv(g))
             f_inf = TestUtils.f_2d_ising(β)
             @test f ≈ f_inf rtol = 1.0e-1

@@ -6,13 +6,18 @@ using WrappedUnions: @wrapped
     } <: AbstractNamedDimsArray{T, Any}
     union::Union{A, Mul{LazyNamedDimsArray{T, A}}}
 end
+
+parenttype(::Type{LazyNamedDimsArray{<:Any, A}}) where {A} = A
+parenttype(::Type{LazyNamedDimsArray{T}}) where {T} = AbstractNamedDimsArray{T}
+parenttype(::Type{LazyNamedDimsArray}) = AbstractNamedDimsArray
+
 function LazyNamedDimsArray(a::AbstractNamedDimsArray)
     # Use `eltype(typeof(a))` for arrays that have different
     # runtime and compile time eltypes, like `ITensor`.
     return LazyNamedDimsArray{eltype(typeof(a)), typeof(a)}(a)
 end
-function LazyNamedDimsArray(a::Mul{LazyNamedDimsArray{T, A}}) where {T, A}
-    return LazyNamedDimsArray{T, A}(a)
+function LazyNamedDimsArray(a::Mul{L}) where {L <: LazyNamedDimsArray}
+    return LazyNamedDimsArray{eltype(L), parenttype(L)}(a)
 end
 lazy(a::LazyNamedDimsArray) = a
 lazy(a::AbstractNamedDimsArray) = LazyNamedDimsArray(a)
@@ -45,6 +50,7 @@ AbstractTrees.nodevalue(a::LazyNamedDimsArray) = nodevalue_lazy(a)
 Base.Broadcast.materialize(a::LazyNamedDimsArray) = materialize_lazy(a)
 Base.copy(a::LazyNamedDimsArray) = copy_lazy(a)
 Base.:(==)(a1::LazyNamedDimsArray, a2::LazyNamedDimsArray) = equals_lazy(a1, a2)
+Base.isequal(a1::LazyNamedDimsArray, a2::LazyNamedDimsArray) = isequal_lazy(a1, a2)
 Base.hash(a::LazyNamedDimsArray, h::UInt64) = hash_lazy(a, h)
 map_arguments(f, a::LazyNamedDimsArray) = map_arguments_lazy(f, a)
 substitute(a::LazyNamedDimsArray, substitutions) = substitute_lazy(a, substitutions)
