@@ -61,9 +61,7 @@ function flatten_expression(a)
     if !iscall(a)
         return a
     elseif ismul(a)
-        flattened_arguments = mapreduce(vcat, arguments(a)) do arg
-            return ismul(arg) ? arguments(arg) : [arg]
-        end
+        flattened_arguments = mapreduce(to_mul_arguments, vcat, arguments(a))
         return lazy(Mul(flattened_arguments))
     else
         return error("Variant not supported.")
@@ -71,16 +69,12 @@ function flatten_expression(a)
 end
 
 function optimize_evaluation_order(alg, a)
-    return optimize_evaluation_order_flattened(alg, flatten_expression(a))
-end
-
-function optimize_evaluation_order_flattened(alg, a)
     if !iscall(a)
         return a
     elseif ismul(a)
-        return optimize_contraction_order_flattened(alg, a)
+        return optimize_contraction_order(alg, a)
     else
-        # TODO: Recurse into other operations, calling `optimize_evaluation_order_flattened`.
+        # TODO: Recurse into other operations, calling `optimize_evaluation_order`.
         return error("Variant not supported.")
     end
 end
@@ -94,19 +88,21 @@ end
 using BackendSelection: @Algorithm_str, Algorithm
 default_optimize_evaluation_order_alg(a) = Algorithm"eager"()
 
-function optimize_contraction_order_flattened(alg, a)
+function optimize_contraction_order(alg, a)
     return error("`alg = $alg` not supported.")
 end
 
 using Combinatorics: combinations
-function optimize_contraction_order_flattened(alg::Algorithm"eager", a)
+function optimize_contraction_order(alg::Algorithm"eager", a)
     @assert ismul(a)
     arity(a) in (1, 2) && return a
     a1, a2 = argmin(combinations(arguments(a), 2)) do (a1, a2)
         # Penalize outer product contractions.
+        # TODO: Still order the outer products by time complexity,
+        # say by checking if there are only outer products left.
         isdisjoint(inds(a1), inds(a2)) && return typemax(Int)
         return time_complexity(*, a1, a2)
     end
     contracted_arguments = [filter(∉((a1, a2)), arguments(a)); [a1 * a2]]
-    return optimize_contraction_order_flattened(alg, lazy(Mul(contracted_arguments)))
+    return optimize_contraction_order(alg, lazy(Mul(contracted_arguments)))
 end

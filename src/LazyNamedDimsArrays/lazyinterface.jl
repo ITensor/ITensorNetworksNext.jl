@@ -157,13 +157,8 @@ end
 function show_lazy(io::IO, mime::MIME"text/plain", a)
     summary(io, a)
     println(io, ":")
-    if !iscall(a)
-        show(io, mime, unwrap(a))
-        return nothing
-    else
-        show(io, a)
-        return nothing
-    end
+    !iscall(a) ? show(io, mime, unwrap(a)) : show(io, a)
+    return nothing
 end
 add_lazy(a1, a2) = error("Not implemented.")
 sub_lazy(a) = error("Not implemented.")
@@ -179,7 +174,12 @@ function mul_lazy(a)
     end
 end
 # Note that this is nested by default.
-mul_lazy(a1, a2) = lazy(Mul([a1, a2]))
+function mul_lazy(a1, a2; flatten::Bool = false)
+    return flatten ? mul_lazy_flattened(a1, a2) : mul_lazy_nested(a1, a2)
+end
+mul_lazy_nested(a1, a2) = lazy(Mul([a1, a2]))
+to_mul_arguments(a) = ismul(a) ? arguments(a) : [a]
+mul_lazy_flattened(a1, a2) = lazy(Mul([to_mul_arguments(a1); to_mul_arguments(a2)]))
 mul_lazy(a1::Number, a2) = error("Not implemented.")
 mul_lazy(a1, a2::Number) = error("Not implemented.")
 mul_lazy(a1::Number, a2::Number) = a1 * a2
