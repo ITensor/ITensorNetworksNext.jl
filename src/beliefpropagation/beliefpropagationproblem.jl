@@ -9,7 +9,7 @@ function default_algorithm(
         bpc::BeliefPropagationCache;
         verbose = false,
         tol = nothing,
-        edge_sequence = forest_cover_edge_sequence(underlying_graph(bpc)),
+        edge_sequence = forest_cover_edge_sequence(network(bpc)),
         message_update_alg = default_algorithm(Algorithm"contract"),
         maxiter = is_tree(bpc) ? 1 : nothing,
     )
@@ -44,7 +44,8 @@ end
 function region_plan(
         prob::BeliefPropagationProblem; root_vertex = default_root_vertex, sweep_kwargs...
     )
-    edges = forest_cover_edge_sequence(underlying_graph(prob.cache); root_vertex)
+
+    edges = forest_cover_edge_sequence(network(prob.cache); root_vertex)
 
     plan = map(edges) do e
         return [e] => (; sweep_kwargs...)
