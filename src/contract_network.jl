@@ -56,8 +56,8 @@ function contraction_order(tn; alg = default_kwargs(contraction_order, tn).alg, 
 end
 # Convert the tensor network to a flat symbolic multiplication expression.
 function contraction_order(alg::Algorithm"flat", tn)
-    syms = [symnameddims(i, Tuple(inds(tn[i]))) for i in keys(tn)]
     # Same as: `reduce((a, b) -> *(a, b; flatten = true), syms)`.
+    syms = vec([symnameddims(i, Tuple(inds(tn[i]))) for i in keys(tn)])
     return lazy(Mul(syms))
 end
 function contraction_order(alg::Algorithm"left_associative", tn)
