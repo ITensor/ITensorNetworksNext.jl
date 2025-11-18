@@ -1,5 +1,6 @@
 using DiagonalArrays: DiagonalArray
 using Graphs: degree, dst, edges, src
+using ..ITensorNetworksNext: @preserve_graph
 using LinearAlgebra: Diagonal, eigen
 using NamedDimsArrays: apply, dename, inds, operator, randname
 using NamedGraphs.GraphsExtensions: vertextype
@@ -42,8 +43,8 @@ function ising_network(
         deg2 = degree(tn, v2)
         m = sqrt_ising_bond(β; J, h, deg1, deg2)
         t = operator(m, (f̃(e),), (f(e),))
-        tn[v1] = apply(t, tn[v1])
-        tn[v2] = apply(t, tn[v2])
+        @preserve_graph tn[v1] = apply(t, tn[v1])
+        @preserve_graph tn[v2] = apply(t, tn[v2])
     end
     return tn
 end
