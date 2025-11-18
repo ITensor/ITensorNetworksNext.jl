@@ -96,8 +96,8 @@ const sorted_children_lazy = lazy_interface(sorted_children)
 sorted_children_lazy(a) = sorted_arguments(a)
 const ismul_lazy = lazy_interface(ismul)
 ismul_lazy(a) = ismul(unwrap(a))
-function abstracttrees_children end
-const abstracttrees_children_lazy = lazy_interface(abstracttrees_children)
+using AbstractTrees: AbstractTrees
+const abstracttrees_children_lazy = lazy_interface(AbstractTrees.children)
 function abstracttrees_children_lazy(a)
     if !iscall(a)
         return ()
