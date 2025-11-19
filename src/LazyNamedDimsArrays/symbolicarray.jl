@@ -16,6 +16,7 @@ Base.size(a::SymbolicArray) = length.(axes(a))
 function Base.:(==)(a::SymbolicArray, b::SymbolicArray)
     return symname(a) == symname(b) && axes(a) == axes(b)
 end
+Base.isequal(a::SymbolicArray, b::SymbolicArray) = a == b
 function Base.hash(a::SymbolicArray, h::UInt64)
     h = hash(:SymbolicArray, h)
     h = hash(symname(a), h)

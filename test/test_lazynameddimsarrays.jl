@@ -96,6 +96,7 @@ using WrappedUnions: unwrap
         @test dename(a1) isa SymbolicArray
         @test dename(unwrap(a1)) isa SymbolicArray
         @test dename(unwrap(a1)) == SymbolicArray(:a1, ())
+        @test isequal(dename(unwrap(a1)), SymbolicArray(:a1, ()))
         @test inds(a1) == ()
         @test dimnames(a1) == ()
 
