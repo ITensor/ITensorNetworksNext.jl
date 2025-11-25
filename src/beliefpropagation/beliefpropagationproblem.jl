@@ -52,10 +52,8 @@ function default_message(::Type{<:Algorithm"bp"}, network, edge)
 
     #TODO: Get datatype working on tensornetworks so we can support GPU, etc...
     links = linkinds(network, edge)
-    data = ones(dim.(links)...)
-
-    t = ITensor(data, links)
-    return t
+    data = ones(Tuple(links))
+    return data
 end
 
 updated_message(alg, bpc, edge) = not_implemented()

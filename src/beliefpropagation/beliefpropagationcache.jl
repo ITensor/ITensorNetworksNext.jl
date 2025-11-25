@@ -3,7 +3,6 @@ using Dictionaries: Dictionary, set!, delete!
 using Graphs: AbstractGraph, is_tree, connected_components
 using NamedGraphs: convert_vertextype
 using NamedGraphs.GraphsExtensions: default_root_vertex, forest_cover, post_order_dfs_edges, is_path_graph
-using ITensorBase: ITensor, dim
 using NamedGraphs.PartitionedGraphs: QuotientView, QuotientEdge, quotient_graph
 
 struct BeliefPropagationCache{V, N <: AbstractGraph{V}, ET, MT} <:
