@@ -9,19 +9,23 @@ using LinearAlgebra: LinearAlgebra, factorize
 using MacroTools: @capture
 using NamedDimsArrays: dimnames, inds
 using NamedGraphs: NamedGraphs, NamedGraph, not_implemented, steiner_tree
-using NamedGraphs.GraphsExtensions: ⊔, directed_graph, incident_edges, rem_edges!,
-    rename_vertices, vertextype
+using NamedGraphs.OrdinalIndexing: OrdinalSuffixedInteger
+using NamedGraphs.GraphsExtensions:
+    ⊔,
+    directed_graph,
+    incident_edges,
+    rem_edges!,
+    rename_vertices,
+    vertextype
 using SplitApplyCombine: flatten
+using NamedGraphs.SimilarType: similar_type
 
 abstract type AbstractTensorNetwork{V, VD} <: AbstractDataGraph{V, VD, Nothing} end
 
-function Graphs.rem_edge!(tn::AbstractTensorNetwork, e)
-    rem_edge!(underlying_graph(tn), e)
-    return tn
-end
+# Need to be careful about removing edges from tensor networks in case there is a bond
+Graphs.rem_edge!(::AbstractTensorNetwork, edge) = not_implemented()
 
-# TODO: Define a generic fallback for `AbstractDataGraph`?
-DataGraphs.edge_data_eltype(::Type{<:AbstractTensorNetwork}) = error("No edge data")
+DataGraphs.edge_data_eltype(::Type{<:AbstractTensorNetwork}) = not_implemented()
 
 # Graphs.jl overloads
 function Graphs.weights(graph::AbstractTensorNetwork)
@@ -36,7 +40,7 @@ function Graphs.weights(graph::AbstractTensorNetwork)
 end
 
 # Copy
-Base.copy(tn::AbstractTensorNetwork) = error("Not implemented")
+Base.copy(::AbstractTensorNetwork) = not_implemented()
 
 # Iteration
 Base.iterate(tn::AbstractTensorNetwork, args...) = iterate(vertex_data(tn), args...)
@@ -49,20 +53,11 @@ Base.eltype(tn::AbstractTensorNetwork) = eltype(vertex_data(tn))
 # Overload if needed
 Graphs.is_directed(::Type{<:AbstractTensorNetwork}) = false
 
-# Derived interface, may need to be overloaded
-function DataGraphs.underlying_graph_type(G::Type{<:AbstractTensorNetwork})
-    return underlying_graph_type(data_graph_type(G))
-end
-
 # AbstractDataGraphs overloads
-function DataGraphs.vertex_data(graph::AbstractTensorNetwork, args...)
-    return error("Not implemented")
-end
-function DataGraphs.edge_data(graph::AbstractTensorNetwork, args...)
-    return error("Not implemented")
-end
+DataGraphs.vertex_data(::AbstractTensorNetwork) = not_implemented()
+DataGraphs.edge_data(::AbstractTensorNetwork) = not_implemented()
 
-DataGraphs.underlying_graph(tn::AbstractTensorNetwork) = error("Not implemented")
+DataGraphs.underlying_graph(::AbstractTensorNetwork) = not_implemented()
 function NamedGraphs.vertex_positions(tn::AbstractTensorNetwork)
     return NamedGraphs.vertex_positions(underlying_graph(tn))
 end
@@ -81,40 +76,37 @@ function Adapt.adapt_structure(to, tn::AbstractTensorNetwork)
     return map_vertex_data_preserve_graph(adapt(to), tn)
 end
 
-function linkinds(tn::AbstractTensorNetwork, edge::Pair)
-    return linkinds(tn, edgetype(tn)(edge))
-end
-function linkinds(tn::AbstractTensorNetwork, edge::AbstractEdge)
-    return inds(tn[src(edge)]) ∩ inds(tn[dst(edge)])
-end
-function linkaxes(tn::AbstractTensorNetwork, edge::Pair)
+linkinds(tn::AbstractGraph, edge::Pair) = linkinds(tn, edgetype(tn)(edge))
+linkinds(tn::AbstractGraph, edge::AbstractEdge) = inds(tn[src(edge)]) ∩ inds(tn[dst(edge)])
+
+function linkaxes(tn::AbstractGraph, edge::Pair)
     return linkaxes(tn, edgetype(tn)(edge))
 end
-function linkaxes(tn::AbstractTensorNetwork, edge::AbstractEdge)
+function linkaxes(tn::AbstractGraph, edge::AbstractEdge)
     return axes(tn[src(edge)]) ∩ axes(tn[dst(edge)])
 end
-function linknames(tn::AbstractTensorNetwork, edge::Pair)
+function linknames(tn::AbstractGraph, edge::Pair)
     return linknames(tn, edgetype(tn)(edge))
 end
-function linknames(tn::AbstractTensorNetwork, edge::AbstractEdge)
+function linknames(tn::AbstractGraph, edge::AbstractEdge)
     return dimnames(tn[src(edge)]) ∩ dimnames(tn[dst(edge)])
 end
 
-function siteinds(tn::AbstractTensorNetwork, v)
+function siteinds(tn::AbstractGraph, v)
     s = inds(tn[v])
     for v′ in neighbors(tn, v)
         s = setdiff(s, inds(tn[v′]))
     end
     return s
 end
-function siteaxes(tn::AbstractTensorNetwork, edge::AbstractEdge)
+function siteaxes(tn::AbstractGraph, edge::AbstractEdge)
     s = axes(tn[src(edge)]) ∩ axes(tn[dst(edge)])
     for v′ in neighbors(tn, v)
         s = setdiff(s, axes(tn[v′]))
     end
     return s
 end
-function sitenames(tn::AbstractTensorNetwork, edge::AbstractEdge)
+function sitenames(tn::AbstractGraph, edge::AbstractEdge)
     s = dimnames(tn[src(edge)]) ∩ dimnames(tn[dst(edge)])
     for v′ in neighbors(tn, v)
         s = setdiff(s, dimnames(tn[v′]))
@@ -122,8 +114,8 @@ function sitenames(tn::AbstractTensorNetwork, edge::AbstractEdge)
     return s
 end
 
-function setindex_preserve_graph!(tn::AbstractTensorNetwork, value, vertex)
-    vertex_data(tn)[vertex] = value
+function setindex_preserve_graph!(tn::AbstractGraph, value, vertex)
+    set!(vertex_data(tn), vertex, value)
     return tn
 end
 
@@ -153,7 +145,7 @@ end
 
 # Update the graph of the TensorNetwork `tn` to include
 # edges that should exist based on the tensor connectivity.
-function add_missing_edges!(tn::AbstractTensorNetwork)
+function add_missing_edges!(tn::AbstractGraph)
     foreach(v -> add_missing_edges!(tn, v), vertices(tn))
     return tn
 end
@@ -161,7 +153,7 @@ end
 # Update the graph of the TensorNetwork `tn` to include
 # edges that should be incident to the vertex `v`
 # based on the tensor connectivity.
-function add_missing_edges!(tn::AbstractTensorNetwork, v)
+function add_missing_edges!(tn::AbstractGraph, v)
     for v′ in vertices(tn)
         if v ≠ v′
             e = v => v′
@@ -175,13 +167,13 @@ end
 
 # Fix the edges of the TensorNetwork `tn` to match
 # the tensor connectivity.
-function fix_edges!(tn::AbstractTensorNetwork)
+function fix_edges!(tn::AbstractGraph)
     foreach(v -> fix_edges!(tn, v), vertices(tn))
     return tn
 end
 # Fix the edges of the TensorNetwork `tn` to match
 # the tensor connectivity at vertex `v`.
-function fix_edges!(tn::AbstractTensorNetwork, v)
+function fix_edges!(tn::AbstractGraph, v)
     rem_edges!(tn, incident_edges(tn, v))
     add_missing_edges!(tn, v)
     return tn
@@ -215,28 +207,20 @@ function Base.setindex!(tn::AbstractTensorNetwork, value, v)
     fix_edges!(tn, v)
     return tn
 end
-using NamedGraphs.OrdinalIndexing: OrdinalSuffixedInteger
 # Fix ambiguity error.
 function Base.setindex!(graph::AbstractTensorNetwork, value, vertex::OrdinalSuffixedInteger)
     graph[vertices(graph)[vertex]] = value
     return graph
 end
-# Fix ambiguity error.
-function Base.setindex!(tn::AbstractTensorNetwork, value, edge::AbstractEdge)
-    return error("No edge data.")
-end
-# Fix ambiguity error.
-function Base.setindex!(tn::AbstractTensorNetwork, value, edge::Pair)
-    return error("No edge data.")
-end
-using NamedGraphs.OrdinalIndexing: OrdinalSuffixedInteger
+Base.setindex!(tn::AbstractTensorNetwork, value, edge::AbstractEdge) = not_implemented()
+Base.setindex!(tn::AbstractTensorNetwork, value, edge::Pair) = not_implemented()
 # Fix ambiguity error.
 function Base.setindex!(
         tn::AbstractTensorNetwork,
         value,
         edge::Pair{<:OrdinalSuffixedInteger, <:OrdinalSuffixedInteger},
     )
-    return error("No edge data.")
+    return not_implemented()
 end
 
 function Base.show(io::IO, mime::MIME"text/plain", graph::AbstractTensorNetwork)
@@ -255,3 +239,21 @@ function Base.show(io::IO, mime::MIME"text/plain", graph::AbstractTensorNetwork)
 end
 
 Base.show(io::IO, graph::AbstractTensorNetwork) = show(io, MIME"text/plain"(), graph)
+
+function Graphs.induced_subgraph(graph::AbstractTensorNetwork, subvertices::AbstractVector{V}) where {V <: Int}
+    return tensornetwork_induced_subgraph(graph, subvertices)
+end
+function Graphs.induced_subgraph(graph::AbstractTensorNetwork, subvertices)
+    return tensornetwork_induced_subgraph(graph, subvertices)
+end
+
+function tensornetwork_induced_subgraph(graph, subvertices)
+    underlying_subgraph, vlist = Graphs.induced_subgraph(underlying_graph(graph), subvertices)
+    subgraph = similar_type(graph)(underlying_subgraph)
+    for v in vertices(subgraph)
+        if isassigned(graph, v)
+            set!(vertex_data(subgraph), v, graph[v])
+        end
+    end
+    return subgraph, vlist
+end
