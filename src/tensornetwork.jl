@@ -66,8 +66,7 @@ end
 tensornetwork_edges(tensors) = tensornetwork_edges(NamedEdge, tensors)
 
 function TensorNetwork(f::Base.Callable, graph::AbstractGraph)
-    tensors = Dictionary(vertices(graph), f.(vertices(graph)))
-    return TensorNetwork(graph, tensors)
+    return TensorNetwork(graph, Dictionary(map(f, vertices(graph))))
 end
 function TensorNetwork(graph::AbstractGraph, tensors)
     tn = _TensorNetwork(graph, tensors)
