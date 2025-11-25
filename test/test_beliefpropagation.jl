@@ -51,4 +51,3 @@ using Test: @test, @testset
     z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
     @test abs(z_bp - z_exact) <= 1.0e-14
 end
-
