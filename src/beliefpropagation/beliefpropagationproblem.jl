@@ -1,4 +1,3 @@
-using Distributed: WorkerPool, @everywhere, remotecall, myid, waitall, workers
 using Graphs: SimpleGraph, vertices, edges, has_edge
 using NamedGraphs: AbstractNamedGraph, position_graph
 using NamedGraphs.GraphsExtensions: add_edges!, partition_vertices
