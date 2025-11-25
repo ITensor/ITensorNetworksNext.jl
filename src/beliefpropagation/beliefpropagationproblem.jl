@@ -87,7 +87,7 @@ function contract_messages(
 end
 
 function default_algorithm(
-        ::Type{<:Algorithm"contract"}; normalize = true, contraction_alg = default_algorithm(Algorithm"exact")
+        ::Type{<:Algorithm"contract"}; normalize = true, contraction_alg = Algorithm("exact")
     )
     return Algorithm("contract"; normalize, contraction_alg)
 end

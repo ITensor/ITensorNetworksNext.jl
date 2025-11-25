@@ -4,7 +4,7 @@ using Dictionaries: AbstractDictionary, Indices, dictionary
 using Graphs: AbstractSimpleGraph, rem_vertex!, rem_edge!
 using NamedDimsArrays: AbstractNamedDimsArray, dimnames
 using NamedGraphs: NamedGraphs, NamedEdge, NamedGraph, vertextype
-using NamedGraphs.GraphsExtensions: GraphsExtensions, arranged_edges, vertextype
+using NamedGraphs.GraphsExtensions: GraphsExtensions, arranged_edges, arrange_edge, vertextype
 using NamedGraphs.PartitionedGraphs:
     AbstractPartitionedGraph,
     PartitionedGraphs,
@@ -87,10 +87,7 @@ function fix_links!(tn::AbstractTensorNetwork)
     for e in setdiff(arranged_edges(graph), tn_edges)
         insert_trivial_link!(tn, e)
     end
-    for edge in setdiff(arranged_edges(graph), arranged_edges(graph_structure))
-        insert_trivial_link!(network, edge)
-    end
-    return network
+    return tn
 end
 
 # Determine the graph structure from the tensors.
