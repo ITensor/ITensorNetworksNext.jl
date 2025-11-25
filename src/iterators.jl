@@ -54,8 +54,8 @@ mutable struct RegionIterator{Problem, RegionPlan} <: AbstractNetworkIterator
     end
 end
 
-function RegionIterator(problem; sweep, sweep_kwargs...)
-    plan = region_plan(problem; sweep_kwargs...)
+function RegionIterator(problem, prevplan; sweep, sweep_kwargs...)
+    plan = region_plan(problem, prevplan; sweep_kwargs...)
     return RegionIterator(problem, plan, sweep)
 end
 
@@ -109,6 +109,8 @@ function compute!(iter::RegionIterator)
     return iter
 end
 
+# Default behaviour:
+region_plan(problem, ::Any; sweep_kwargs...) = region_plan(problem; sweep_kwargs...)
 region_plan(problem; sweep_kwargs...) = euler_sweep(state(problem); sweep_kwargs...)
 
 #
@@ -129,7 +131,7 @@ mutable struct SweepIterator{Problem, Iter} <: AbstractNetworkIterator
         end
 
         first_kwargs, _ = first_state
-        region_iter = RegionIterator(problem; sweep = 1, first_kwargs...)
+        region_iter = RegionIterator(problem, nothing; sweep = 1, first_kwargs...)
 
         return new{Prob, Iter}(region_iter, stateful_sweep_kwargs, 1)
     end
@@ -151,7 +153,10 @@ end
 
 function update_region_iterator!(iterator::SweepIterator; kwargs...)
     sweep = state(iterator)
-    iterator.region_iter = RegionIterator(problem(iterator); sweep, kwargs...)
+
+    previous_plan = iterator.region_iter.region_plan
+
+    iterator.region_iter = RegionIterator(problem(iterator), previous_plan; sweep, kwargs...)
     return iterator
 end
 
