@@ -33,25 +33,11 @@ function Base.copy(bp_cache::BeliefPropagationCache)
     return BeliefPropagationCache(copy(network(bp_cache)), copy(messages(bp_cache)))
 end
 
-# TODO: This needs to go in DataGraphsGraphsExtensionsExt
-#
-# This function is problematic when `ng isa TensorNetwork` as it relies on deleting edges
-# and taking subgraphs, which is not always well-defined for the `TensorNetwork` type,
-# hence we just strip off any `AbstractDataGraph` data to avoid this.
-function forest_cover_edge_sequence(g::AbstractDataGraph; kwargs...)
-    return forest_cover_edge_sequence(underlying_graph(g); kwargs...)
-end
-# TODO: This needs to go in PartitionedGraphsGraphsExtensionsExt
-#
-# While it is not at all necessary to explictly instantiate the `QuotientView`, it allows the
-# data of a data graph to be removed using the above method if `parent_type(g)` is an
-# `AbstractDataGraph`.
-function forest_cover_edge_sequence(g::QuotientView; kwargs...)
-    return forest_cover_edge_sequence(quotient_graph(parent(g)); kwargs...)
-end
 # TODO: This needs to go in GraphsExtensions
-function forest_cover_edge_sequence(g::AbstractGraph; root_vertex = default_root_vertex)
-    add_edges!(g, edges(g))
+function forest_cover_edge_sequence(gi::AbstractGraph; root_vertex = default_root_vertex)
+    # All we care about are the edges so the type of the graph doesnt matter
+    g = NamedGraph(vertices(gi))
+    add_edges!(g, edges(gi))
     forests = forest_cover(g)
     rv = edgetype(g)[]
     for forest in forests
