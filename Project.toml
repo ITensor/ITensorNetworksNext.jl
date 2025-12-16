@@ -50,3 +50,6 @@ TermInterface = "2"
 TypeParameterAccessors = "0.4.4"
 WrappedUnions = "0.3"
 julia = "1.10"
+
+[workspace]
+projects = ["benchmark", "dev", "docs", "examples", "test"]

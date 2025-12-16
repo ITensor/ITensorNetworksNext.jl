@@ -1,9 +1,12 @@
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
-Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
 ITensorNetworksNext = "302f2e75-49f0-4526-aef7-d8ba550cb06c"
+Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
+
+[sources]
+ITensorNetworksNext = {path = ".."}
 
 [compat]
 Documenter = "1"
-Literate = "2"
 ITensorNetworksNext = "0.2"
+Literate = "2"
