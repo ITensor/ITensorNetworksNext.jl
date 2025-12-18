@@ -25,7 +25,7 @@ end
 
 function AI.step!(
         problem::TestProblem, algorithm::TestAlgorithmStep, state::AIE.DefaultState;
-        logging_context_prefix = Symbol()
+        kwargs...
     )
     state.iterate .+= 2  # Different increment step
     return state
@@ -58,7 +58,7 @@ end
         state = AIE.DefaultState(; iterate = [0.0, 0.0], stopping_criterion_state)
 
         initial_iterate = [1.0, 2.0]
-        AIE.AI.initialize_state!(problem, algorithm, state; iterate = initial_iterate)
+        AI.initialize_state!(problem, algorithm, state; iterate = initial_iterate)
         @test state.iterate == initial_iterate
         @test state.iteration == 0
     end
@@ -68,7 +68,7 @@ end
         problem = TestProblem([1.0, 2.0])
         algorithm = TestAlgorithm()
 
-        state = AIE.AI.initialize_state(problem, algorithm; iterate = [0.0, 0.0])
+        state = AI.initialize_state(problem, algorithm; iterate = [0.0, 0.0])
         @test state isa AIE.DefaultState
         @test state.iteration == 0
     end
@@ -363,14 +363,14 @@ end
         )
 
         problem = TestProblem([1.0, 2.0])
-        state = AIE.AI.initialize_state(problem, flattened_alg; iterate = [0.0, 0.0])
+        state = AI.initialize_state(problem, flattened_alg; iterate = [0.0, 0.0])
 
         # Manually step through to test step! functionality
-        AIE.AI.increment!(problem, flattened_alg, state)
+        AI.increment!(problem, flattened_alg, state)
         @test state.parent_iteration == 1
         @test state.child_iteration == 1
 
-        AIE.AI.step!(problem, flattened_alg, state)
+        AI.step!(problem, flattened_alg, state)
         # The nested algorithm runs TestAlgorithmStep with 2 iterations, each incrementing by 2
         @test state.iterate ≈ [4.0, 4.0]
     end
