@@ -1,5 +1,6 @@
 [deps]
 AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
+AlgorithmsInterface = "d1e3940c-cd12-4505-8585-b0a4b322527d"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 DiagonalArrays = "74fd4be6-21e2-4f6f-823a-4360d37c7a77"
 Dictionaries = "85a47980-9c8c-11e8-2b9f-f7ca1fa99fb4"

@@ -6,7 +6,7 @@ include("abstracttensornetwork.jl")
 include("tensornetwork.jl")
 include("TensorNetworkGenerators/TensorNetworkGenerators.jl")
 include("contract_network.jl")
-include("sweeping.jl")
-include("eigenproblem.jl")
+include("sweeping/sweeping.jl")
+include("sweeping/eigenproblem.jl")
 
 end
