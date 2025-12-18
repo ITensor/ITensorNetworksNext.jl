@@ -2,8 +2,7 @@ import AlgorithmsInterface as AI
 import .AlgorithmsInterfaceExtensions as AIE
 
 @kwdef struct Sweeping{
-        Algorithms <: AbstractVector{<:AI.Algorithm},
-        StoppingCriterion <: AI.StoppingCriterion,
+        Algorithms <: AbstractVector, StoppingCriterion <: AI.StoppingCriterion,
     } <: AIE.NestedAlgorithm
     algorithms::Algorithms
     stopping_criterion::StoppingCriterion = AI.StopAfterIteration(length(algorithms))
@@ -24,31 +23,18 @@ which is converted into a function that always returns the same keyword argument
 for an region.
 =#
 @kwdef struct Sweep{
-        RegionAlgorithms <: AbstractVector, StoppingCriterion <: AI.StoppingCriterion,
-    } <: AIE.Algorithm
-    region_algorithms::RegionAlgorithms
-    stopping_criterion::StoppingCriterion = AI.StopAfterIteration(length(region_algorithms))
+        Algorithms <: AbstractVector, StoppingCriterion <: AI.StoppingCriterion,
+    } <: AIE.NestedAlgorithm
+    algorithms::Algorithms
+    stopping_criterion::StoppingCriterion = AI.StopAfterIteration(length(algorithms))
 end
 function Sweep(f, nalgorithms::Int; kwargs...)
-    region_algorithms = to_region_algorithm.(f.(1:nalgorithms))
-    return Sweep(; region_algorithms, kwargs...)
+    return Sweep(; algorithms = f.(1:nalgorithms), kwargs...)
 end
-to_region_algorithm(algorithm::Function) = algorithm
-to_region_algorithm(algorithm) = Returns(region_algorithm(algorithm))
 
-AIE.max_iterations(algorithm::Sweep) = length(algorithm.algorithms)
-
-abstract type RegionAlgorithm end
-region_algorithm(algorithm::RegionAlgorithm) = algorithm
-region_algorithm(algorithm::NamedTuple) = Region(; algorithm...)
-
-struct Region{R, Kwargs <: NamedTuple} <: RegionAlgorithm
+struct Region{R, Kwargs <: NamedTuple} <: AIE.NonIterativeAlgorithm
     region::R
     kwargs::Kwargs
 end
-function Region(; region, kwargs...)
-    return Region(region, (; kwargs...))
-end
-function Region(region; kwargs...)
-    return Region(region, (; kwargs...))
-end
+Region(; region, kwargs...) = Region(region, (; kwargs...))
+Region(region; kwargs...) = Region(region, (; kwargs...))

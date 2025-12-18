@@ -58,36 +58,6 @@ struct EigenProblem{Operator} <: AIE.Problem
     operator::Operator
 end
 
-function AI.step!(problem::EigenProblem, algorithm::Sweep, state::AI.State; kwargs...)
-    iterate = solve_region!!(
-        problem, algorithm.region_algorithms[state.iteration](state.iterate), state.iterate
-    )
-    state.iterate = iterate
-    return state
-end
-
-# extract!, update!, insert! for the region.
-function solve_region!!(problem::EigenProblem, algorithm::RegionAlgorithm, state)
-    operator = problem.operator
-    region = algorithm.region
-    region_kwargs = algorithm.kwargs
-
-    #=
-    # Reduce the `operator` and state `x` onto the region `region`,
-    # and call `eigsolve` on the reduced operator and state using the
-    # keyword arguments determined from `region_kwargs`.
-    operator_region = reduced_operator(operator, x, region)
-    x_region = reduced_state(x, region)
-    x_region′ = eigsolve(operator_region, x_region; region_kwargs.update...)
-    x′ = insert(x, region, x_region′; region_kwargs.insert...)
-    state.state = x′
-    =#
-
-    # Dummy update for demonstration purposes.
-    state′ = "region = $region" *
-        ", update_kwargs = $(region_kwargs.update)" *
-        ", insert_kwargs = $(region_kwargs.insert)"
-    state = [state; [state′]]
-
-    return state
+function AI.step!(problem::EigenProblem, algorithm::Region, state::AIE.State; kwargs...)
+    return error("Region step for EigenProblem not implemented.")
 end

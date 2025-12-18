@@ -9,9 +9,8 @@ abstract type Algorithm <: AI.Algorithm end
 abstract type State <: AI.State end
 
 function AI.initialize_state!(
-        problem::Problem, algorithm::Algorithm, state::State; iterate = nothing
+        problem::Problem, algorithm::Algorithm, state::State; kwargs...
     )
-    !isnothing(iterate) && (state.iterate = iterate)
     AI.initialize_state!(
         problem, algorithm, algorithm.stopping_criterion, state.stopping_criterion_state
     )
@@ -276,6 +275,25 @@ end
     parent_iteration::Int = 1
     child_iteration::Int = 0
     stopping_criterion_state::StoppingCriterionState
+end
+
+#============================ NonIterativeAlgorithm =======================================#
+
+# Algorithm that only performs a single step.
+abstract type NonIterativeAlgorithm <: Algorithm end
+
+function Base.getproperty(algorithm::NonIterativeAlgorithm, name::Symbol)
+    if name ≡ :stopping_criterion
+        return AI.StopAfterIteration(1)
+    else
+        return getfield(algorithm, name)
+    end
+end
+
+abstract type NonIterativeAlgorithmState <: State end
+
+mutable struct DefaultNonIterativeAlgorithmState{Iterate} <: NonIterativeAlgorithmState
+    iterate::Iterate
 end
 
 end
