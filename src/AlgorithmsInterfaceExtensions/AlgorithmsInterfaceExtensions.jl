@@ -9,8 +9,12 @@ abstract type Algorithm <: AI.Algorithm end
 abstract type State <: AI.State end
 
 function AI.initialize_state!(
-        problem::Problem, algorithm::Algorithm, state::State; kwargs...
+        problem::Problem, algorithm::Algorithm, state::State; iteration = 0, kwargs...
     )
+    for (k, v) in pairs(kwargs)
+        setproperty!(state, k, v)
+    end
+    state.iteration = iteration
     AI.initialize_state!(
         problem, algorithm, algorithm.stopping_criterion, state.stopping_criterion_state
     )

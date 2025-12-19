@@ -55,12 +55,13 @@ end
         stopping_criterion_state = AI.initialize_state(
             problem, algorithm, algorithm.stopping_criterion
         )
-        state = AIE.DefaultState(; iterate = [0.0, 0.0], stopping_criterion_state)
-
-        initial_iterate = [1.0, 2.0]
-        AI.initialize_state!(problem, algorithm, state; iterate = initial_iterate)
-        @test state.iterate == initial_iterate
+        state = AIE.DefaultState(;
+            iteration = 2, iterate = [0.0, 0.0], stopping_criterion_state
+        )
+        AI.initialize_state!(problem, algorithm, state)
+        @test state.iterate == [0.0, 0.0]
         @test state.iteration == 0
+        @test state.stopping_criterion_state == stopping_criterion_state
     end
 
     @testset "initialize_state" begin
@@ -99,13 +100,14 @@ end
         state = AI.initialize_state(problem, algorithm; iterate = copy(initial_iterate))
 
         # Solve with custom initial iterate
+        initial_iterate = [5.0, 10.0]
         final_state = AI.solve!(
             problem, algorithm, state; iterate = copy(initial_iterate)
         )
 
         @test final_state.iteration == 3
-        # Each step increments by 1, so after 3 steps: [10, 20] + 3 = [13, 23]
-        @test final_state.iterate ≈ [13.0, 23.0]
+        # Each step increments by 1, so after 3 steps: [5, 10] + 3 = [8, 13]
+        @test final_state.iterate ≈ [8.0, 13.0]
 
         # Test solve without exclamation
         problem2 = TestProblem([1.0, 2.0])
