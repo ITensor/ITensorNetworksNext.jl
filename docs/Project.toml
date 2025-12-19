@@ -8,5 +8,5 @@ ITensorNetworksNext = {path = ".."}
 
 [compat]
 Documenter = "1"
-ITensorNetworksNext = "0.2"
+ITensorNetworksNext = "0.3"
 Literate = "2"
