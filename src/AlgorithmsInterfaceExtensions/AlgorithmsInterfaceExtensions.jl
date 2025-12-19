@@ -196,7 +196,8 @@ An algorithm that consists of running an algorithm at each iteration
 from a list of stored algorithms.
 =#
 @kwdef struct DefaultNestedAlgorithm{
-        Algorithms <: AbstractVector{<:Algorithm},
+        ChildAlgorithm <: Algorithm,
+        Algorithms <: AbstractVector{ChildAlgorithm},
         StoppingCriterion <: AI.StoppingCriterion,
     } <: NestedAlgorithm
     algorithms::Algorithms
@@ -256,7 +257,8 @@ function AI.step!(
 end
 
 @kwdef struct DefaultFlattenedAlgorithm{
-        Algorithms <: AbstractVector{<:Algorithm},
+        ChildAlgorithm <: Algorithm,
+        Algorithms <: AbstractVector{ChildAlgorithm},
         StoppingCriterion <: AI.StoppingCriterion,
     } <: FlattenedAlgorithm
     algorithms::Algorithms
@@ -281,18 +283,19 @@ end
 
 # Algorithm that only performs a single step.
 abstract type NonIterativeAlgorithm <: Algorithm end
-
-function Base.getproperty(algorithm::NonIterativeAlgorithm, name::Symbol)
-    if name ≡ :stopping_criterion
-        return AI.StopAfterIteration(1)
-    else
-        return getfield(algorithm, name)
-    end
-end
-
 abstract type NonIterativeAlgorithmState <: State end
 
-mutable struct DefaultNonIterativeAlgorithmState{Iterate} <: NonIterativeAlgorithmState
+function AI.initialize_state(problem::Problem, algorithm::NonIterativeAlgorithm; kwargs...)
+    return DefaultNonIterativeAlgorithmState(; kwargs...)
+end
+function AI.solve!(
+        problem::Problem, algorithm::NonIterativeAlgorithm, state::State; kwargs...
+    )
+    return throw(MethodError(AI.solve!, (problem, algorithm, state)))
+end
+
+@kwdef mutable struct DefaultNonIterativeAlgorithmState{Iterate} <:
+    NonIterativeAlgorithmState
     iterate::Iterate
 end
 

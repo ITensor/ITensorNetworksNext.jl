@@ -1,53 +1,6 @@
 import AlgorithmsInterface as AI
 import .AlgorithmsInterfaceExtensions as AIE
 
-maybe_fill(value, len::Int) = fill(value, len)
-function maybe_fill(v::AbstractVector, len::Int)
-    @assert length(v) == len
-    return v
-end
-
-function dmrg_sweep(operator, algorithm, state)
-    problem = select_problem(dmrg_sweep, operator, algorithm, state)
-    return AI.solve(problem, algorithm; iterate = state).iterate
-end
-function dmrg_sweep(operator, state; kwargs...)
-    algorithm = select_algorithm(dmrg_sweep, operator, state; kwargs...)
-    return dmrg_sweep(operator, algorithm, state)
-end
-
-function select_problem(::typeof(dmrg_sweep), operator, algorithm, state)
-    return EigenProblem(operator)
-end
-function select_algorithm(::typeof(dmrg_sweep), operator, state; regions, region_kwargs)
-    region_kwargs′ = maybe_fill(region_kwargs, length(regions))
-    return Sweep(length(regions)) do i
-        return Returns(Region(regions[i]; region_kwargs′[i]...))
-    end
-end
-
-function dmrg(operator, algorithm, state)
-    problem = select_problem(dmrg, operator, algorithm, state)
-    return AI.solve(problem, algorithm; iterate = state).iterate
-end
-function dmrg(operator, state; kwargs...)
-    algorithm = select_algorithm(dmrg, operator, state; kwargs...)
-    return dmrg(operator, algorithm, state)
-end
-
-function select_problem(::typeof(dmrg), operator, algorithm, state)
-    return EigenProblem(operator)
-end
-function select_algorithm(::typeof(dmrg), operator, state; nsweeps, regions, region_kwargs)
-    region_kwargs′ = maybe_fill(region_kwargs, nsweeps)
-    return Sweeping(nsweeps) do i
-        return select_algorithm(
-            dmrg_sweep, operator, state;
-            regions, region_kwargs = region_kwargs′[i],
-        )
-    end
-end
-
 #=
     EigenProblem(operator)
 
@@ -58,6 +11,52 @@ struct EigenProblem{Operator} <: AIE.Problem
     operator::Operator
 end
 
-function AI.step!(problem::EigenProblem, algorithm::Region, state::AIE.State; kwargs...)
-    return error("Region step for EigenProblem not implemented.")
+struct EigsolveRegion{R, Kwargs <: NamedTuple} <: AIE.NonIterativeAlgorithm
+    region::R
+    kwargs::Kwargs
+end
+EigsolveRegion(region; kwargs...) = EigsolveRegion(region, (; kwargs...))
+
+function AI.solve!(
+        problem::EigenProblem, algorithm::EigsolveRegion, state::AIE.State; kwargs...
+    )
+    return error("EigsolveRegion step for EigenProblem not implemented yet.")
+end
+
+maybe_fill(value, len::Int) = fill(value, len)
+function maybe_fill(v::AbstractVector, len::Int)
+    @assert length(v) == len
+    return v
+end
+
+function dmrg(operator, algorithm, state)
+    problem = EigenProblem(operator)
+    return AI.solve(problem, algorithm; iterate = state).iterate
+end
+function dmrg(operator, state; kwargs...)
+    problem = EigenProblem(operator)
+    algorithm = select_algorithm(dmrg, operator, state; kwargs...)
+    return AI.solve(problem, algorithm; iterate = state).iterate
+end
+
+function repeat_last(v::AbstractVector, len::Int)
+    length(v) ≥ len && return v
+    return [v; fill(v[end], len - length(v))]
+end
+repeat_last(v, len::Int) = fill(v, len)
+function extend_columns(nt::NamedTuple, len::Int)
+    return NamedTuple{keys(nt)}(map(v -> repeat_last(v, len), values(nt)))
+end
+function eachrow(nt::NamedTuple, len::Int)
+    return [NamedTuple{keys(nt)}(map(v -> v[i], values(nt))) for i in 1:len]
+end
+
+function select_algorithm(::typeof(dmrg), operator, state; nsweeps, regions, kwargs...)
+    extended_kwargs = extend_columns((; kwargs...), nsweeps)
+    region_kwargs = eachrow(extended_kwargs, nsweeps)
+    return AIE.nested_algorithm(nsweeps) do i
+        return AIE.nested_algorithm(length(regions)) do j
+            return EigsolveRegion(regions[j]; region_kwargs[i]...)
+        end
+    end
 end
