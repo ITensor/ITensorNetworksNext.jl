@@ -1,8 +1,8 @@
 [deps]
 ITensorNetworksNext = "302f2e75-49f0-4526-aef7-d8ba550cb06c"
 
-[sources]
-ITensorNetworksNext = {path = ".."}
+[sources.ITensorNetworksNext]
+path = ".."
 
 [compat]
-ITensorNetworksNext = "0.3"
+ITensorNetworksNext = "0.3, 0.2"
