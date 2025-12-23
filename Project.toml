@@ -1,7 +1,7 @@
 name = "ITensorNetworksNext"
 uuid = "302f2e75-49f0-4526-aef7-d8ba550cb06c"
 authors = ["ITensor developers <support@itensor.org> and contributors"]
-version = "0.3.0"
+version = "0.3.1"
 
 [deps]
 AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
@@ -33,7 +33,7 @@ ITensorNetworksNextTensorOperationsExt = "TensorOperations"
 [compat]
 AbstractTrees = "0.4.5"
 Adapt = "4.3"
-AlgorithmsInterface = "0.1.0"
+AlgorithmsInterface = "0.1"
 BackendSelection = "0.1.6"
 Combinatorics = "1"
 DataGraphs = "0.2.7"
@@ -43,7 +43,7 @@ Dictionaries = "0.4.5"
 Graphs = "1.13.1"
 LinearAlgebra = "1.10"
 MacroTools = "0.5.16"
-NamedDimsArrays = "0.8, 0.9"
+NamedDimsArrays = "0.8, 0.9, 0.10, 0.11"
 NamedGraphs = "0.6.9, 0.7, 0.8"
 SimpleTraits = "0.9.5"
 SplitApplyCombine = "1.2.3"
