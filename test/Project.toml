@@ -22,13 +22,14 @@ ITensorNetworksNext = {path = ".."}
 
 [compat]
 AbstractTrees = "0.4.5"
+AlgorithmsInterface = "0.1"
 Aqua = "0.8.14"
 DiagonalArrays = "0.3.23"
 Dictionaries = "0.4.5"
 Graphs = "1.13.1"
-ITensorBase = "0.3"
+ITensorBase = "0.3, 0.4"
 ITensorNetworksNext = "0.3"
-NamedDimsArrays = "0.8, 0.9"
+NamedDimsArrays = "0.8, 0.9, 0.10, 0.11"
 NamedGraphs = "0.6.8, 0.7, 0.8"
 QuadGK = "2.11.2"
 SafeTestsets = "0.1"
