@@ -1,4 +1,4 @@
-using NamedDimsArrays: AbstractNamedDimsArrayStyle
+using NamedDimsArrays.Broadcast: AbstractNamedDimsArrayStyle
 
 # Lazy broadcasting.
 struct LazyNamedDimsArrayStyle <: AbstractNamedDimsArrayStyle{Any} end
