@@ -53,10 +53,6 @@ Base.eltype(tn::AbstractTensorNetwork) = eltype(vertex_data(tn))
 # Overload if needed
 Graphs.is_directed(::Type{<:AbstractTensorNetwork}) = false
 
-# AbstractDataGraphs overloads
-DataGraphs.vertex_data(::AbstractTensorNetwork) = not_implemented()
-DataGraphs.edge_data(::AbstractTensorNetwork) = not_implemented()
-
 DataGraphs.underlying_graph(::AbstractTensorNetwork) = not_implemented()
 function NamedGraphs.vertex_positions(tn::AbstractTensorNetwork)
     return NamedGraphs.vertex_positions(underlying_graph(tn))
@@ -240,10 +236,7 @@ end
 
 Base.show(io::IO, graph::AbstractTensorNetwork) = show(io, MIME"text/plain"(), graph)
 
-function Graphs.induced_subgraph(graph::AbstractTensorNetwork, subvertices::AbstractVector{V}) where {V <: Int}
-    return tensornetwork_induced_subgraph(graph, subvertices)
-end
-function Graphs.induced_subgraph(graph::AbstractTensorNetwork, subvertices)
+function Graphs.induced_subgraph(graph::AbstractTensorNetwork{V}, subvertices::Vector{V}) where {V}
     return tensornetwork_induced_subgraph(graph, subvertices)
 end
 
