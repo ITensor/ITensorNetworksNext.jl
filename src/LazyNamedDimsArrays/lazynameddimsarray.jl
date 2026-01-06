@@ -7,7 +7,7 @@ using WrappedUnions: @wrapped
     union::Union{A, Mul{LazyNamedDimsArray{T, A}}}
 end
 
-parenttype(::Type{LazyNamedDimsArray{<:Any, A}}) where {A} = A
+parenttype(::Type{LazyNamedDimsArray{T, A}}) where {T, A} = A
 parenttype(::Type{LazyNamedDimsArray{T}}) where {T} = AbstractNamedDimsArray{T}
 parenttype(::Type{LazyNamedDimsArray}) = AbstractNamedDimsArray
 
