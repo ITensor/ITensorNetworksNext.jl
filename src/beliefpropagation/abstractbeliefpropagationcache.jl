@@ -3,11 +3,13 @@ using DataGraphs: AbstractDataGraph, edge_data, vertex_data, edge_data_eltype
 using NamedGraphs.GraphsExtensions: boundary_edges
 using NamedGraphs.PartitionedGraphs: QuotientView, QuotientEdge, parent
 
-messages(::AbstractGraph) = not_implemented()
-messages(bp_cache::AbstractDataGraph) = edge_data(bp_cache)
+messages(bp_cache::AbstractGraph) = edge_data(bp_cache)
 messages(bp_cache::AbstractGraph, edges) = [message(bp_cache, e) for e in edges]
 
-message(bp_cache::AbstractGraph, edge::AbstractEdge) = messages(bp_cache)[edge]
+function message(bp_cache::AbstractGraph, edge::AbstractEdge)
+    ms = messages(bp_cache)
+    return get!(ms, edge, default_message(bp_cache, edge))
+end
 
 deletemessage!(bp_cache::AbstractGraph, edge) = not_implemented()
 function deletemessage!(bp_cache::AbstractDataGraph, edge)
@@ -25,8 +27,7 @@ end
 
 setmessage!(bp_cache::AbstractGraph, edge, message) = not_implemented()
 function setmessage!(bp_cache::AbstractDataGraph, edge, message)
-    ms = messages(bp_cache)
-    set!(ms, edge, message)
+    setindex!(bp_cache, message, edge)
     return bp_cache
 end
 function setmessage!(bp_cache::QuotientView, edge, message)
@@ -56,7 +57,7 @@ factor(bpc::AbstractGraph, vertex) = factors(bpc)[vertex]
 setfactor!(bpc::AbstractGraph, vertex, factor) = not_implemented()
 function setfactor!(bpc::AbstractDataGraph, vertex, factor)
     fs = factors(bpc)
-    set!(fs, vertex, factor)
+    setindex!(fs, vertex, factor)
     return bpc
 end
 
