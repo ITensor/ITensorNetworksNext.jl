@@ -1,9 +1,9 @@
 using Combinatorics: combinations
 using DataGraphs: DataGraphs, AbstractDataGraph, DataGraph
-using Dictionaries: AbstractDictionary, Indices, dictionary
+using Dictionaries: AbstractDictionary, Indices, dictionary, set!, unset!
 using Graphs: AbstractSimpleGraph, rem_vertex!, rem_edge!
 using NamedDimsArrays: AbstractNamedDimsArray, dimnames
-using NamedGraphs: NamedGraphs, NamedEdge, NamedGraph, vertextype
+using NamedGraphs: NamedGraphs, NamedEdge, NamedGraph, vertextype, Vertices, parent_graph_indices
 using NamedGraphs.GraphsExtensions: GraphsExtensions, arranged_edges, arrange_edge, vertextype
 using NamedGraphs.PartitionedGraphs:
     AbstractPartitionedGraph,
@@ -12,9 +12,13 @@ using NamedGraphs.PartitionedGraphs:
     partitioned_vertices,
     partitionedgraph,
     quotient_graph,
-    quotient_graph_type
+    quotient_graph_type,
+    QuotientVertex,
+    QuotientVertices,
+    QuotientVertexVertices,
+    quotientvertices
 using .LazyNamedDimsArrays: lazy, Mul
-using DataGraphs: vertex_data_eltype, vertex_data, edge_data
+using DataGraphs: vertex_data_eltype, vertex_data, edge_data, get_vertices_data
 using DataGraphs.DataGraphsPartitionedGraphsExt
 
 function _TensorNetwork end
@@ -31,7 +35,7 @@ struct TensorNetwork{V, VD, UG <: AbstractGraph{V}, Tensors <: AbstractDictionar
     end
 end
 # This assumes the tensor connectivity matches the graph structure.
-function _TensorNetwork(graph::AbstractGraph, tensors)
+function TensorNetwork(graph::AbstractGraph, tensors::AbstractDictionary)
     return _TensorNetwork(graph, Dictionary(keys(tensors), values(tensors)))
 end
 
@@ -39,10 +43,18 @@ function TensorNetwork{V, VD, UG, Tensors}(graph::UG) where {V, VD, UG <: Abstra
     return _TensorNetwork(graph, Tensors())
 end
 
-DataGraphs.underlying_graph(tn::TensorNetwork) = getfield(tn, :underlying_graph)
-DataGraphs.vertex_data(tn::TensorNetwork) = getfield(tn, :tensors)
-DataGraphs.edge_data(tn::TensorNetwork) = Dictionary{edgetype(tn), Nothing}()
-DataGraphs.vertex_data_eltype(T::Type{<:TensorNetwork}) = eltype(fieldtype(T, :tensors))
+# DataGraphs interface
+
+DataGraphs.underlying_graph(tn::TensorNetwork) = tn.underlying_graph
+
+DataGraphs.has_vertex_data(tn::TensorNetwork, v) = haskey(tn.tensors, v)
+DataGraphs.has_edge_data(tn::TensorNetwork, e) = false
+
+DataGraphs.get_vertex_data(tn::TensorNetwork, v) = tn.tensors[v]
+
+DataGraphs.set_vertex_data!(tn::TensorNetwork, val, v) = set!(tn.tensors, v, val)
+DataGraphs.unset_vertex_data!(tn::TensorNetwork, val, v) = unset!(tn.tensors, v, val)
+
 function DataGraphs.underlying_graph_type(type::Type{<:TensorNetwork})
     return fieldtype(type, :underlying_graph)
 end
@@ -123,17 +135,23 @@ function Graphs.rem_edge!(tn::TensorNetwork, e)
     return true
 end
 
-function GraphsExtensions.graph_from_vertices(type::Type{<:TensorNetwork}, vertices)
+function GraphsExtensions.similar(type::Type{<:TensorNetwork})
     DT = fieldtype(type, :tensors)
     empty_dict = DT()
-    return TensorNetwork(similar_graph(underlying_graph_type(type), vertices), empty_dict)
+    return TensorNetwork(similar_graph(underlying_graph_type(type)), empty_dict)
 end
 
 ## PartitionedGraphs
 function PartitionedGraphs.quotient_graph(tn::TensorNetwork)
     ug = quotient_graph(underlying_graph(tn))
-    return TensorNetwork(ug, vertex_data(QuotientView(tn)))
+
+    inds = Indices(parent_graph_indices(QuotientVertices(tn)))
+    data = map(v -> tn[QuotientVertex(v)], inds)
+
+    return TensorNetwork(ug, data)
 end
+# TODO: This method should not be required with a better interface with a better
+# DataGraphsPartitionedGraphsExt interface.
 function PartitionedGraphs.quotient_graph_type(type::Type{<:TensorNetwork})
     UG = quotient_graph_type(underlying_graph_type(type))
     VD = Vector{vertex_data_eltype(type)}
@@ -141,9 +159,10 @@ function PartitionedGraphs.quotient_graph_type(type::Type{<:TensorNetwork})
     return TensorNetwork{V, VD, UG, Dictionary{V, VD}}
 end
 
+# Partition the underlying graph of the tensor network; does not affect the data.
 function PartitionedGraphs.partitionedgraph(tn::TensorNetwork, parts)
     pg = partitionedgraph(underlying_graph(tn), parts)
-    return TensorNetwork(pg, vertex_data(tn))
+    return TensorNetwork(pg, copy(vertex_data(tn)))
 end
 
 PartitionedGraphs.departition(tn::TensorNetwork) = tn
@@ -153,8 +172,9 @@ function PartitionedGraphs.departition(
     return TensorNetwork(departition(underlying_graph(tn)), vertex_data(tn))
 end
 
-function DataGraphsPartitionedGraphsExt.to_quotient_vertex_data(::TensorNetwork, data)
-    return mapreduce(lazy, *, collect(last(data)))
+function DataGraphs.get_vertices_data(tn::TensorNetwork, vertex::QuotientVertexVertices)
+    data = collect(map(v -> tn[v], NamedGraphs.parent_graph_indices(vertex)))
+    return mapreduce(lazy, *, data)
 end
 
 function PartitionedGraphs.quotientview(tn::TensorNetwork)
