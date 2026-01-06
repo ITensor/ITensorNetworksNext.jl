@@ -2,6 +2,9 @@ using Graphs: SimpleGraph, vertices, edges, has_edge
 using NamedGraphs: AbstractNamedGraph, position_graph
 using NamedGraphs.GraphsExtensions: add_edges!, partition_vertices
 using NamedGraphs.OrderedDictionaries: OrderedDictionary, OrderedIndices
+using NamedDimsArrays: AbstractNamedDimsArray
+using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArray, parenttype, lazy
+
 
 abstract type AbstractBeliefPropagationProblem{Alg} <: AbstractProblem end
 
@@ -45,15 +48,16 @@ function compute!(iter::RegionIterator{<:BeliefPropagationProblem{<:Algorithm"bp
     return iter
 end
 
-default_message(alg, network, edge) = default_message(typeof(alg), network, edge)
-
-default_message(::Type{<:Algorithm}, network, edge) = not_implemented()
-function default_message(::Type{<:Algorithm"bp"}, network, edge)
-
-    #TODO: Get datatype working on tensornetworks so we can support GPU, etc...
-    links = linkinds(network, edge)
-    data = ones(Tuple(links))
-    return data
+function default_message(bpc::BeliefPropagationCache, edge)
+    return default_message(message_type(bpc), network(bpc), edge)
+end
+function default_message(T::Type, network, edge)
+    array = ones(Tuple(linkinds(network, edge)))
+    return convert(T, array)
+end
+function default_message(T::Type{<:LazyNamedDimsArray}, network, edge)
+    message = default_message(parenttype(T), network, edge)
+    return convert(T, lazy(message))
 end
 
 updated_message(alg, bpc, edge) = not_implemented()
