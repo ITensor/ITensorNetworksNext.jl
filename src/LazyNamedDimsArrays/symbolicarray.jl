@@ -28,8 +28,8 @@ end
 function Base.setindex!(a::SymbolicArray{<:Any, N}, value, I::Vararg{Int, N}) where {N}
     return error("Indexing into SymbolicArray not supported.")
 end
-using DerivableInterfaces: DerivableInterfaces
-DerivableInterfaces.permuteddims(a::SymbolicArray, p) = permutedims(a, p)
+using FunctionImplementations: FunctionImplementations
+FunctionImplementations.permuteddims(a::SymbolicArray, p) = permutedims(a, p)
 function Base.permutedims(a::SymbolicArray, p)
     @assert ndims(a) == length(p) && isperm(p)
     return SymbolicArray(symname(a), ntuple(i -> axes(a)[p[i]], ndims(a)))
