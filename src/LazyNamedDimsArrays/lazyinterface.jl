@@ -1,4 +1,4 @@
-using NamedDimsArrays: dename
+using NamedDimsArrays: denamed
 using TermInterface: iscall, maketerm, operation, sorted_arguments
 using WrappedUnions: unwrap
 
@@ -224,11 +224,11 @@ function inds_lazy(a)
         return error("Variant not supported.")
     end
 end
-const dename_lazy = lazy_style(dename)
-function dename_lazy(a)
+const denamed_lazy = lazy_style(denamed)
+function denamed_lazy(a)
     u = unwrap(a)
     if !iscall(u)
-        return dename(u)
+        return denamed(u)
     else
         return error("Variant not supported.")
     end
