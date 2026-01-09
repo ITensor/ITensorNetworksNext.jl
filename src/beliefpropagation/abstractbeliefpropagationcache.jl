@@ -81,7 +81,7 @@ function vertex_scalars(bp_cache::AbstractGraph, vertices = vertices(bp_cache))
     return map(v -> region_scalar(bp_cache, v), vertices)
 end
 
-function edge_scalars(bp_cache::AbstractGraph, edges = edges(bp_cache))
+function edge_scalars(bp_cache::AbstractGraph, edges = edges(undirected_graph(underlying_graph(bp_cache))))
     return map(e -> region_scalar(bp_cache, e), edges)
 end
 
@@ -120,7 +120,9 @@ adapt_factors(to, bp_cache, vs = vertices(bp_cache)) = map_factors(adapt(to), bp
 abstract type AbstractBeliefPropagationCache{V, ED} <: AbstractDataGraph{V, Nothing, ED} end
 
 function free_energy(bp_cache::AbstractBeliefPropagationCache)
+
     numerator_terms, denominator_terms = scalar_factors_quotient(bp_cache)
+
     if any(t -> real(t) < 0, numerator_terms)
         numerator_terms = complex.(numerator_terms)
     end
