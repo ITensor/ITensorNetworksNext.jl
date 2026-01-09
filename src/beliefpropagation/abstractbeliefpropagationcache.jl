@@ -130,7 +130,10 @@ function free_energy(bp_cache::AbstractBeliefPropagationCache)
         denominator_terms = complex.(denominator_terms)
     end
 
-    any(iszero, denominator_terms) && return -Inf
+    if any(iszero, denominator_terms)
+        return -Inf
+    end
+
     return sum(log.(numerator_terms)) - sum(log.((denominator_terms)))
 end
 partitionfunction(bp_cache::AbstractBeliefPropagationCache) = exp(free_energy(bp_cache))
