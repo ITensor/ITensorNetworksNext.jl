@@ -24,7 +24,7 @@ lazy(a::AbstractNamedDimsArray) = LazyNamedDimsArray(a)
 lazy(a::Mul{<:LazyNamedDimsArray}) = LazyNamedDimsArray(a)
 
 NamedDimsArrays.inds(a::LazyNamedDimsArray) = inds_lazy(a)
-NamedDimsArrays.dename(a::LazyNamedDimsArray) = dename_lazy(a)
+NamedDimsArrays.denamed(a::LazyNamedDimsArray) = denamed_lazy(a)
 
 # Broadcasting
 function Base.BroadcastStyle(::Type{<:LazyNamedDimsArray})

@@ -1,11 +1,11 @@
-using NamedDimsArrays: NamedDimsArray, dename, inds
+using NamedDimsArrays: NamedDimsArray, denamed, inds
 # Defined to avoid type piracy.
 # TODO: Define a proper hash function
 # in NamedDimsArrays.jl, maybe one that is
 # independent of the order of dimensions.
 function _hash(a::NamedDimsArray, h::UInt64)
     h = hash(:NamedDimsArray, h)
-    h = hash(dename(a), h)
+    h = hash(denamed(a), h)
     for i in inds(a)
         h = hash(i, h)
     end

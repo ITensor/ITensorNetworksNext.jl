@@ -2,7 +2,8 @@ using AbstractTrees: AbstractTrees, print_tree, printnode
 using Base.Broadcast: materialize
 using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArrays, LazyNamedDimsArray,
     Mul, SymbolicArray, ismul, lazy, substitute, symnameddims
-using NamedDimsArrays: NamedDimsArray, @names, dename, dimnames, inds, nameddims, namedoneto
+using NamedDimsArrays: NamedDimsArray, @names, denamed, dimnames, inds, nameddims,
+    namedoneto
 using TermInterface: arguments, arity, children, head, iscall, isexpr, maketerm, operation,
     sorted_arguments, sorted_children
 using Test: @test, @test_throws, @testset
@@ -93,10 +94,10 @@ using WrappedUnions: unwrap
         a1, a2, a3 = symnameddims.((:a1, :a2, :a3))
         @test a1 isa LazyNamedDimsArray
         @test unwrap(a1) isa NamedDimsArray
-        @test dename(a1) isa SymbolicArray
-        @test dename(unwrap(a1)) isa SymbolicArray
-        @test dename(unwrap(a1)) == SymbolicArray(:a1, ())
-        @test isequal(dename(unwrap(a1)), SymbolicArray(:a1, ()))
+        @test denamed(a1) isa SymbolicArray
+        @test denamed(unwrap(a1)) isa SymbolicArray
+        @test denamed(unwrap(a1)) == SymbolicArray(:a1, ())
+        @test isequal(denamed(unwrap(a1)), SymbolicArray(:a1, ()))
         @test inds(a1) == ()
         @test dimnames(a1) == ()
 

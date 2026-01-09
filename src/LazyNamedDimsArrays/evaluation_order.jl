@@ -1,4 +1,4 @@
-using NamedDimsArrays: dename, inds
+using NamedDimsArrays: denamed, inds
 using TermInterface: arguments, arity, operation
 
 # The time complexity of evaluating `f(args...)`.
@@ -18,16 +18,16 @@ using NamedDimsArrays: AbstractNamedDimsArray
 function time_complexity(
         ::typeof(*), t1::AbstractNamedDimsArray, t2::AbstractNamedDimsArray
     )
-    return prod(length ∘ dename, (inds(t1) ∪ inds(t2)))
+    return prod(length ∘ denamed, (inds(t1) ∪ inds(t2)))
 end
 function time_complexity(
         ::typeof(+), t1::AbstractNamedDimsArray, t2::AbstractNamedDimsArray
     )
     @assert issetequal(inds(t1), inds(t2))
-    return prod(dename, size(t1))
+    return prod(denamed, size(t1))
 end
 function time_complexity(::typeof(*), c::Number, t::AbstractNamedDimsArray)
-    return prod(dename, size(t))
+    return prod(denamed, size(t))
 end
 function time_complexity(::typeof(*), t::AbstractNamedDimsArray, c::Number)
     return time_complexity(*, c, t)
