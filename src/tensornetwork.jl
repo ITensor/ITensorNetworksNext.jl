@@ -35,8 +35,13 @@ struct TensorNetwork{V, VD, UG <: AbstractGraph{V}, Tensors <: AbstractDictionar
     end
 end
 # This assumes the tensor connectivity matches the graph structure.
+function TensorNetwork(graph::AbstractGraph, tensors)
+    return TensorNetwork(graph, Dictionary(keys(tensors), values(tensors)))
+end
 function TensorNetwork(graph::AbstractGraph, tensors::AbstractDictionary)
-    return _TensorNetwork(graph, Dictionary(keys(tensors), values(tensors)))
+    tn = _TensorNetwork(graph, tensors)
+    fix_links!(tn)
+    return tn
 end
 
 function TensorNetwork{V, VD, UG, Tensors}(graph::UG) where {V, VD, UG <: AbstractGraph{V}, Tensors}
@@ -79,11 +84,6 @@ tensornetwork_edges(tensors) = tensornetwork_edges(NamedEdge, tensors)
 
 function TensorNetwork(f::Base.Callable, graph::AbstractGraph)
     return TensorNetwork(graph, Dictionary(map(f, vertices(graph))))
-end
-function TensorNetwork(graph::AbstractGraph, tensors)
-    tn = _TensorNetwork(graph, tensors)
-    fix_links!(tn)
-    return tn
 end
 
 # Insert trivial links for missing edges, and also check
@@ -172,6 +172,7 @@ function PartitionedGraphs.departition(
     return TensorNetwork(departition(underlying_graph(tn)), vertex_data(tn))
 end
 
+# When getting data according the quotient vertices, take a lazy contraction.
 function DataGraphs.get_vertices_data(tn::TensorNetwork, vertex::QuotientVertexVertices)
     data = collect(map(v -> tn[v], NamedGraphs.parent_graph_indices(vertex)))
     return mapreduce(lazy, *, data)

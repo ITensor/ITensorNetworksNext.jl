@@ -1,7 +1,7 @@
 using Adapt: Adapt, adapt, adapt_structure
 using BackendSelection: @Algorithm_str, Algorithm
 using DataGraphs: DataGraphs, AbstractDataGraph, edge_data, underlying_graph,
-    underlying_graph_type, vertex_data
+    underlying_graph_type, vertex_data, set_vertex_data!
 using Dictionaries: Dictionary
 using Graphs: Graphs, AbstractEdge, AbstractGraph, Graph, add_edge!, add_vertex!,
     bfs_tree, center, dst, edges, edgetype, ne, neighbors, nv, rem_edge!, src, vertices
@@ -111,7 +111,7 @@ function sitenames(tn::AbstractGraph, edge::AbstractEdge)
 end
 
 function setindex_preserve_graph!(tn::AbstractGraph, value, vertex)
-    set!(vertex_data(tn), vertex, value)
+    set_vertex_data!(tn, value, vertex)
     return tn
 end
 
