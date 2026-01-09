@@ -14,9 +14,9 @@ using Test: @test, @testset
         C = ITensor([5.0, 1.0], j)
         D = ITensor([-2.0, 3.0, 4.0, 5.0, 1.0], k)
 
-        ABCD_1 = contract_network([A, B, C, D]; order_alg = "left_associative")
-        ABCD_2 = contract_network([A, B, C, D]; order_alg = "eager")
-        ABCD_3 = contract_network([A, B, C, D]; order_alg = "optimal")
+        ABCD_1 = contract_network([A, B, C, D]; alg = "left_associative")
+        ABCD_2 = contract_network([A, B, C, D]; alg = "eager")
+        ABCD_3 = contract_network([A, B, C, D]; alg = "optimal")
 
         @test ABCD_1 == ABCD_2 == ABCD_3
     end
@@ -31,9 +31,9 @@ using Test: @test, @testset
             return randn(Tuple(is))
         end
 
-        z1 = contract_network(tn; order_alg = "left_associative")[]
-        z2 = contract_network(tn; order_alg = "eager")[]
-        z3 = contract_network(tn; order_alg = "optimal")[]
+        z1 = contract_network(tn; alg = "left_associative")[]
+        z2 = contract_network(tn; alg = "eager")[]
+        z3 = contract_network(tn; alg = "optimal")[]
 
         @test abs(z1 - z2) / abs(z1) <= 1.0e3 * eps(Float64)
         @test abs(z1 - z3) / abs(z1) <= 1.0e3 * eps(Float64)
