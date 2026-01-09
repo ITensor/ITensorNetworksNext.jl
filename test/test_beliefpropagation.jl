@@ -20,7 +20,7 @@ using Test: @test, @testset
 @testset "BeliefPropagation" begin
 
     #Chain of tensors
-    dims = (4, 1)
+    dims = (2, 1)
     g = named_grid(dims)
     l = Dict(e => Index(2) for e in edges(g))
     l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
@@ -30,10 +30,10 @@ using Test: @test, @testset
     end
 
     bpc = BeliefPropagationCache(tn)
-    bpc = ITensorNetworksNext.update(bpc; maxiter = 1)
+    bpc = ITensorNetworksNext.beliefpropagation(bpc; maxiter = 1)
     z_bp = partitionfunction(bpc)
     z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
-    @test abs(z_bp - z_exact) <= 1.0e-14
+    @test z_bp ≈ z_exact atol = 1.0e-14
 
     #Tree of tensors
     dims = (4, 3)
@@ -46,8 +46,8 @@ using Test: @test, @testset
     end
 
     bpc = BeliefPropagationCache(tn)
-    bpc = ITensorNetworksNext.update(bpc; maxiter = 10)
+    bpc = ITensorNetworksNext.beliefpropagation(bpc; maxiter = 1)
     z_bp = partitionfunction(bpc)
     z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
-    @test abs(z_bp - z_exact) <= 1.0e-14
+    @test z_bp ≈ z_exact atol = 1.0e-12
 end

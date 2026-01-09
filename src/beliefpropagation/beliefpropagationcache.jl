@@ -23,6 +23,7 @@ using NamedGraphs.GraphsExtensions: default_root_vertex,
     is_path_graph,
     undirected_graph
 using NamedGraphs.PartitionedGraphs: QuotientView, QuotientEdge, QuotientEdges, quotient_graph, quotientedges
+using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArray, lazy, parenttype
 
 struct BeliefPropagationCache{V, G <: AbstractGraph{V}, N <: AbstractGraph{V}, ET, MT} <:
     AbstractBeliefPropagationCache{V, MT}
@@ -124,4 +125,16 @@ function PartitionedGraphs.quotientview(bpc::BeliefPropagationCache)
     inds = Indices(parent_graph_indices(QuotientEdges(underlying_graph(bpc))))
     data = map(e -> bpc[QuotientEdge(e)], inds)
     return BeliefPropagationCache(QuotientView(network(bpc)), data)
+end
+
+function default_message(bpc::BeliefPropagationCache, edge)
+    return default_message(message_type(bpc), network(bpc), edge)
+end
+function default_message(T::Type, network, edge)
+    array = ones(Tuple(linkinds(network, edge)))
+    return convert(T, array)
+end
+function default_message(T::Type{<:LazyNamedDimsArray}, network, edge)
+    message = default_message(parenttype(T), network, edge)
+    return convert(T, lazy(message))
 end
