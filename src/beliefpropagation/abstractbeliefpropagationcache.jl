@@ -62,7 +62,7 @@ function setfactor!(bpc::AbstractDataGraph, vertex, factor)
 end
 
 function region_scalar(bp_cache::AbstractGraph, edge::AbstractEdge)
-    return message(bp_cache, edge) * message(bp_cache, reverse(edge))
+    return (message(bp_cache, edge) * message(bp_cache, reverse(edge)))[]
 end
 
 function region_scalar(bp_cache::AbstractGraph, vertex)
@@ -70,7 +70,7 @@ function region_scalar(bp_cache::AbstractGraph, vertex)
     messages = incoming_messages(bp_cache, vertex)
     state = factors(bp_cache, vertex)
 
-    return reduce(*, messages) * reduce(*, state)
+    return (reduce(*, messages) * reduce(*, state))[]
 end
 
 message_type(bpc::AbstractGraph) = message_type(typeof(bpc))
