@@ -1,7 +1,10 @@
 name = "ITensorNetworksNext"
 uuid = "302f2e75-49f0-4526-aef7-d8ba550cb06c"
+version = "0.3.6"
 authors = ["ITensor developers <support@itensor.org> and contributors"]
-version = "0.3.5"
+
+[workspace]
+projects = ["benchmark", "dev", "docs", "examples", "test"]
 
 [deps]
 AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
@@ -39,7 +42,7 @@ Combinatorics = "1"
 DataGraphs = "0.2.7"
 DiagonalArrays = "0.3.23"
 Dictionaries = "0.4.5"
-FunctionImplementations = "0.3"
+FunctionImplementations = "0.3, 0.4"
 Graphs = "1.13.1"
 LinearAlgebra = "1.10"
 MacroTools = "0.5.16"
@@ -52,6 +55,3 @@ TermInterface = "2"
 TypeParameterAccessors = "0.4.4"
 WrappedUnions = "0.3"
 julia = "1.10"
-
-[workspace]
-projects = ["benchmark", "dev", "docs", "examples", "test"]
