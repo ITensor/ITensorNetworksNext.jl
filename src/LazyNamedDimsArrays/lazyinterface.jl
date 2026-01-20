@@ -23,9 +23,9 @@ opwalk(opmap, a) = walk(opmap, identity, a)
 argwalk(argmap, a) = walk(identity, argmap, a)
 
 # Generic lazy functionality.
-using FunctionImplementations: AbstractArrayStyle
-struct LazyStyle <: AbstractArrayStyle end
-const lazy_style = LazyStyle()
+using FunctionImplementations: AbstractArrayImplementationStyle
+struct LazyNamedDimsArrayImplementationStyle <: AbstractArrayImplementationStyle end
+const lazy_style = LazyNamedDimsArrayImplementationStyle()
 
 const maketerm_lazy = lazy_style(maketerm)
 function maketerm_lazy(type::Type, head, args, metadata)
