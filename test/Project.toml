@@ -17,8 +17,8 @@ TermInterface = "8ea1fca8-c5ef-4a55-8b96-4e9afe9c9a3c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 WrappedUnions = "325db55a-9c6c-5b90-b1a2-ec87e7a38c44"
 
-[sources]
-ITensorNetworksNext = {path = ".."}
+[sources.ITensorNetworksNext]
+path = ".."
 
 [compat]
 AbstractTrees = "0.4.5"
@@ -27,7 +27,7 @@ Aqua = "0.8.14"
 DiagonalArrays = "0.3.23"
 Dictionaries = "0.4.5"
 Graphs = "1.13.1"
-ITensorBase = "0.3, 0.4"
+ITensorBase = "0.3, 0.4, 0.5"
 ITensorNetworksNext = "0.3"
 NamedDimsArrays = "0.13"
 NamedGraphs = "0.6.8, 0.7, 0.8"
