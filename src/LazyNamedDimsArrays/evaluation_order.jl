@@ -1,4 +1,4 @@
-using NamedDimsArrays: denamed, inds
+using NamedDimsArrays: denamed, dimnames, inds
 using TermInterface: arguments, arity, operation
 
 # The time complexity of evaluating `f(args...)`.
@@ -23,7 +23,7 @@ end
 function time_complexity(
         ::typeof(+), t1::AbstractNamedDimsArray, t2::AbstractNamedDimsArray
     )
-    @assert issetequal(inds(t1), inds(t2))
+    @assert issetequal(dimnames(t1), dimnames(t2))
     return prod(denamed, size(t1))
 end
 function time_complexity(::typeof(*), c::Number, t::AbstractNamedDimsArray)
@@ -100,7 +100,7 @@ function optimize_contraction_order(alg::Algorithm"eager", a)
         # Penalize outer product contractions.
         # TODO: Still order the outer products by time complexity,
         # say by checking if there are only outer products left.
-        isdisjoint(inds(a1), inds(a2)) && return typemax(Int)
+        isdisjoint(dimnames(a1), dimnames(a2)) && return typemax(Int)
         return time_complexity(*, a1, a2)
     end
     contracted_arguments = [filter(∉((a1, a2)), arguments(a)); [a1 * a2]]

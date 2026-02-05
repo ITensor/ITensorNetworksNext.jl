@@ -1,4 +1,4 @@
-using NamedDimsArrays: denamed
+using NamedDimsArrays: denamed, dimnames, inds
 using TermInterface: iscall, maketerm, operation, sorted_arguments
 using WrappedUnions: unwrap
 
@@ -213,6 +213,17 @@ mul_lazy(a1::Number, a2::Number) = a1 * a2
 div_lazy(a1, a2::Number) = error("Not implemented.")
 
 # NamedDimsArrays.jl interface.
+const dimnames_lazy = lazy_style(dimnames)
+function dimnames_lazy(a)
+    u = unwrap(a)
+    if !iscall(u)
+        return dimnames(u)
+    elseif ismul(u)
+        return mapreduce(dimnames, symdiff, arguments(u))
+    else
+        return error("Variant not supported.")
+    end
+end
 const inds_lazy = lazy_style(inds)
 function inds_lazy(a)
     u = unwrap(a)
