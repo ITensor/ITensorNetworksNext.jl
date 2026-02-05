@@ -38,12 +38,12 @@ function get_order(alg::Algorithm"exact", tn)
     end
     # Contraction order may or may not have indices attached, canonicalize the format
     # by attaching indices.
-    subs = Dict(symnameddims(i) => symnameddims(i, Tuple(inds(tn[i]))) for i in keys(tn))
+    subs = Dict(symnameddims(i) => symnameddims(i, Tuple(axes(tn[i]))) for i in keys(tn))
     return substitute(order, subs)
 end
 function contract_network(alg::Algorithm"exact", tn)
     order = get_order(alg, tn)
-    syms_to_ts = Dict(symnameddims(i, Tuple(inds(tn[i]))) => lazy(tn[i]) for i in keys(tn))
+    syms_to_ts = Dict(symnameddims(i, Tuple(axes(tn[i]))) => lazy(tn[i]) for i in keys(tn))
     tn_expression = substitute(order, syms_to_ts)
     return materialize(tn_expression)
 end
@@ -57,11 +57,11 @@ end
 # Convert the tensor network to a flat symbolic multiplication expression.
 function contraction_order(alg::Algorithm"flat", tn)
     # Same as: `reduce((a, b) -> *(a, b; flatten = true), syms)`.
-    syms = vec([symnameddims(i, Tuple(inds(tn[i]))) for i in keys(tn)])
+    syms = vec([symnameddims(i, Tuple(axes(tn[i]))) for i in keys(tn)])
     return lazy(Mul(syms))
 end
 function contraction_order(alg::Algorithm"left_associative", tn)
-    return prod(i -> symnameddims(i, Tuple(inds(tn[i]))), keys(tn))
+    return prod(i -> symnameddims(i, Tuple(axes(tn[i]))), keys(tn))
 end
 function contraction_order(alg::Algorithm, tn)
     s = contraction_order(Algorithm"flat"(), tn)

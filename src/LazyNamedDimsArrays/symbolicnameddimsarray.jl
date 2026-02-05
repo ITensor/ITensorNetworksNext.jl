@@ -1,9 +1,9 @@
-using NamedDimsArrays: NamedDimsArray, denamed, inds, nameddims
+using NamedDimsArrays: NamedDimsArray, denamed, dimnames, name, nameddims
 
 const SymbolicNamedDimsArray{T, N, Parent <: SymbolicArray{T, N}, DimNames} =
     NamedDimsArray{T, N, Parent, DimNames}
-function symnameddims(name, dims)
-    return lazy(nameddims(SymbolicArray(name, denamed.(dims)), dims))
+function symnameddims(symname, dims)
+    return lazy(nameddims(SymbolicArray(symname, denamed.(dims)), name.(dims)))
 end
 symnameddims(name) = symnameddims(name, ())
 using AbstractTrees: AbstractTrees
@@ -16,7 +16,7 @@ function AbstractTrees.printnode(io::IO, a::SymbolicNamedDimsArray)
 end
 printnode_nameddims(io::IO, a::SymbolicNamedDimsArray) = AbstractTrees.printnode(io, a)
 function Base.:(==)(a::SymbolicNamedDimsArray, b::SymbolicNamedDimsArray)
-    return issetequal(inds(a), inds(b)) && denamed(a) == denamed(b)
+    return issetequal(dimnames(a), dimnames(b)) && denamed(a) == denamed(b)
 end
 Base.:*(a::SymbolicNamedDimsArray, b::SymbolicNamedDimsArray) = lazy(a) * lazy(b)
 Base.:*(a::SymbolicNamedDimsArray, b::LazyNamedDimsArray) = lazy(a) * b
