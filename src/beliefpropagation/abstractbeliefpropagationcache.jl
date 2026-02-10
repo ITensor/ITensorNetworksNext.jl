@@ -1,15 +1,12 @@
 using Graphs: AbstractGraph, AbstractEdge
-using DataGraphs: AbstractDataGraph, edge_data, vertex_data, edge_data_eltype
+using DataGraphs: AbstractDataGraph, edge_data, vertex_data, edge_data_type
 using NamedGraphs.GraphsExtensions: boundary_edges
 using NamedGraphs.PartitionedGraphs: QuotientView, QuotientEdge, parent
 
 messages(bp_cache::AbstractGraph) = edge_data(bp_cache)
 messages(bp_cache::AbstractGraph, edges) = [message(bp_cache, e) for e in edges]
 
-function message(bp_cache::AbstractGraph, edge::AbstractEdge)
-    ms = messages(bp_cache)
-    return get!(ms, edge, default_message(bp_cache, edge))
-end
+message(bp_cache::AbstractGraph, edge::AbstractEdge) = messages(bp_cache)[edge]
 
 deletemessage!(bp_cache::AbstractGraph, edge) = not_implemented()
 function deletemessage!(bp_cache::AbstractDataGraph, edge)
@@ -52,7 +49,7 @@ factors(bpc::AbstractGraph) = vertex_data(bpc)
 factors(bpc::AbstractGraph, vertices::Vector) = [factor(bpc, v) for v in vertices]
 factors(bpc::AbstractGraph{V}, vertex::V) where {V} = factors(bpc, V[vertex])
 
-factor(bpc::AbstractGraph, vertex) = factors(bpc)[vertex]
+factor(bpc::AbstractGraph, vertex) = bpc[vertex]
 
 setfactor!(bpc::AbstractGraph, vertex, factor) = not_implemented()
 function setfactor!(bpc::AbstractDataGraph, vertex, factor)
@@ -75,7 +72,7 @@ end
 
 message_type(bpc::AbstractGraph) = message_type(typeof(bpc))
 message_type(G::Type{<:AbstractGraph}) = eltype(Base.promote_op(messages, G))
-message_type(type::Type{<:AbstractDataGraph}) = edge_data_eltype(type)
+message_type(type::Type{<:AbstractDataGraph}) = edge_data_type(type)
 
 function vertex_scalars(bp_cache::AbstractGraph, vertices = vertices(bp_cache))
     return map(v -> region_scalar(bp_cache, v), vertices)
@@ -117,7 +114,13 @@ end
 adapt_messages(to, bp_cache, es = edges(bp_cache)) = map_messages(adapt(to), bp_cache, es)
 adapt_factors(to, bp_cache, vs = vertices(bp_cache)) = map_factors(adapt(to), bp_cache, vs)
 
-abstract type AbstractBeliefPropagationCache{V, ED} <: AbstractDataGraph{V, Nothing, ED} end
+abstract type AbstractBeliefPropagationCache{V, VD, ED} <: AbstractDataGraph{V, VD, ED} end
+
+factor_type(bpc::AbstractBeliefPropagationCache) = typeof(bpc)
+factor_type(::Type{<:AbstractBeliefPropagationCache{<:Any, VD}}) where {VD} = VD
+
+message_type(bpc::AbstractBeliefPropagationCache) = message_type(typeof(bpc))
+message_type(::Type{<:AbstractBeliefPropagationCache{<:Any, <:Any, ED}}) where {ED} = ED
 
 function free_energy(bp_cache::AbstractBeliefPropagationCache)
 

@@ -16,7 +16,8 @@ using NamedGraphs.GraphsExtensions:
     incident_edges,
     rem_edges!,
     rename_vertices,
-    vertextype
+    vertextype,
+    similar_graph
 using SplitApplyCombine: flatten
 using NamedGraphs.SimilarType: similar_type
 
@@ -25,7 +26,7 @@ abstract type AbstractTensorNetwork{V, VD} <: AbstractDataGraph{V, VD, Nothing} 
 # Need to be careful about removing edges from tensor networks in case there is a bond
 Graphs.rem_edge!(::AbstractTensorNetwork, edge) = not_implemented()
 
-DataGraphs.edge_data_eltype(::Type{<:AbstractTensorNetwork}) = not_implemented()
+DataGraphs.edge_data_type(::Type{<:AbstractTensorNetwork}) = not_implemented()
 
 # Graphs.jl overloads
 function Graphs.weights(graph::AbstractTensorNetwork)
@@ -235,18 +236,3 @@ function Base.show(io::IO, mime::MIME"text/plain", graph::AbstractTensorNetwork)
 end
 
 Base.show(io::IO, graph::AbstractTensorNetwork) = show(io, MIME"text/plain"(), graph)
-
-function Graphs.induced_subgraph(graph::AbstractTensorNetwork{V}, subvertices::Vector{V}) where {V}
-    return tensornetwork_induced_subgraph(graph, subvertices)
-end
-
-function tensornetwork_induced_subgraph(graph, subvertices)
-    underlying_subgraph, vlist = Graphs.induced_subgraph(underlying_graph(graph), subvertices)
-    subgraph = similar_type(graph)(underlying_subgraph)
-    for v in vertices(subgraph)
-        if isassigned(graph, v)
-            set!(vertex_data(subgraph), v, graph[v])
-        end
-    end
-    return subgraph, vlist
-end
