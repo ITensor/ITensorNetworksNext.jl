@@ -1,8 +1,9 @@
 using Graphs: SimpleGraph, vertices, edges, has_edge, AbstractEdge
 using NamedGraphs: AbstractNamedGraph, position_graph
-using NamedGraphs.GraphsExtensions: add_edges!, partition_vertices
+using NamedGraphs.GraphsExtensions: add_edges!, partition_vertices, subgraph, boundary_edges
 using NamedGraphs.OrderedDictionaries: OrderedDictionary, OrderedIndices
 using NamedDimsArrays: AbstractNamedDimsArray
+using NamedGraphs.PartitionedGraphs: quotientvertices
 using DataGraphs: edge_data
 
 import AlgorithmsInterface as AI
@@ -41,55 +42,35 @@ function AI.is_finished!(
     # maxdiff = 0.0 initially, so skip this the first time.
     if state.iteration > 0
         st.delta = state.iterate.maxdiff
+        @info "$(state.iteration): $(st.delta)"
     end
 
     return st.delta < c.tol
 end
 
-struct BeliefPropagationProblem{Network} <: AIE.Problem
-    network::Network
-end
+# struct BeliefPropagationProblem{Network} <: AIE.Problem
+#     network::Network
+# end
 
-@kwdef mutable struct BeliefPropagationState{
-        Iterate <: BeliefPropagationCache,
-        Diffs,
-    } <: AIE.NonIterativeAlgorithmState
+struct BeliefPropagationProblem <: AIE.Problem end
+
+@kwdef mutable struct BeliefPropagationState{Iterate, Diffs} <: AIE.NonIterativeAlgorithmState
     iterate::Iterate
     diffs::Diffs = similar(edge_data(iterate), Float64)
     maxdiff::Float64 = 0.0
 end
 
-function AI.initialize_state(
-        problem::BeliefPropagationProblem,
-        algorithm::AIE.NonIterativeAlgorithm; iterate, kwargs...
-    )
-
-    diffs = iterate.diffs
-    maxdiff = iterate.maxdiff
-
-    return BeliefPropagationState(; iterate = iterate.iterate, diffs, maxdiff, kwargs...)
+@kwdef struct BeliefPropagation{
+        ChildAlgorithm <: AIE.Algorithm,
+        Algorithms <: AbstractVector{ChildAlgorithm},
+        StoppingCriterion <: AI.StoppingCriterion,
+    } <: AIE.NestedAlgorithm
+    algorithms::Algorithms
+    stopping_criterion::StoppingCriterion = AI.StopAfterIteration(length(algorithms))
 end
 
-# This gets called at the start of every sweep.
-function AI.initialize_state!(
-        problem::BeliefPropagationProblem,
-        algorithm::AIE.NestedAlgorithm,
-        state::AIE.State,
-    )
-    state.iterate.maxdiff = 0.0
-    return state
-end
-
-function AIE.set_substate!(
-        ::BeliefPropagationProblem,
-        ::AIE.NestedAlgorithm,
-        state::AIE.State,
-        substate::BeliefPropagationState
-    )
-
-    state.iterate = substate
-
-    return state
+function BeliefPropagation(f::Function, niterations::Int; kwargs...)
+    return BeliefPropagation(; algorithms = f.(1:niterations), kwargs...)
 end
 
 abstract type AbstractMessageUpdate <: AIE.NonIterativeAlgorithm end
@@ -101,7 +82,7 @@ end
 
 function SimpleMessageUpdate(
         edge;
-        normalize = false,
+        normalize = true,
         contraction_alg = "eager",
         compute_diff = false,
         kwargs...
@@ -117,6 +98,53 @@ function Base.getproperty(alg::SimpleMessageUpdate, name::Symbol)
     end
 end
 
+struct BeliefPropagationSweep{
+        ChildAlgorithm <: AIE.Algorithm,
+        Algorithms <: AbstractVector{ChildAlgorithm},
+    } <: AIE.NestedAlgorithm
+    algorithms::Algorithms
+    stopping_criterion::AI.StopAfterIteration
+    function BeliefPropagationSweep(; algorithms)
+        stopping_criterion = AI.StopAfterIteration(length(algorithms))
+        return new{eltype(algorithms), typeof(algorithms)}(algorithms, stopping_criterion)
+    end
+end
+
+BeliefPropagationSweep(f::Function, edges) = BeliefPropagationSweep(; algorithms = f.(edges))
+
+function AI.initialize_state(
+        problem::BeliefPropagationProblem,
+        update_algorithm::AIE.NonIterativeAlgorithm; iterate, kwargs...
+    )
+
+    diffs = iterate.diffs
+    maxdiff = iterate.maxdiff
+
+    return BeliefPropagationState(; iterate = iterate.iterate, diffs, maxdiff, kwargs...)
+end
+
+# This gets called at the start of every sweep.
+function AI.initialize_state!(
+        ::BeliefPropagationProblem,
+        ::BeliefPropagationSweep,
+        iteration_state::AIE.State,
+    )
+    iteration_state.iterate.maxdiff = 0.0
+    return iteration_state
+end
+
+function AIE.set_substate!(
+        ::BeliefPropagationProblem,
+        sweep_algorithm::BeliefPropagationSweep,
+        sweep_state::AIE.DefaultState,
+        noniterative_substate::BeliefPropagationState,
+    )
+
+    sweep_state.iterate = noniterative_substate
+
+    return sweep_state
+end
+
 struct MessageUpdateProblem{Messages, Factors} <: AIE.Problem
     messages::Messages
     factors::Factors
@@ -124,7 +152,7 @@ end
 
 function AI.solve!(
         problem::BeliefPropagationProblem,
-        algorithm::AbstractMessageUpdate,
+        algorithm::SimpleMessageUpdate,
         state::BeliefPropagationState;
         logging_context_prefix = default_logging_context_prefix(problem, algorithm),
     )
@@ -177,7 +205,7 @@ end
 function AI.solve!(
         problem::MessageUpdateProblem,
         algorithm::SimpleMessageUpdate,
-        state::AIE.NonIterativeAlgorithmState;
+        state::AIE.DefaultNonIterativeAlgorithmState;
         logging_context_prefix = AI.default_logging_context_prefix(problem, algorithm),
         kwargs...
     )
@@ -209,24 +237,29 @@ end
 beliefpropagation(network; kwargs...) = beliefpropagation(BeliefPropagationCache(network); kwargs...)
 function beliefpropagation(cache::AbstractBeliefPropagationCache; kwargs...)
 
-    problem = BeliefPropagationProblem(network(cache))
+    # problem = BeliefPropagationProblem(network(cache))
+    problem = BeliefPropagationProblem()
 
     algorithm = select_algorithm(beliefpropagation, cache; kwargs...)
 
     # The nested algorithms will wrap and manipulate this object.
+
     base_state = BeliefPropagationState(; iterate = cache)
 
-    state = AI.solve(problem, algorithm; iterate = base_state)
+    state = AI.initialize_state(problem, algorithm; iterate = base_state)
+
+    state = AI.solve!(problem, algorithm, state)
 
     return state.iterate.iterate
 end
 
+
 function select_algorithm(
         ::typeof(beliefpropagation),
-        cache;
+        cache::AbstractBeliefPropagationCache;
         edges = forest_cover_edge_sequence(network(cache)),
         maxiter = is_tree(network(cache)) ? 1 : nothing,
-        tol = 0.0,
+        tol = -Inf,
         kwargs...
     )
 
@@ -237,7 +270,7 @@ function select_algorithm(
     stopping_criterion = AI.StopAfterIteration(maxiter)
     compute_diff = false
 
-    if tol > 0.0
+    if tol > -Inf
         stopping_criterion = stopping_criterion | StopWhenConverged(tol)
         compute_diff = true
     end
@@ -245,9 +278,14 @@ function select_algorithm(
     extended_kwargs = extend_columns((; compute_diff, kwargs...), maxiter)
     edge_kwargs = rows(extended_kwargs, len = maxiter)
 
-    return AIE.nested_algorithm(maxiter; stopping_criterion) do repnum
-        return AIE.nested_algorithm(length(edges)) do edgenum
-            return SimpleMessageUpdate(edges[edgenum]; edge_kwargs[repnum]...)
-        end
+    return BeliefPropagation(maxiter; stopping_criterion) do repnum
+        return beliefpropagation_sweep(cache; edges, edge_kwargs[repnum]...)
+    end
+end
+
+# A single sweep across the given edges.
+function beliefpropagation_sweep(cache::BeliefPropagationCache; edges, kwargs...)
+    return BeliefPropagationSweep(edges) do edge
+        return SimpleMessageUpdate(edge; kwargs...)
     end
 end
