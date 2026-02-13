@@ -1,46 +1,29 @@
-using DataGraphs:
-    DataGraphs,
-    AbstractDataGraph,
-    DataGraph,
-    get_vertex_data,
-    get_edge_data,
-    set_vertex_data!,
-    set_edge_data!,
-    vertex_data_type,
-    edge_data_type,
-    underlying_graph,
-    underlying_graph_type,
-    is_vertex_assigned,
-    is_edge_assigned
-using Dictionaries: Dictionary, set!, delete!
-using Graphs: AbstractGraph, is_tree, connected_components, is_directed
-using NamedGraphs: NamedDiGraph, convert_vertextype, parent_graph_indices, Vertices
-using NamedGraphs.GraphsExtensions: default_root_vertex,
-    forest_cover,
-    post_order_dfs_edges,
-    vertextype,
-    is_path_graph,
-    undirected_graph
-using NamedGraphs.PartitionedGraphs: QuotientView, QuotientEdge, QuotientEdges, quotient_graph, quotientedges
+using DataGraphs: AbstractDataGraph, DataGraphs, edge_data, edge_data_type,
+    set_vertex_data!, underlying_graph, underlying_graph_type, vertex_data,
+    vertex_data_type
+using Dictionaries: Dictionary, delete!, set!, getindices
+using Graphs: AbstractGraph, connected_components, is_tree, is_directed
 using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArray, lazy, parenttype
+using NamedGraphs.GraphsExtensions: default_root_vertex, forest_cover, post_order_dfs_edges, undirected_graph, vertextype
+using NamedGraphs.PartitionedGraphs: QuotientEdge, QuotientView, quotient_graph
 
-struct BeliefPropagationCache{V, VD, ED, G <: AbstractGraph{V}, N <: AbstractGraph{V}, E} <:
-    AbstractBeliefPropagationCache{V, VD, ED}
+using NamedGraphs: Vertices, convert_vertextype, parent_graph_indices
+
+struct BeliefPropagationCache{V, VD, ED, E, G <: AbstractGraph{V}} <: AbstractBeliefPropagationCache{V, VD, ED}
     underlying_graph::G # we only use this for the edges.
-    network::N
+    factors::Dictionary{V, VD}
     messages::Dictionary{E, ED}
-    function BeliefPropagationCache(network::AbstractGraph, messages::Dictionary)
+    function BeliefPropagationCache(graph::AbstractGraph, factors::Dictionary, messages::Dictionary)
+        # Ensure the graph is directed, if not make it directed.
+        digraph = is_directed(graph) ? graph : directed_graph(graph)
 
-        V = vertextype(network)
-        VD = vertex_data_type(network)
-        N = typeof(network)
-        ET = keytype(messages)
+        V = keytype(factors)
+        VD = eltype(factors)
+
+        E = keytype(messages)
         ED = eltype(messages)
 
-        # Construct a directed graph version of the underlying graph of the tensor network.
-        digraph = directed_graph(underlying_graph(network))
-
-        bpc = new{V, VD, ED, typeof(digraph), N, ET}(digraph, network, messages)
+        bpc = new{V, VD, ED, E, typeof(digraph)}(digraph, factors, messages)
 
         for edge in edges(bpc)
             get!(() -> default_message(bpc, edge), messages, edge)
@@ -49,30 +32,39 @@ struct BeliefPropagationCache{V, VD, ED, G <: AbstractGraph{V}, N <: AbstractGra
     end
 end
 
-network(bp_cache) = getfield(bp_cache, :network)
+DataGraphs.underlying_graph(bpc::BeliefPropagationCache) = bpc.underlying_graph
 
-DataGraphs.underlying_graph(bpc::BeliefPropagationCache) = getfield(bpc, :underlying_graph)
-
-DataGraphs.is_vertex_assigned(bpc::BeliefPropagationCache, vertex) = is_vertex_assigned(network(bpc), vertex)
+DataGraphs.is_vertex_assigned(bpc::BeliefPropagationCache, vertex) = haskey(bpc.factors, vertex)
 DataGraphs.is_edge_assigned(bpc::BeliefPropagationCache, edge) = haskey(bpc.messages, edge)
 
-DataGraphs.get_vertex_data(bpc::BeliefPropagationCache, vertex) = get_vertex_data(network(bpc), vertex)
+DataGraphs.get_vertex_data(bpc::BeliefPropagationCache, vertex) = bpc.factors[vertex]
 DataGraphs.get_edge_data(bpc::BeliefPropagationCache, edge::AbstractEdge) = bpc.messages[edge]
 
-DataGraphs.set_vertex_data!(bpc::BeliefPropagationCache, val, vertex) = set_vertex_data!(network(bpc), val, vertex)
+DataGraphs.set_vertex_data!(bpc::BeliefPropagationCache, val, vertex) = set!(bpc.factors, vertex, val)
 DataGraphs.set_edge_data!(bpc::BeliefPropagationCache, val, edge) = set!(bpc.messages, edge, val)
 
+# These two methods assume `network` behaves llike a tensor network
+# (could be e.g. a QuotientView) otherwise how would one know what the factors should be.
 function BeliefPropagationCache(network::AbstractGraph)
-    MT = vertex_data_type(typeof(network))
-    return BeliefPropagationCache(MT, network)
+    graph = underlying_graph(network)
+    return BeliefPropagationCache(graph, copy(vertex_data(network)))
 end
 function BeliefPropagationCache(MT::Type, network::AbstractGraph)
-    dict = Dictionary{edgetype(network), MT}()
-    return BeliefPropagationCache(network, dict)
+    graph = underlying_graph(network)
+    return BeliefPropagationCache(MT, graph, copy(vertex_data(network)))
+end
+
+function BeliefPropagationCache(graph::AbstractGraph, factors::Dictionary)
+    MT = vertex_data_type(typeof(graph))
+    return BeliefPropagationCache(MT, graph, factors)
+end
+function BeliefPropagationCache(MT::Type, graph::AbstractGraph, factors::Dictionary)
+    messages = Dictionary{edgetype(graph), MT}()
+    return BeliefPropagationCache(graph, factors, messages)
 end
 
 function Base.copy(bp_cache::BeliefPropagationCache)
-    return BeliefPropagationCache(copy(network(bp_cache)), copy(messages(bp_cache)))
+    return BeliefPropagationCache(copy(bp_cache.underlying_graph), copy(bp_cache.factors), copy(bp_cache.messages))
 end
 
 # TODO: This needs to go in GraphsExtensions
@@ -92,41 +84,50 @@ function forest_cover_edge_sequence(gi::AbstractGraph; root_vertex = default_roo
     return rv
 end
 
-function bpcache_induced_subgraph(graph, subvertices)
-    underlying_subgraph, vlist = Graphs.induced_subgraph(network(graph), subvertices)
+function induced_subgraph_bpcache(graph, subvertices)
+    underlying_subgraph, vlist = Graphs.induced_subgraph(underlying_graph(graph), subvertices)
 
-    edge_data = Dictionary{edgetype(underlying_subgraph), edge_data_type(typeof(graph))}()
+    assigned = v -> isassigned(graph, v)
 
-    subgraph = BeliefPropagationCache(underlying_subgraph, edge_data)
-    for e in edges(subgraph)
-        if isassigned(graph, e)
-            subgraph[e] = graph[e]
-        end
-    end
+    assigned_subvertices = Iterators.filter(assigned, subvertices)
+    assigned_subedges = Iterators.filter(assigned, edges(underlying_subgraph))
+
+    factors = getindices(vertex_data(graph), Indices(assigned_subvertices))
+    messages = getindices(edge_data(graph), Indices(assigned_subedges))
+
+    subgraph = BeliefPropagationCache(underlying_subgraph, factors, messages)
+
     return subgraph, vlist
 end
 
 function NamedGraphs.induced_subgraph_from_vertices(graph::BeliefPropagationCache, subvertices)
-    return bpcache_induced_subgraph(graph, subvertices)
+    return induced_subgraph_bpcache(graph, subvertices)
 end
 
 ## PartitionedGraphs
 
+# Take a QuotientView of the underlying graph.
 function PartitionedGraphs.quotientview(bpc::BeliefPropagationCache)
-    inds = Indices(parent_graph_indices(QuotientEdges(underlying_graph(bpc))))
-    data = map(e -> bpc[QuotientEdge(e)], inds)
-    return BeliefPropagationCache(QuotientView(network(bpc)), data)
+
+    graph = underlying_graph(bpc)
+
+    quotient_view = QuotientView(graph)
+
+    factors = map(v -> bpc[QuotientVertex(v)], Indices(vertices(quotient_view)))
+    messages = map(e -> bpc[QuotientEdge(e)], Indices(edges(quotient_view)))
+
+    return BeliefPropagationCache(quotient_view, factors, messages)
 end
 
 function default_message(bpc::BeliefPropagationCache, edge)
-    return default_message(message_type(bpc), network(bpc), edge)
+    return default_message(message_type(bpc), bpc[src(edge)], bpc[dst(edge)])
 end
-function default_message(T::Type, network, edge)
-    array = ones(Tuple(linkinds(network, edge)))
+function default_message(T::Type, src, dst)
+    array = ones(Tuple(inds(src) ∩ inds(dst)))
     return convert(T, array)
 end
-function default_message(T::Type{<:LazyNamedDimsArray}, network, edge)
-    message = default_message(parenttype(T), network, edge)
+function default_message(T::Type{<:LazyNamedDimsArray}, src, dst)
+    message = default_message(parenttype(T), src, dst)
     return convert(T, lazy(message))
 end
 

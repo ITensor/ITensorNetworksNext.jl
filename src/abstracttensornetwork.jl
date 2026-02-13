@@ -1,25 +1,17 @@
-using Adapt: Adapt, adapt, adapt_structure
+using Adapt: Adapt, adapt
 using BackendSelection: @Algorithm_str, Algorithm
-using DataGraphs: DataGraphs, AbstractDataGraph, edge_data, underlying_graph,
-    underlying_graph_type, vertex_data, set_vertex_data!
+using DataGraphs: AbstractDataGraph, DataGraphs, edge_data, set_vertex_data!,
+    underlying_graph, underlying_graph_type, vertex_data
 using Dictionaries: Dictionary
-using Graphs: Graphs, AbstractEdge, AbstractGraph, Graph, add_edge!, add_vertex!,
-    bfs_tree, center, dst, edges, edgetype, ne, neighbors, nv, rem_edge!, src, vertices
-using LinearAlgebra: LinearAlgebra, factorize
+using Graphs: AbstractEdge, AbstractGraph, Graphs, add_edge!, add_vertex!,
+    dst, edges, edgetype, ne, neighbors, nv, rem_edge!, src, vertices
+using LinearAlgebra: LinearAlgebra
 using MacroTools: @capture
 using NamedDimsArrays: dimnames, inds
-using NamedGraphs: NamedGraphs, NamedGraph, not_implemented, steiner_tree
+using NamedGraphs: NamedGraph, NamedGraphs, not_implemented
 using NamedGraphs.OrdinalIndexing: OrdinalSuffixedInteger
-using NamedGraphs.GraphsExtensions:
-    ⊔,
-    directed_graph,
-    incident_edges,
-    rem_edges!,
-    rename_vertices,
-    vertextype,
-    similar_graph
-using SplitApplyCombine: flatten
-using NamedGraphs.SimilarType: similar_type
+using NamedGraphs.GraphsExtensions: directed_graph, incident_edges, rem_edges!,
+    similar_graph, vertextype
 
 abstract type AbstractTensorNetwork{V, VD} <: AbstractDataGraph{V, VD, Nothing} end
 
