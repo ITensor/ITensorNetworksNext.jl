@@ -13,4 +13,6 @@ include("beliefpropagation/abstractbeliefpropagationcache.jl")
 include("beliefpropagation/beliefpropagationcache.jl")
 include("beliefpropagation/beliefpropagationproblem.jl")
 
+include("ITensorNetworksNextParallel/ITensorNetworksNextParallel.jl")
+
 end
