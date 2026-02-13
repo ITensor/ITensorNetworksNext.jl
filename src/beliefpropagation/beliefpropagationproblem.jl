@@ -79,7 +79,7 @@ end
 function SimpleMessageUpdate(
         edge;
         normalize = true,
-        contraction_alg = "eager",
+        contraction_alg = "exact",
         compute_diff = false,
         kwargs...
     )
@@ -275,7 +275,7 @@ function select_algorithm(
     end
 
     extended_kwargs = extend_columns((; message_diff_function, kwargs...), maxiter)
-    edge_kwargs = rows(extended_kwargs, len = maxiter)
+    edge_kwargs = rows(extended_kwargs, maxiter)
 
     return BeliefPropagation(maxiter; stopping_criterion) do repnum
         return beliefpropagation_sweep(cache; edges, edge_kwargs[repnum]...)
