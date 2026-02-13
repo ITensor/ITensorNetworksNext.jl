@@ -2,7 +2,7 @@ using DiagonalArrays: DiagonalArray
 using Graphs: degree, dst, edges, src
 using ..ITensorNetworksNext: @preserve_graph
 using LinearAlgebra: Diagonal, eigen
-using NamedDimsArrays: apply, dename, inds, operator, randname
+using NamedDimsArrays: apply, denamed, name, operator, randname
 using NamedGraphs.GraphsExtensions: vertextype
 
 function sqrt_ising_bond(β; J = one(β), h = zero(β), deg1::Integer, deg2::Integer)
@@ -33,8 +33,8 @@ function ising_network(
     f̃(e) = get(() -> l̃[reverse(e)], l̃, e)
     tn = delta_network(f̃, elt, g)
     for v in sz_vertices
-        a = DiagonalArray(elt[1, -1], dename.(inds(tn[v])))
-        tn[v] = a[inds(tn[v])...]
+        a = DiagonalArray(elt[1, -1], denamed.(axes(tn[v])))
+        tn[v] = a[axes(tn[v])...]
     end
     for e in edges(tn)
         v1 = src(e)
@@ -42,7 +42,7 @@ function ising_network(
         deg1 = degree(tn, v1)
         deg2 = degree(tn, v2)
         m = sqrt_ising_bond(β; J, h, deg1, deg2)
-        t = operator(m, (f̃(e),), (f(e),))
+        t = operator(m, (name(f̃(e)),), (name(f(e)),))
         @preserve_graph tn[v1] = apply(t, tn[v1])
         @preserve_graph tn[v2] = apply(t, tn[v2])
     end

@@ -1,7 +1,5 @@
-using NamedDimsArrays: AbstractNamedDimsArrayStyle
-
 # Lazy broadcasting.
-struct LazyNamedDimsArrayStyle <: AbstractNamedDimsArrayStyle{Any} end
+struct LazyNamedDimsArrayStyle <: Base.Broadcast.AbstractArrayStyle{Any} end
 function Broadcast.broadcasted(::LazyNamedDimsArrayStyle, f, as...)
     return error("Arbitrary broadcasting not supported for LazyNamedDimsArray.")
 end

@@ -1,4 +1,4 @@
-using NamedDimsArrays: dename
+using NamedDimsArrays: denamed, dimnames, inds
 using TermInterface: iscall, maketerm, operation, sorted_arguments
 using WrappedUnions: unwrap
 
@@ -23,14 +23,11 @@ opwalk(opmap, a) = walk(opmap, identity, a)
 argwalk(argmap, a) = walk(identity, argmap, a)
 
 # Generic lazy functionality.
-using DerivableInterfaces: AbstractArrayInterface, InterfaceFunction
-struct LazyInterface{N} <: AbstractArrayInterface{N} end
-LazyInterface() = LazyInterface{Any}()
-LazyInterface(::Val{N}) where {N} = LazyInterface{N}()
-LazyInterface{M}(::Val{N}) where {M, N} = LazyInterface{N}()
-const lazy_interface = LazyInterface()
+using FunctionImplementations: AbstractArrayImplementationStyle
+struct LazyNamedDimsArrayImplementationStyle <: AbstractArrayImplementationStyle end
+const lazy_style = LazyNamedDimsArrayImplementationStyle()
 
-const maketerm_lazy = lazy_interface(maketerm)
+const maketerm_lazy = lazy_style(maketerm)
 function maketerm_lazy(type::Type, head, args, metadata)
     if head ≡ *
         return type(maketerm(Mul, head, args, metadata))
@@ -38,7 +35,7 @@ function maketerm_lazy(type::Type, head, args, metadata)
         return error("Only mul supported right now.")
     end
 end
-const getindex_lazy = lazy_interface(getindex)
+const getindex_lazy = lazy_style(getindex)
 function getindex_lazy(a::AbstractArray, I...)
     u = unwrap(a)
     if !iscall(u)
@@ -47,7 +44,7 @@ function getindex_lazy(a::AbstractArray, I...)
         return error("Indexing into expression not supported.")
     end
 end
-const arguments_lazy = lazy_interface(arguments)
+const arguments_lazy = lazy_style(arguments)
 function arguments_lazy(a)
     u = unwrap(a)
     if !iscall(u)
@@ -59,17 +56,17 @@ function arguments_lazy(a)
     end
 end
 using TermInterface: children
-const children_lazy = lazy_interface(children)
+const children_lazy = lazy_style(children)
 children_lazy(a) = arguments(a)
 using TermInterface: head
-const head_lazy = lazy_interface(head)
+const head_lazy = lazy_style(head)
 head_lazy(a) = operation(a)
-const iscall_lazy = lazy_interface(iscall)
+const iscall_lazy = lazy_style(iscall)
 iscall_lazy(a) = iscall(unwrap(a))
 using TermInterface: isexpr
-const isexpr_lazy = lazy_interface(isexpr)
+const isexpr_lazy = lazy_style(isexpr)
 isexpr_lazy(a) = iscall(a)
-const operation_lazy = lazy_interface(operation)
+const operation_lazy = lazy_style(operation)
 function operation_lazy(a)
     u = unwrap(a)
     if !iscall(u)
@@ -80,7 +77,7 @@ function operation_lazy(a)
         return error("Variant not supported.")
     end
 end
-const sorted_arguments_lazy = lazy_interface(sorted_arguments)
+const sorted_arguments_lazy = lazy_style(sorted_arguments)
 function sorted_arguments_lazy(a)
     u = unwrap(a)
     if !iscall(u)
@@ -92,12 +89,12 @@ function sorted_arguments_lazy(a)
     end
 end
 using TermInterface: sorted_children
-const sorted_children_lazy = lazy_interface(sorted_children)
+const sorted_children_lazy = lazy_style(sorted_children)
 sorted_children_lazy(a) = sorted_arguments(a)
-const ismul_lazy = lazy_interface(ismul)
+const ismul_lazy = lazy_style(ismul)
 ismul_lazy(a) = ismul(unwrap(a))
 using AbstractTrees: AbstractTrees
-const abstracttrees_children_lazy = lazy_interface(AbstractTrees.children)
+const abstracttrees_children_lazy = lazy_style(AbstractTrees.children)
 function abstracttrees_children_lazy(a)
     if !iscall(a)
         return ()
@@ -106,7 +103,7 @@ function abstracttrees_children_lazy(a)
     end
 end
 using AbstractTrees: nodevalue
-const nodevalue_lazy = lazy_interface(nodevalue)
+const nodevalue_lazy = lazy_style(nodevalue)
 function nodevalue_lazy(a)
     if !iscall(a)
         return unwrap(a)
@@ -115,11 +112,11 @@ function nodevalue_lazy(a)
     end
 end
 using Base.Broadcast: materialize
-const materialize_lazy = lazy_interface(materialize)
+const materialize_lazy = lazy_style(materialize)
 materialize_lazy(a) = argwalk(unwrap, a)
-const copy_lazy = lazy_interface(copy)
+const copy_lazy = lazy_style(copy)
 copy_lazy(a) = materialize(a)
-const equals_lazy = lazy_interface(==)
+const equals_lazy = lazy_style(==)
 function equals_lazy(a1, a2)
     u1, u2 = unwrap.((a1, a2))
     if !iscall(u1) && !iscall(u2)
@@ -130,7 +127,7 @@ function equals_lazy(a1, a2)
         return false
     end
 end
-const isequal_lazy = lazy_interface(isequal)
+const isequal_lazy = lazy_style(isequal)
 function isequal_lazy(a1, a2)
     u1, u2 = unwrap.((a1, a2))
     if !iscall(u1) && !iscall(u2)
@@ -141,13 +138,13 @@ function isequal_lazy(a1, a2)
         return false
     end
 end
-const hash_lazy = lazy_interface(hash)
+const hash_lazy = lazy_style(hash)
 function hash_lazy(a, h::UInt64)
     h = hash(Symbol(unspecify_type_parameters(typeof(a))), h)
     # Use `_hash`, which defines a custom hash for NamedDimsArray.
     return _hash(unwrap(a), h)
 end
-const map_arguments_lazy = lazy_interface(map_arguments)
+const map_arguments_lazy = lazy_style(map_arguments)
 function map_arguments_lazy(f, a)
     u = unwrap(a)
     if !iscall(u)
@@ -159,7 +156,7 @@ function map_arguments_lazy(f, a)
     end
 end
 function substitute end
-const substitute_lazy = lazy_interface(substitute)
+const substitute_lazy = lazy_style(substitute)
 function substitute_lazy(a, substitutions::AbstractDict)
     haskey(substitutions, a) && return substitutions[a]
     !iscall(a) && return a
@@ -167,13 +164,13 @@ function substitute_lazy(a, substitutions::AbstractDict)
 end
 substitute_lazy(a, substitutions) = substitute(a, Dict(substitutions))
 using AbstractTrees: printnode
-const printnode_lazy = lazy_interface(printnode)
+const printnode_lazy = lazy_style(printnode)
 function printnode_lazy(io, a)
     # Use `printnode_nameddims` to avoid type piracy,
     # since it overloads on `AbstractNamedDimsArray`.
     return printnode_nameddims(io, unwrap(a))
 end
-const show_lazy = lazy_interface(show)
+const show_lazy = lazy_style(show)
 function show_lazy(io::IO, a)
     if !iscall(a)
         return show(io, unwrap(a))
@@ -187,12 +184,12 @@ function show_lazy(io::IO, mime::MIME"text/plain", a)
     !iscall(a) ? show(io, mime, unwrap(a)) : show(io, a)
     return nothing
 end
-const add_lazy = lazy_interface(+)
+const add_lazy = lazy_style(+)
 add_lazy(a1, a2) = error("Not implemented.")
-const sub_lazy = lazy_interface(-)
+const sub_lazy = lazy_style(-)
 sub_lazy(a) = error("Not implemented.")
 sub_lazy(a1, a2) = error("Not implemented.")
-const mul_lazy = lazy_interface(*)
+const mul_lazy = lazy_style(*)
 function mul_lazy(a)
     u = unwrap(a)
     if !iscall(u)
@@ -216,7 +213,18 @@ mul_lazy(a1::Number, a2::Number) = a1 * a2
 div_lazy(a1, a2::Number) = error("Not implemented.")
 
 # NamedDimsArrays.jl interface.
-const inds_lazy = lazy_interface(inds)
+const dimnames_lazy = lazy_style(dimnames)
+function dimnames_lazy(a)
+    u = unwrap(a)
+    if !iscall(u)
+        return dimnames(u)
+    elseif ismul(u)
+        return mapreduce(dimnames, symdiff, arguments(u))
+    else
+        return error("Variant not supported.")
+    end
+end
+const inds_lazy = lazy_style(inds)
 function inds_lazy(a)
     u = unwrap(a)
     if !iscall(u)
@@ -227,11 +235,11 @@ function inds_lazy(a)
         return error("Variant not supported.")
     end
 end
-const dename_lazy = lazy_interface(dename)
-function dename_lazy(a)
+const denamed_lazy = lazy_style(denamed)
+function denamed_lazy(a)
     u = unwrap(a)
     if !iscall(u)
-        return dename(u)
+        return denamed(u)
     else
         return error("Variant not supported.")
     end

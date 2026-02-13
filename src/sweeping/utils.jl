@@ -7,12 +7,6 @@ function extend_columns(nt::NamedTuple, len::Int)
     return (; (keys(nt) .=> map(v -> repeat_last(v, len), values(nt)))...)
 end
 rowlength(nt::NamedTuple) = only(unique(length.(values(nt))))
-function rows(nt::NamedTuple; len = nothing)
-    if isnothing(len)
-        if isempty(nt)
-            throw(ArgumentError("Got empty named tuple; keyword `len` must be specified in this case."))
-        end
-        len = rowlength(nt)
-    end
+function rows(nt::NamedTuple, len::Int = rowlength(nt))
     return [(; (keys(nt) .=> map(v -> v[i], values(nt)))...) for i in 1:len]
 end
