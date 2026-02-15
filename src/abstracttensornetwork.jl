@@ -3,14 +3,14 @@ using BackendSelection: @Algorithm_str, Algorithm
 using DataGraphs: DataGraphs, AbstractDataGraph, edge_data, underlying_graph,
     underlying_graph_type, vertex_data
 using Dictionaries: Dictionary
-using Graphs: Graphs, AbstractEdge, AbstractGraph, Graph, add_edge!, add_vertex!,
-    bfs_tree, center, dst, edges, edgetype, ne, neighbors, nv, rem_edge!, src, vertices
+using Graphs: Graphs, AbstractEdge, AbstractGraph, Graph, add_edge!, add_vertex!, bfs_tree,
+    center, dst, edges, edgetype, ne, neighbors, nv, rem_edge!, src, vertices
 using LinearAlgebra: LinearAlgebra, factorize
 using MacroTools: @capture
 using NamedDimsArrays: dimnames, inds
+using NamedGraphs.GraphsExtensions:
+    directed_graph, incident_edges, rem_edges!, rename_vertices, vertextype, ⊔
 using NamedGraphs: NamedGraphs, NamedGraph, not_implemented, steiner_tree
-using NamedGraphs.GraphsExtensions: ⊔, directed_graph, incident_edges, rem_edges!,
-    rename_vertices, vertextype
 using SplitApplyCombine: flatten
 
 abstract type AbstractTensorNetwork{V, VD} <: AbstractDataGraph{V, VD, Nothing} end
@@ -144,7 +144,7 @@ is_assignment_expr(expr) = false
 macro preserve_graph(expr)
     if !is_setindex!_expr(expr)
         error(
-            "preserve_graph must be used with setindex! syntax (as @preserve_graph a[i,j,...] = value)",
+            "preserve_graph must be used with setindex! syntax (as @preserve_graph a[i,j,...] = value)"
         )
     end
     @capture(expr, array_[indices__] = value_)
@@ -234,7 +234,7 @@ using NamedGraphs.OrdinalIndexing: OrdinalSuffixedInteger
 function Base.setindex!(
         tn::AbstractTensorNetwork,
         value,
-        edge::Pair{<:OrdinalSuffixedInteger, <:OrdinalSuffixedInteger},
+        edge::Pair{<:OrdinalSuffixedInteger, <:OrdinalSuffixedInteger}
     )
     return error("No edge data.")
 end

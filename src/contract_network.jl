@@ -1,7 +1,7 @@
 using BackendSelection: @Algorithm_str, Algorithm
 using Base.Broadcast: materialize
-using ITensorNetworksNext.LazyNamedDimsArrays: Mul, lazy, optimize_evaluation_order,
-    substitute, symnameddims
+using ITensorNetworksNext.LazyNamedDimsArrays:
+    Mul, lazy, optimize_evaluation_order, substitute, symnameddims
 
 # This is related to `MatrixAlgebraKit.select_algorithm`.
 # TODO: Define this in BackendSelection.jl.

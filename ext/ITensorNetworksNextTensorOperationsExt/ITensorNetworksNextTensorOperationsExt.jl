@@ -1,9 +1,9 @@
 module ITensorNetworksNextTensorOperationsExt
 
 using BackendSelection: @Algorithm_str, Algorithm
-using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArrays, ismul, symnameddims,
-    substitute
 using ITensorNetworksNext.LazyNamedDimsArrays.TermInterface: arguments
+using ITensorNetworksNext.LazyNamedDimsArrays:
+    LazyNamedDimsArrays, ismul, substitute, symnameddims
 using NamedDimsArrays: inds
 using TensorOperations: TensorOperations, optimaltree
 

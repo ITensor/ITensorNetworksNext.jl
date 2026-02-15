@@ -1,8 +1,8 @@
 using DiagonalArrays: δ
 using Graphs: edges, ne, nv, vertices
 using ITensorBase: Index
-using ITensorNetworksNext: contract_network
 using ITensorNetworksNext.TensorNetworkGenerators: delta_network, ising_network
+using ITensorNetworksNext: contract_network
 using NamedDimsArrays: inds
 using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges
 using NamedGraphs.NamedGraphGenerators: named_grid
