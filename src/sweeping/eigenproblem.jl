@@ -1,5 +1,5 @@
-import AlgorithmsInterface as AI
 import .AlgorithmsInterfaceExtensions as AIE
+import AlgorithmsInterface as AI
 
 function dmrg(operator, algorithm, state)
     problem = EigenProblem(operator)

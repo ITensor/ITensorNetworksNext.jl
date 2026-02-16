@@ -1,6 +1,6 @@
+using ..ITensorNetworksNext: TensorNetwork
 using DiagonalArrays: δ
 using Graphs: AbstractGraph
-using ..ITensorNetworksNext: TensorNetwork
 using NamedGraphs.GraphsExtensions: incident_edges
 
 """

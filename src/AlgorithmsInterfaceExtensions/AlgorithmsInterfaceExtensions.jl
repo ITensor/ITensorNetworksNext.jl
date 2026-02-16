@@ -2,7 +2,7 @@ module AlgorithmsInterfaceExtensions
 
 import AlgorithmsInterface as AI
 
-#========================== Patches for AlgorithmsInterface.jl ============================#
+# ========================== Patches for AlgorithmsInterface.jl ============================
 
 abstract type Problem <: AI.Problem end
 abstract type Algorithm <: AI.Algorithm end
@@ -30,7 +30,7 @@ function AI.initialize_state(
     return DefaultState(; stopping_criterion_state, kwargs...)
 end
 
-#============================ DefaultState ================================================#
+# ============================ DefaultState ================================================
 
 @kwdef mutable struct DefaultState{
         Iterate, StoppingCriterionState <: AI.StoppingCriterionState,
@@ -40,14 +40,13 @@ end
     stopping_criterion_state::StoppingCriterionState
 end
 
-#============================ increment! ==================================================#
+# ============================ increment! ==================================================
 
 # Custom version of `increment!` that also takes the problem and algorithm as arguments.
 function AI.increment!(problem::Problem, algorithm::Algorithm, state::State)
     return AI.increment!(state)
 end
-
-#============================ solve! ======================================================#
+# ============================ solve! ======================================================
 
 # Custom version of `solve!` that allows specifying the logger and also overloads
 # `increment!` on the problem and algorithm.
@@ -58,13 +57,13 @@ default_logging_context_prefix(x) = Symbol(basetypenameof(x), :_)
 function default_logging_context_prefix(problem::Problem, algorithm::Algorithm)
     return Symbol(
         default_logging_context_prefix(problem),
-        default_logging_context_prefix(algorithm),
+        default_logging_context_prefix(algorithm)
     )
 end
 function AI.solve!(
         problem::Problem, algorithm::Algorithm, state::State;
         logging_context_prefix = default_logging_context_prefix(problem, algorithm),
-        kwargs...,
+        kwargs...
     )
     logger = AI.algorithm_logger()
 
@@ -97,13 +96,13 @@ end
 function AI.solve(
         problem::Problem, algorithm::Algorithm;
         logging_context_prefix = default_logging_context_prefix(problem, algorithm),
-        kwargs...,
+        kwargs...
     )
     state = AI.initialize_state(problem, algorithm; kwargs...)
     return AI.solve!(problem, algorithm, state; logging_context_prefix, kwargs...)
 end
 
-#============================ AlgorithmIterator ===========================================#
+# ============================ AlgorithmIterator ===========================================
 
 abstract type AlgorithmIterator end
 
@@ -138,7 +137,7 @@ struct DefaultAlgorithmIterator{Problem, Algorithm, State} <: AlgorithmIterator
     state::State
 end
 
-#============================ with_algorithmlogger ========================================#
+# ============================ with_algorithmlogger ========================================
 
 # Allow passing functions, not just CallbackActions.
 @inline function with_algorithmlogger(f, args::Pair{Symbol, AI.LoggingAction}...)
@@ -148,7 +147,7 @@ end
     return AI.with_algorithmlogger(f, (first.(args) .=> AI.CallbackAction.(last.(args)))...)
 end
 
-#============================ NestedAlgorithm =============================================#
+# ============================ NestedAlgorithm =============================================
 
 abstract type NestedAlgorithm <: Algorithm end
 
@@ -211,7 +210,7 @@ function DefaultNestedAlgorithm(f::Function, nalgorithms::Int; kwargs...)
     return DefaultNestedAlgorithm(; algorithms = f.(1:nalgorithms), kwargs...)
 end
 
-#============================ FlattenedAlgorithm ==========================================#
+# ============================ FlattenedAlgorithm ==========================================
 
 # Flatten a nested algorithm.
 abstract type FlattenedAlgorithm <: Algorithm end
@@ -283,7 +282,7 @@ end
     stopping_criterion_state::StoppingCriterionState
 end
 
-#============================ NonIterativeAlgorithm =======================================#
+# ============================ NonIterativeAlgorithm =======================================
 
 # Algorithm that only performs a single step.
 abstract type NonIterativeAlgorithm <: Algorithm end
