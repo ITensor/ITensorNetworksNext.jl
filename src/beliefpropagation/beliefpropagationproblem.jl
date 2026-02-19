@@ -232,7 +232,7 @@ function AI.solve!(
     return state
 end
 
-function contract_messages(alg, factor::AbstractArray, messages::Vector{<:AbstractArray})
+function contract_messages(alg, factor::AbstractArray, messages)
     factors = typeof(factor)[factor]
     return contract_network(vcat(factors, messages); alg)
 end

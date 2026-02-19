@@ -2,6 +2,7 @@
 AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
 AlgorithmsInterface = "d1e3940c-cd12-4505-8585-b0a4b322527d"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+BackendSelection = "680c2d7c-f67a-4cc9-ae9c-da132b1447a5"
 DiagonalArrays = "74fd4be6-21e2-4f6f-823a-4360d37c7a77"
 Dictionaries = "85a47980-9c8c-11e8-2b9f-f7ca1fa99fb4"
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
