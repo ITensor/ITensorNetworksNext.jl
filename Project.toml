@@ -1,6 +1,6 @@
 name = "ITensorNetworksNext"
 uuid = "302f2e75-49f0-4526-aef7-d8ba550cb06c"
-version = "0.3.9"
+version = "0.3.10"
 authors = ["ITensor developers <support@itensor.org> and contributors"]
 
 [workspace]
