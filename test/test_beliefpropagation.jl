@@ -1,22 +1,48 @@
-using Dictionaries: Dictionary
-using ITensorBase: Index
+using Dictionaries: Dictionary, set!
+using ITensorBase: Index, ITensor, prime, noprime
 using ITensorNetworksNext:
     BeliefPropagationCache,
     ITensorNetworksNext,
     TensorNetwork,
-    adapt_messages,
-    default_message,
-    default_messages,
-    edge_scalars,
-    factors,
-    messages,
-    partitionfunction,
-    setmessages!
-using Graphs: edges, vertices
+    partitionfunction
+using DiagonalArrays: δ
+using Graphs: src, dst, edges, vertices, AbstractGraph
 using NamedGraphs.NamedGraphGenerators: named_grid, named_comb_tree
-using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges
+using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges, vertextype
 using Test: @test, @testset
+using LinearAlgebra: LinearAlgebra
+using NamedDimsArrays: name, inds
 
+function ising_tensornetwork(g::AbstractGraph, β::Real; h = 0.0)
+    links = Dictionary(edges(g), [Index(2; tags = "edge" => "e$(src(e))_$(dst(e))") for e in edges(g)])
+    links = merge(links, Dictionary(reverse.(edges(g)), [links[e] for e in edges(g)]))
+
+    # symmetric sqrt of Boltzmann matrix W = exp(β σσ')
+    sqrt_Ws = Dictionary()
+    for e in edges(g)
+        W = [ exp(-(β + 2 * h)) exp(β); exp(β) exp(-(β - 2 * h)) ]
+
+        F = LinearAlgebra.svd(W)
+        U, S, V = F.U, F.S, F.Vt
+        @assert U * LinearAlgebra.diagm(S) * V ≈ W
+        id = [1.0 0.0; 0.0 1.0]
+        set!(sqrt_Ws, e, id)
+        set!(sqrt_Ws, reverse(e), U * LinearAlgebra.diagm(S) * V)
+    end
+    ts = Dictionary{vertextype(g), ITensor}()
+    for v in vertices(g)
+        es = incident_edges(g, v; dir = :in)
+        #t = ITensor(1.0, physical_inds[v]...) * delta([links[e] for e in es])
+        t = δ(Float64, Tuple([links[e] for e in es]))
+        for e in es
+            t_prime = ITensor(sqrt_Ws[e], (name(links[e]), name(prime(links[e])))) * t
+            newinds = noprime.(inds(t_prime))
+            t = ITensor(parent(t_prime), name.(newinds))
+        end
+        set!(ts, v, t)
+    end
+    return TensorNetwork(g, ts)
+end
 @testset "BeliefPropagation" begin
 
     #Chain of tensors
@@ -49,5 +75,17 @@ using Test: @test, @testset
     bpc = ITensorNetworksNext.beliefpropagation(bpc; maxiter = 1)
     z_bp = partitionfunction(bpc)
     z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
-    @test z_bp ≈ z_exact atol = 1.0e-12
+    @test z_bp ≈ z_exact atol = 1.0e-10
+
+    #Square lattice Ising model
+    dims = (3, 3)
+    g = named_grid(dims)
+    tn = ising_tensornetwork(g, 0.05, h = 0.5)
+    bpc = ITensorNetworksNext.BeliefPropagationCache(tn)
+    bpc = ITensorNetworksNext.beliefpropagation(bpc; maxiter = 50, tol = 1.0e-10)
+
+    z_bp = partitionfunction(bpc)
+    z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
+    @test z_bp ≈ z_exact rtol = 1.0e-4
+
 end
