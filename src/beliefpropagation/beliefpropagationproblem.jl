@@ -1,12 +1,11 @@
-using Graphs: AbstractEdge, edges, has_edge, vertices
-using NamedGraphs.GraphsExtensions: add_edges!, boundary_edges, subgraph
-using NamedDimsArrays: AbstractNamedDimsArray
-using NamedGraphs.PartitionedGraphs: quotientvertices
-using DataGraphs: edge_data
-using LinearAlgebra: norm, normalize
-
-import AlgorithmsInterface as AI
 import .AlgorithmsInterfaceExtensions as AIE
+import AlgorithmsInterface as AI
+using DataGraphs: edge_data
+using Graphs: AbstractEdge, edges, has_edge, vertices
+using LinearAlgebra: norm, normalize
+using NamedDimsArrays: AbstractNamedDimsArray
+using NamedGraphs.GraphsExtensions: add_edges!, boundary_edges, subgraph
+using NamedGraphs.PartitionedGraphs: quotientvertices
 
 @kwdef struct StopWhenConverged <: AI.StoppingCriterion
     tol::Float64 = 0.0
@@ -24,7 +23,7 @@ function AI.initialize_state!(
         ::AIE.Problem,
         ::AIE.Algorithm,
         ::StopWhenConverged,
-        st::StopWhenConvergedState,
+        st::StopWhenConvergedState
     )
     st.delta = Inf
     return st
@@ -35,7 +34,7 @@ function AI.is_finished!(
         ::AIE.Algorithm,
         state::AIE.State,
         c::StopWhenConverged,
-        st::StopWhenConvergedState,
+        st::StopWhenConvergedState
     )
 
     # maxdiff = 0.0 initially, so skip this the first time.
@@ -50,7 +49,8 @@ struct BeliefPropagationProblem{Network} <: AIE.Problem
     network::Network
 end
 
-@kwdef mutable struct BeliefPropagationState{Iterate, Diffs} <: AIE.NonIterativeAlgorithmState
+@kwdef mutable struct BeliefPropagationState{Iterate, Diffs} <:
+    AIE.NonIterativeAlgorithmState
     iterate::Iterate
     diffs::Diffs = similar(edge_data(iterate), Float64)
     maxdiff::Float64 = 0.0
@@ -83,7 +83,10 @@ function SimpleMessageUpdate(
         compute_diff = false,
         kwargs...
     )
-    return SimpleMessageUpdate(edge, (; normalize, contraction_alg, compute_diff, kwargs...))
+    return SimpleMessageUpdate(
+        edge,
+        (; normalize, contraction_alg, compute_diff, kwargs...)
+    )
 end
 
 function Base.getproperty(alg::SimpleMessageUpdate, name::Symbol)
@@ -106,12 +109,13 @@ struct BeliefPropagationSweep{
     end
 end
 
-BeliefPropagationSweep(f::Function, edges) = BeliefPropagationSweep(; algorithms = f.(edges))
+function BeliefPropagationSweep(f::Function, edges)
+    return BeliefPropagationSweep(; algorithms = f.(edges))
+end
 
 function AI.initialize_state(
         ::BeliefPropagationProblem, ::AIE.NonIterativeAlgorithm; iterate, kwargs...
     )
-
     diffs = iterate.diffs
     maxdiff = iterate.maxdiff
 
@@ -122,7 +126,7 @@ end
 function AI.initialize_state!(
         ::BeliefPropagationProblem,
         ::BeliefPropagationSweep,
-        iteration_state::AIE.State,
+        iteration_state::AIE.State
     )
     iteration_state.iterate.maxdiff = 0.0
     return iteration_state
@@ -132,9 +136,8 @@ function AIE.set_substate!(
         ::BeliefPropagationProblem,
         ::BeliefPropagationSweep,
         sweep_state::AIE.DefaultState,
-        noniterative_substate::BeliefPropagationState,
+        noniterative_substate::BeliefPropagationState
     )
-
     sweep_state.iterate = noniterative_substate
 
     return sweep_state
@@ -149,9 +152,8 @@ function AI.solve!(
         problem::BeliefPropagationProblem,
         algorithm::SimpleMessageUpdate,
         state::BeliefPropagationState;
-        logging_context_prefix = AIE.default_logging_context_prefix(problem, algorithm),
+        logging_context_prefix = AIE.default_logging_context_prefix(problem, algorithm)
     )
-
     logger = AI.algorithm_logger()
 
     cache = state.iterate
@@ -204,17 +206,20 @@ function AI.solve!(
         logging_context_prefix = AIE.default_logging_context_prefix(problem, algorithm),
         kwargs...
     )
-
     logger = AI.algorithm_logger()
 
     AI.emit_message(
         logger, problem, algorithm, state, Symbol(logging_context_prefix, :PreUpdate)
     )
 
-    state.iterate = contract_messages(algorithm.contraction_alg, problem.factor, problem.messages)
+    state.iterate =
+        contract_messages(algorithm.contraction_alg, problem.factor, problem.messages)
 
     AI.emit_message(
-        logger, problem, algorithm, state, Symbol(logging_context_prefix, :PreNormalization)
+        logger, problem, algorithm, state, Symbol(
+            logging_context_prefix,
+            :PreNormalization
+        )
     )
 
     if algorithm.normalize
@@ -226,7 +231,8 @@ function AI.solve!(
     end
 
     AI.emit_message(
-        logger, problem, algorithm, state, Symbol(logging_context_prefix, :PostNormalization)
+        logger, problem, algorithm, state,
+        Symbol(logging_context_prefix, :PostNormalization)
     )
 
     return state
@@ -237,9 +243,14 @@ function contract_messages(alg, factor::AbstractArray, messages)
     return contract_network(vcat(factors, messages); alg)
 end
 
-beliefpropagation(network; kwargs...) = beliefpropagation(BeliefPropagationCache(network), network; kwargs...)
-function beliefpropagation(cache::AbstractBeliefPropagationCache, network = nothing; kwargs...)
-
+function beliefpropagation(network; kwargs...)
+    return beliefpropagation(BeliefPropagationCache(network), network; kwargs...)
+end
+function beliefpropagation(
+        cache::AbstractBeliefPropagationCache,
+        network = nothing;
+        kwargs...
+    )
     problem = BeliefPropagationProblem(network)
 
     algorithm = select_algorithm(beliefpropagation, cache; kwargs...)
@@ -260,10 +271,13 @@ function select_algorithm(
         edges = forest_cover_edge_sequence(cache),
         maxiter = is_tree(cache) ? 1 : nothing,
         tol = -Inf,
-        message_diff_function = tol > -Inf ? (m1, m2) -> norm(m1 / norm(m1) - m2 / norm(m2)) : nothing,
+        message_diff_function = if tol > -Inf
+            (m1, m2) -> norm(m1 / norm(m1) - m2 / norm(m2))
+        else
+            nothing
+        end,
         kwargs...
     )
-
     if isnothing(maxiter)
         throw(ArgumentError("`maxiter` must be specified for non-tree graphs"))
     end

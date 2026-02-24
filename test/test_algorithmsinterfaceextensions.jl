@@ -164,7 +164,7 @@ end
         # Test with CallbackAction (wrapped functions)
         state = AIE.with_algorithmlogger(
             :TestProblem_TestAlgorithm_PreStep => callback1,
-            :TestProblem_TestAlgorithm_PostStep => callback2,
+            :TestProblem_TestAlgorithm_PostStep => callback2
         ) do
             return AI.solve(problem, algorithm; iterate = [0.0])
         end
@@ -227,7 +227,7 @@ end
         )
         state = AIE.DefaultState(;
             iterate = [0.0],
-            stopping_criterion_state = stopping_criterion_state,
+            stopping_criterion_state = stopping_criterion_state
         )
 
         # Test progression through iterations
@@ -253,7 +253,7 @@ end
         state = AIE.DefaultState(;
             iterate = [5.0, 10.0],
             iteration = 1,
-            stopping_criterion_state,
+            stopping_criterion_state
         )
 
         subproblem, subalgorithm, substate = AIE.get_subproblem(problem, nested_alg, state)
@@ -264,7 +264,7 @@ end
         # Test set_substate!
         new_substate = AIE.DefaultState(;
             iterate = [100.0, 200.0],
-            substate.stopping_criterion_state,
+            substate.stopping_criterion_state
         )
         AIE.set_substate!(problem, nested_alg, state, new_substate)
         @test state.iterate ≈ [100.0, 200.0]
@@ -321,7 +321,7 @@ end
 
         flattened_alg = AIE.DefaultFlattenedAlgorithm(;
             algorithms = nested_algs,
-            stopping_criterion = AI.StopAfterIteration(4),
+            stopping_criterion = AI.StopAfterIteration(4)
         )
 
         problem = TestProblem([1.0])
@@ -330,7 +330,7 @@ end
         )
         state = AIE.DefaultFlattenedAlgorithmState(;
             iterate = [0.0],
-            stopping_criterion_state = stopping_criterion_state,
+            stopping_criterion_state = stopping_criterion_state
         )
 
         # Test initial state
@@ -388,7 +388,7 @@ end
         # Using the helper function
         flattened_alg = AIE.flattened_algorithm(2) do i
             AIE.nested_algorithm(1) do j
-                TestAlgorithmStep(; stopping_criterion = AI.StopAfterIteration(2))
+                return TestAlgorithmStep(; stopping_criterion = AI.StopAfterIteration(2))
             end
         end
 

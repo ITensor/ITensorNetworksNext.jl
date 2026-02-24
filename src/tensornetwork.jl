@@ -1,25 +1,19 @@
+using .LazyNamedDimsArrays: Mul, lazy
 using Combinatorics: combinations
-using DataGraphs: DataGraphs, AbstractDataGraph, DataGraph
-using Dictionaries: AbstractDictionary, Indices, dictionary, set!, unset!
-using Graphs: AbstractSimpleGraph, rem_vertex!, rem_edge!
-using NamedDimsArrays: AbstractNamedDimsArray, dimnames
-using NamedGraphs: NamedGraphs, NamedEdge, NamedGraph, vertextype, Vertices, parent_graph_indices
-using NamedGraphs.GraphsExtensions: GraphsExtensions, arranged_edges, arrange_edge, vertextype
-using NamedGraphs.PartitionedGraphs:
-    AbstractPartitionedGraph,
-    PartitionedGraphs,
-    departition,
-    partitioned_vertices,
-    partitionedgraph,
-    quotient_graph,
-    quotient_graph_type,
-    QuotientVertex,
-    QuotientVertices,
-    QuotientVertexVertices,
-    quotientvertices
-using .LazyNamedDimsArrays: lazy, Mul
-using DataGraphs: vertex_data_type, vertex_data, edge_data, get_vertices_data
 using DataGraphs.DataGraphsPartitionedGraphsExt
+using DataGraphs: DataGraphs, AbstractDataGraph, DataGraph, edge_data, get_vertices_data,
+    vertex_data, vertex_data_type
+using Dictionaries: AbstractDictionary, Indices, dictionary, set!, unset!
+using Graphs: AbstractSimpleGraph, rem_edge!, rem_vertex!
+using NamedDimsArrays: AbstractNamedDimsArray, dimnames
+using NamedGraphs.GraphsExtensions:
+    GraphsExtensions, arrange_edge, arranged_edges, vertextype
+using NamedGraphs.PartitionedGraphs: AbstractPartitionedGraph, PartitionedGraphs,
+    QuotientVertex, QuotientVertexVertices, QuotientVertices, departition,
+    partitioned_vertices, partitionedgraph, quotient_graph, quotient_graph_type,
+    quotientvertices
+using NamedGraphs:
+    NamedGraphs, NamedEdge, NamedGraph, Vertices, parent_graph_indices, vertextype
 
 function _TensorNetwork end
 
@@ -44,7 +38,9 @@ function TensorNetwork(graph::AbstractGraph, tensors::AbstractDictionary)
     return tn
 end
 
-function TensorNetwork{V, VD, UG, Tensors}(graph::UG) where {V, VD, UG <: AbstractGraph{V}, Tensors}
+function TensorNetwork{V, VD, UG, Tensors}(
+        graph::UG
+    ) where {V, VD, UG <: AbstractGraph{V}, Tensors}
     return _TensorNetwork(graph, Tensors())
 end
 
@@ -121,14 +117,20 @@ end
 NamedGraphs.convert_vertextype(::Type{V}, tn::TensorNetwork{V}) where {V} = tn
 NamedGraphs.convert_vertextype(V::Type, tn::TensorNetwork) = TensorNetwork{V}(tn)
 
-Graphs.connected_components(tn::TensorNetwork) = Graphs.connected_components(underlying_graph(tn))
+function Graphs.connected_components(tn::TensorNetwork)
+    return Graphs.connected_components(underlying_graph(tn))
+end
 
 function Graphs.rem_edge!(tn::TensorNetwork, e)
     if !has_edge(underlying_graph(tn), e)
         return false
     end
     if !isempty(linkinds(tn, e))
-        throw(ArgumentError("cannot remove edge $e due to tensor indices existing on this edge."))
+        throw(
+            ArgumentError(
+                "cannot remove edge $e due to tensor indices existing on this edge."
+            )
+        )
     end
     rem_edge!(underlying_graph(tn), e)
     return true
@@ -150,7 +152,8 @@ function NamedGraphs.induced_subgraph_from_vertices(graph::TensorNetwork, subver
 end
 
 function tensornetwork_induced_subgraph(graph, subvertices)
-    underlying_subgraph, vlist = Graphs.induced_subgraph(underlying_graph(graph), subvertices)
+    underlying_subgraph, vlist =
+        Graphs.induced_subgraph(underlying_graph(graph), subvertices)
 
     subgraph = TensorNetwork(underlying_subgraph) do vertex
         return graph[vertex]

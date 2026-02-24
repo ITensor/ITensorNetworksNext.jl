@@ -1,9 +1,9 @@
 using AbstractTrees: AbstractTrees, print_tree, printnode
 using Base.Broadcast: materialize
-using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArrays, LazyNamedDimsArray,
-    Mul, SymbolicArray, ismul, lazy, substitute, symnameddims
-using NamedDimsArrays: NamedDimsArray, @names, denamed, dimnames, inds, nameddims,
-    namedoneto
+using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArray, LazyNamedDimsArrays, Mul,
+    SymbolicArray, ismul, lazy, substitute, symnameddims
+using NamedDimsArrays:
+    @names, NamedDimsArray, denamed, dimnames, inds, nameddims, namedoneto
 using TermInterface: arguments, arity, children, head, iscall, isexpr, maketerm, operation,
     sorted_arguments, sorted_children
 using Test: @test, @test_throws, @testset

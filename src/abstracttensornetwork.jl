@@ -1,17 +1,17 @@
 using Adapt: Adapt, adapt
 using BackendSelection: @Algorithm_str, Algorithm
-using DataGraphs: AbstractDataGraph, DataGraphs, edge_data, set_vertex_data!,
+using DataGraphs: DataGraphs, AbstractDataGraph, edge_data, set_vertex_data!,
     underlying_graph, underlying_graph_type, vertex_data
 using Dictionaries: Dictionary
-using Graphs: AbstractEdge, AbstractGraph, Graphs, add_edge!, add_vertex!,
-    dst, edges, edgetype, ne, neighbors, nv, rem_edge!, src, vertices
+using Graphs: Graphs, AbstractEdge, AbstractGraph, add_edge!, add_vertex!, dst, edges,
+    edgetype, ne, neighbors, nv, rem_edge!, src, vertices
 using LinearAlgebra: LinearAlgebra
 using MacroTools: @capture
 using NamedDimsArrays: dimnames, inds
-using NamedGraphs: NamedGraph, NamedGraphs, not_implemented
+using NamedGraphs.GraphsExtensions:
+    directed_graph, incident_edges, rem_edges!, similar_graph, vertextype
 using NamedGraphs.OrdinalIndexing: OrdinalSuffixedInteger
-using NamedGraphs.GraphsExtensions: directed_graph, incident_edges, rem_edges!,
-    similar_graph, vertextype
+using NamedGraphs: NamedGraphs, NamedGraph, not_implemented
 
 abstract type AbstractTensorNetwork{V, VD} <: AbstractDataGraph{V, VD, Nothing} end
 
@@ -125,7 +125,7 @@ is_assignment_expr(expr) = false
 macro preserve_graph(expr)
     if !is_setindex!_expr(expr)
         error(
-            "preserve_graph must be used with setindex! syntax (as @preserve_graph a[i,j,...] = value)",
+            "preserve_graph must be used with setindex! syntax (as @preserve_graph a[i,j,...] = value)"
         )
     end
     @capture(expr, array_[indices__] = value_)
@@ -207,7 +207,7 @@ Base.setindex!(tn::AbstractTensorNetwork, value, edge::Pair) = not_implemented()
 function Base.setindex!(
         tn::AbstractTensorNetwork,
         value,
-        edge::Pair{<:OrdinalSuffixedInteger, <:OrdinalSuffixedInteger},
+        edge::Pair{<:OrdinalSuffixedInteger, <:OrdinalSuffixedInteger}
     )
     return not_implemented()
 end

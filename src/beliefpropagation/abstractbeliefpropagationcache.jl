@@ -1,7 +1,7 @@
-using Graphs: AbstractGraph, AbstractEdge
-using DataGraphs: AbstractDataGraph, edge_data, vertex_data, edge_data_type
+using DataGraphs: AbstractDataGraph, edge_data, edge_data_type, vertex_data
+using Graphs: AbstractEdge, AbstractGraph
 using NamedGraphs.GraphsExtensions: boundary_edges
-using NamedGraphs.PartitionedGraphs: QuotientView, QuotientEdge, parent
+using NamedGraphs.PartitionedGraphs: QuotientEdge, QuotientView, parent
 
 messages(bp_cache::AbstractGraph) = edge_data(bp_cache)
 messages(bp_cache::AbstractGraph, edges) = [message(bp_cache, e) for e in edges]
@@ -63,7 +63,6 @@ function region_scalar(bp_cache::AbstractGraph, edge::AbstractEdge)
 end
 
 function region_scalar(bp_cache::AbstractGraph, vertex)
-
     messages = incoming_messages(bp_cache, vertex)
     state = factors(bp_cache, vertex)
 
@@ -78,7 +77,10 @@ function vertex_scalars(bp_cache::AbstractGraph, vertices = vertices(bp_cache))
     return map(v -> region_scalar(bp_cache, v), vertices)
 end
 
-function edge_scalars(bp_cache::AbstractGraph, edges = edges(undirected_graph(underlying_graph(bp_cache))))
+function edge_scalars(
+        bp_cache::AbstractGraph,
+        edges = edges(undirected_graph(underlying_graph(bp_cache)))
+    )
     return map(e -> region_scalar(bp_cache, e), edges)
 end
 
@@ -123,7 +125,6 @@ message_type(bpc::AbstractBeliefPropagationCache) = message_type(typeof(bpc))
 message_type(::Type{<:AbstractBeliefPropagationCache{<:Any, <:Any, ED}}) where {ED} = ED
 
 function free_energy(bp_cache::AbstractBeliefPropagationCache)
-
     numerator_terms, denominator_terms = scalar_factors_quotient(bp_cache)
 
     if any(t -> real(t) < 0, numerator_terms)

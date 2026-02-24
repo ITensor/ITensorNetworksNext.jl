@@ -1,19 +1,23 @@
-using DataGraphs: AbstractDataGraph, DataGraphs, edge_data, edge_data_type,
-    set_vertex_data!, underlying_graph, underlying_graph_type, vertex_data,
-    vertex_data_type
-using Dictionaries: Dictionary, delete!, set!, getindices
-using Graphs: AbstractGraph, connected_components, is_tree, is_directed
+using DataGraphs: DataGraphs, AbstractDataGraph, edge_data, edge_data_type,
+    set_vertex_data!, underlying_graph, underlying_graph_type, vertex_data, vertex_data_type
+using Dictionaries: Dictionary, delete!, getindices, set!
+using Graphs: AbstractGraph, connected_components, is_directed, is_tree
 using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArray, lazy, parenttype
-using NamedGraphs.GraphsExtensions: default_root_vertex, forest_cover, post_order_dfs_edges, undirected_graph, vertextype
+using NamedGraphs.GraphsExtensions:
+    default_root_vertex, forest_cover, post_order_dfs_edges, undirected_graph, vertextype
 using NamedGraphs.PartitionedGraphs: QuotientEdge, QuotientView, quotient_graph
-
 using NamedGraphs: Vertices, convert_vertextype, parent_graph_indices
 
-struct BeliefPropagationCache{V, VD, ED, E, G <: AbstractGraph{V}} <: AbstractBeliefPropagationCache{V, VD, ED}
+struct BeliefPropagationCache{V, VD, ED, E, G <: AbstractGraph{V}} <:
+    AbstractBeliefPropagationCache{V, VD, ED}
     underlying_graph::G # we only use this for the edges.
     factors::Dictionary{V, VD}
     messages::Dictionary{E, ED}
-    function BeliefPropagationCache(graph::AbstractGraph, factors::Dictionary, messages::Dictionary)
+    function BeliefPropagationCache(
+            graph::AbstractGraph,
+            factors::Dictionary,
+            messages::Dictionary
+        )
         # Ensure the graph is directed, if not make it directed.
         digraph = is_directed(graph) ? graph : directed_graph(graph)
 
@@ -34,14 +38,22 @@ end
 
 DataGraphs.underlying_graph(bpc::BeliefPropagationCache) = bpc.underlying_graph
 
-DataGraphs.is_vertex_assigned(bpc::BeliefPropagationCache, vertex) = haskey(bpc.factors, vertex)
+function DataGraphs.is_vertex_assigned(bpc::BeliefPropagationCache, vertex)
+    return haskey(bpc.factors, vertex)
+end
 DataGraphs.is_edge_assigned(bpc::BeliefPropagationCache, edge) = haskey(bpc.messages, edge)
 
 DataGraphs.get_vertex_data(bpc::BeliefPropagationCache, vertex) = bpc.factors[vertex]
-DataGraphs.get_edge_data(bpc::BeliefPropagationCache, edge::AbstractEdge) = bpc.messages[edge]
+function DataGraphs.get_edge_data(bpc::BeliefPropagationCache, edge::AbstractEdge)
+    return bpc.messages[edge]
+end
 
-DataGraphs.set_vertex_data!(bpc::BeliefPropagationCache, val, vertex) = set!(bpc.factors, vertex, val)
-DataGraphs.set_edge_data!(bpc::BeliefPropagationCache, val, edge) = set!(bpc.messages, edge, val)
+function DataGraphs.set_vertex_data!(bpc::BeliefPropagationCache, val, vertex)
+    return set!(bpc.factors, vertex, val)
+end
+function DataGraphs.set_edge_data!(bpc::BeliefPropagationCache, val, edge)
+    return set!(bpc.messages, edge, val)
+end
 
 # These two methods assume `network` behaves llike a tensor network
 # (could be e.g. a QuotientView) otherwise how would one know what the factors should be.
@@ -64,7 +76,11 @@ function BeliefPropagationCache(MT::Type, graph::AbstractGraph, factors::Diction
 end
 
 function Base.copy(bp_cache::BeliefPropagationCache)
-    return BeliefPropagationCache(copy(bp_cache.underlying_graph), copy(bp_cache.factors), copy(bp_cache.messages))
+    return BeliefPropagationCache(
+        copy(bp_cache.underlying_graph),
+        copy(bp_cache.factors),
+        copy(bp_cache.messages)
+    )
 end
 
 # TODO: This needs to go in GraphsExtensions
@@ -85,7 +101,8 @@ function forest_cover_edge_sequence(gi::AbstractGraph; root_vertex = default_roo
 end
 
 function induced_subgraph_bpcache(graph, subvertices)
-    underlying_subgraph, vlist = Graphs.induced_subgraph(underlying_graph(graph), subvertices)
+    underlying_subgraph, vlist =
+        Graphs.induced_subgraph(underlying_graph(graph), subvertices)
 
     assigned = v -> isassigned(graph, v)
 
@@ -100,7 +117,10 @@ function induced_subgraph_bpcache(graph, subvertices)
     return subgraph, vlist
 end
 
-function NamedGraphs.induced_subgraph_from_vertices(graph::BeliefPropagationCache, subvertices)
+function NamedGraphs.induced_subgraph_from_vertices(
+        graph::BeliefPropagationCache,
+        subvertices
+    )
     return induced_subgraph_bpcache(graph, subvertices)
 end
 
@@ -108,7 +128,6 @@ end
 
 # Take a QuotientView of the underlying graph.
 function PartitionedGraphs.quotientview(bpc::BeliefPropagationCache)
-
     graph = underlying_graph(bpc)
 
     quotient_view = QuotientView(graph)
@@ -137,6 +156,9 @@ function DataGraphs.get_index_data(tn::BeliefPropagationCache, vertex::QuotientV
     data = collect(map(v -> tn[v], vertices(tn, vertex)))
     return mapreduce(lazy, *, data)
 end
-function DataGraphs.is_graph_index_assigned(tn::BeliefPropagationCache, vertex::QuotientVertex)
+function DataGraphs.is_graph_index_assigned(
+        tn::BeliefPropagationCache,
+        vertex::QuotientVertex
+    )
     return isassigned(tn, Vertices(vertices(tn, vertex)))
 end

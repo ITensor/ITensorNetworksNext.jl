@@ -1,6 +1,6 @@
+using ..ITensorNetworksNext: @preserve_graph
 using DiagonalArrays: DiagonalArray
 using Graphs: degree, dst, edges, src
-using ..ITensorNetworksNext: @preserve_graph
 using LinearAlgebra: Diagonal, eigen
 using NamedDimsArrays: apply, denamed, name, operator, randname
 using NamedGraphs.GraphsExtensions: vertextype

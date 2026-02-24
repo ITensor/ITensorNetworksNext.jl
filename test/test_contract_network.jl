@@ -1,11 +1,11 @@
+using BackendSelection: @Algorithm_str, Algorithm
 using Graphs: edges
+using ITensorBase: Index
+using ITensorNetworksNext: TensorNetwork, contract_network, linkinds, siteinds
 using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges
 using NamedGraphs.NamedGraphGenerators: named_grid
-using ITensorBase: Index
-using ITensorNetworksNext: TensorNetwork, linkinds, siteinds, contract_network
 using TensorOperations: TensorOperations
 using Test: @test, @testset
-using BackendSelection: @Algorithm_str, Algorithm
 
 @testset "contract_network" begin
     orderalg = alg -> Algorithm"exact"(; order_alg = Algorithm(alg))

@@ -1,8 +1,12 @@
 # TODO: Allow dynamic/unknown number of dimensions by supporting vector axes.
-struct SymbolicArray{T, N, Name, Axes <: NTuple{N, AbstractUnitRange{<:Integer}}} <: AbstractArray{T, N}
+struct SymbolicArray{T, N, Name, Axes <: NTuple{N, AbstractUnitRange{<:Integer}}} <:
+    AbstractArray{T, N}
     name::Name
     axes::Axes
-    function SymbolicArray{T}(name, ax::Tuple{Vararg{AbstractUnitRange{<:Integer}}}) where {T}
+    function SymbolicArray{T}(
+            name,
+            ax::Tuple{Vararg{AbstractUnitRange{<:Integer}}}
+        ) where {T}
         N = length(ax)
         return new{T, N, typeof(name), typeof(ax)}(name, ax)
     end

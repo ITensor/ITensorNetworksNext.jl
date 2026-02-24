@@ -1,6 +1,6 @@
 import AlgorithmsInterface as AI
-using ITensorNetworksNext: EigsolveRegion, dmrg, select_algorithm
 import ITensorNetworksNext.AlgorithmsInterfaceExtensions as AIE
+using ITensorNetworksNext: EigsolveRegion, dmrg, select_algorithm
 using Test: @test, @testset
 
 @testset "select_algorithm(dmrg, ...)" begin
@@ -21,7 +21,7 @@ using Test: @test, @testset
             return EigsolveRegion(
                 regions[j];
                 maxdim = maxdims[i],
-                cutoff = cutoffs[i],
+                cutoff = cutoffs[i]
             )
         end
     end

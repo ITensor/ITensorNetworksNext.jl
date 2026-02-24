@@ -1,26 +1,26 @@
-using Dictionaries: Dictionary, set!
-using ITensorBase: Index, ITensor, prime, noprime
-using ITensorNetworksNext:
-    BeliefPropagationCache,
-    ITensorNetworksNext,
-    TensorNetwork,
-    partitionfunction
 using DiagonalArrays: δ
-using Graphs: src, dst, edges, vertices, AbstractGraph
-using NamedGraphs.NamedGraphGenerators: named_grid, named_comb_tree
-using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges, vertextype
-using Test: @test, @testset
+using Dictionaries: Dictionary, set!
+using Graphs: AbstractGraph, dst, edges, src, vertices
+using ITensorBase: ITensor, Index, noprime, prime
+using ITensorNetworksNext:
+    ITensorNetworksNext, BeliefPropagationCache, TensorNetwork, partitionfunction
 using LinearAlgebra: LinearAlgebra
-using NamedDimsArrays: name, inds
+using NamedDimsArrays: inds, name
+using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges, vertextype
+using NamedGraphs.NamedGraphGenerators: named_comb_tree, named_grid
+using Test: @test, @testset
 
 function ising_tensornetwork(g::AbstractGraph, β::Real; h = 0.0)
-    links = Dictionary(edges(g), [Index(2; tags = "edge" => "e$(src(e))_$(dst(e))") for e in edges(g)])
+    links = Dictionary(
+        edges(g),
+        [Index(2; tags = "edge" => "e$(src(e))_$(dst(e))") for e in edges(g)]
+    )
     links = merge(links, Dictionary(reverse.(edges(g)), [links[e] for e in edges(g)]))
 
     # symmetric sqrt of Boltzmann matrix W = exp(β σσ')
     sqrt_Ws = Dictionary()
     for e in edges(g)
-        W = [ exp(-(β + 2 * h)) exp(β); exp(β) exp(-(β - 2 * h)) ]
+        W = [exp(-(β + 2 * h)) exp(β); exp(β) exp(-(β - 2 * h))]
 
         F = LinearAlgebra.svd(W)
         U, S, V = F.U, F.S, F.Vt
@@ -87,5 +87,4 @@ end
     z_bp = partitionfunction(bpc)
     z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
     @test z_bp ≈ z_exact rtol = 1.0e-4
-
 end
