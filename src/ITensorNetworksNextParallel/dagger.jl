@@ -1,14 +1,14 @@
-import AlgorithmsInterface as AI
 import ..ITensorNetworksNext.AlgorithmsInterfaceExtensions as AIE
+import AlgorithmsInterface as AI
 using ITensorNetworksNext: AbstractBeliefPropagationCache
 
 @kwdef mutable struct DaggerState{
         Iterate, StoppingCriterionState <: AI.StoppingCriterionState, Chunk, DTask,
     } <: AIE.State
-    iterate::Iterate
+    iterate::Iterate # DaggerBeliefPropagationCache
     iteration::Int = 0
     stopping_criterion_state::StoppingCriterionState
-    remote_subiterates::Dict{Int, Chunk} = Dict{Int, Any}()
+    # remote_subiterates::Dict{Int, Chunk} = Dict{Int, Any}()
     remote_results::Dict{Int, DTask} = Dict{Int, Any}()
 end
 

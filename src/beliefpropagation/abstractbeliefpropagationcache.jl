@@ -1,7 +1,7 @@
 using DataGraphs: AbstractDataGraph, edge_data, edge_data_type, vertex_data
 using Graphs: AbstractEdge, AbstractGraph
 using NamedGraphs.GraphsExtensions: boundary_edges
-using NamedGraphs.PartitionedGraphs: QuotientEdge, QuotientView, parent
+using NamedGraphs.PartitionedGraphs: QuotientEdge, QuotientView, parent, QuotientVertex
 
 messages(bp_cache::AbstractGraph) = edge_data(bp_cache)
 messages(bp_cache::AbstractGraph, edges) = [message(bp_cache, e) for e in edges]
@@ -141,3 +141,21 @@ function free_energy(bp_cache::AbstractBeliefPropagationCache)
     return sum(log.(numerator_terms)) - sum(log.((denominator_terms)))
 end
 partitionfunction(bp_cache::AbstractBeliefPropagationCache) = exp(free_energy(bp_cache))
+
+function subcache(cache::AbstractBeliefPropagationCache, vertex::QuotientVertex)
+    return subcache(cache, vertices(cache, vertex))
+end
+function subcache(cache::AbstractBeliefPropagationCache, vertices)
+    subcache = subgraph(cache, vertices)
+
+    for vertex in vertices
+        for neighbor_vertex in neighbors(cache, vertex)
+            add_vertex!(subcache, neighbor_vertex)
+            # Add in necessary messages.
+            subcache[vertex => neighbor_vertex] = cache[vertex => neighbor_vertex]
+            subcache[neighbor_vertex => vertex] = cache[neighbor_vertex => vertex]
+        end
+    end
+
+    return subcache
+end

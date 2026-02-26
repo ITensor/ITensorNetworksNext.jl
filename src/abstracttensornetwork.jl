@@ -37,6 +37,7 @@ Base.copy(::AbstractTensorNetwork) = not_implemented()
 
 # Iteration
 Base.iterate(tn::AbstractTensorNetwork, args...) = iterate(vertex_data(tn), args...)
+
 Base.keys(tn::AbstractTensorNetwork) = vertices(tn)
 
 # TODO: This contrasts with the `DataGraphs.AbstractDataGraph` definition,

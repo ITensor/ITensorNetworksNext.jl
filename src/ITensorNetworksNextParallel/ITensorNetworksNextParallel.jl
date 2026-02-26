@@ -1,27 +1,19 @@
 module ITensorNetworksNextParallel
 
-using Graphs: neighbors, add_vertex!, vertices
+using ..ITensorNetworksNext: BeliefPropagationCache
+using Graphs: add_vertex!, neighbors, vertices
 using NamedGraphs.GraphsExtensions: subgraph
 using NamedGraphs.PartitionedGraphs: QuotientVertex
-using ..ITensorNetworksNext: BeliefPropagationCache
 
-subcache(cache::BeliefPropagationCache, vertex::QuotientVertex) = subcache(cache, vertices(cache, vertex))
-function subcache(cache::BeliefPropagationCache, vertices)
-    subcache = subgraph(cache, vertices)
+"""
+    get_subiterate(subproblem::AI.Problem, subalgorithm::AI.Algorithm, state::AI.State)
 
-    for vertex in vertices
-        for neighbor_vertex in neighbors(cache, vertex)
-            add_vertex!(subcache, neighbor_vertex)
-            # Add in necessary messages.
-            subcache[vertex => neighbor_vertex] = cache[vertex => neighbor_vertex]
-            subcache[neighbor_vertex => vertex] = cache[neighbor_vertex => vertex]
-        end
-    end
+For a given `subproblem` and `subalgorithm` of a parent nested algorithm,
+derive (from the parent state `state`) the iterate to be used in the associated sub state.
+The returned value of this function is then pass to a remote call of `initialize_state`.
+"""
+get_subiterate(::AI.Problem, ::AI.Algorithm, state::AI.State) = state.iterate
 
-    return subcache
-end
-
-include("distributed.jl")
 include("dagger.jl")
 
 end # ITensorNetworksNextParallel
