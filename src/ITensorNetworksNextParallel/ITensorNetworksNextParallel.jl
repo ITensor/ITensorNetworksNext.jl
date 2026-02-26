@@ -1,9 +1,6 @@
 module ITensorNetworksNextParallel
 
-using ..ITensorNetworksNext: BeliefPropagationCache
-using Graphs: add_vertex!, neighbors, vertices
-using NamedGraphs.GraphsExtensions: subgraph
-using NamedGraphs.PartitionedGraphs: QuotientVertex
+import AlgorithmsInterface as AI
 
 """
     get_subiterate(subproblem::AI.Problem, subalgorithm::AI.Algorithm, state::AI.State)
