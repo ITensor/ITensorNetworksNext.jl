@@ -149,7 +149,7 @@ end
 
 # ============================ NestedAlgorithm =============================================
 
-abstract type NestedAlgorithm <: Algorithm end
+abstract type NestedAlgorithm{Child} <: Algorithm end
 
 function nested_algorithm(f::Function, iterable; kwargs...)
     return DefaultNestedAlgorithm(f, iterable; kwargs...)
@@ -202,7 +202,7 @@ from a list of stored algorithms.
         ChildAlgorithm <: Algorithm,
         Algorithms <: AbstractVector{ChildAlgorithm},
         StoppingCriterion <: AI.StoppingCriterion,
-    } <: NestedAlgorithm
+    } <: NestedAlgorithm{ChildAlgorithm}
     algorithms::Algorithms
     stopping_criterion::StoppingCriterion = AI.StopAfterIteration(length(algorithms))
 end
