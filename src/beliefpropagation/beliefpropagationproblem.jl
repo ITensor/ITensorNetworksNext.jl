@@ -30,8 +30,8 @@ function AI.initialize_state!(
 end
 
 function AI.is_finished!(
-        ::AIE.Problem,
-        ::AIE.Algorithm,
+        problem::AIE.Problem,
+        algorithm::AIE.Algorithm,
         state::AIE.State,
         c::StopWhenConverged,
         st::StopWhenConvergedState
@@ -42,6 +42,16 @@ function AI.is_finished!(
         st.delta = state.iterate.maxdiff
     end
 
+    return AI.is_finished(problem, algorithm, state, c, st)
+end
+
+function AI.is_finished(
+        ::AIE.Problem,
+        ::AIE.Algorithm,
+        ::AIE.State,
+        c::StopWhenConverged,
+        st::StopWhenConvergedState
+    )
     return st.delta < c.tol
 end
 
@@ -60,7 +70,7 @@ end
         ChildAlgorithm <: AIE.Algorithm,
         Algorithms <: AbstractVector{ChildAlgorithm},
         StoppingCriterion <: AI.StoppingCriterion,
-    } <: AIE.NestedAlgorithm
+    } <: AIE.NestedAlgorithm{ChildAlgorithm}
     algorithms::Algorithms
     stopping_criterion::StoppingCriterion = AI.StopAfterIteration(length(algorithms))
 end
@@ -100,7 +110,7 @@ end
 struct BeliefPropagationSweep{
         ChildAlgorithm <: AIE.Algorithm,
         Algorithms <: AbstractVector{ChildAlgorithm},
-    } <: AIE.NestedAlgorithm
+    } <: AIE.NestedAlgorithm{ChildAlgorithm}
     algorithms::Algorithms
     stopping_criterion::AI.StopAfterIteration
     function BeliefPropagationSweep(; algorithms)
