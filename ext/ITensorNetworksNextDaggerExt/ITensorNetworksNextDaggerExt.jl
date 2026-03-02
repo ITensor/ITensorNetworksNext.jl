@@ -6,17 +6,24 @@ import ITensorNetworksNext.ITensorNetworksNextParallel as ITNNP
 using Dagger
 using ITensorNetworksNext.ITensorNetworksNextParallel:
     DaggerNestedAlgorithm, DaggerState, ITensorNetworksNextParallel
+using Dictionaries: set!
 
-function ITNNP.DaggerNestedAlgorithm(f::Function, iterable; workers = workers(), kwargs...)
-    return DaggerNestedAlgorithm(; algorithms = map(f, iterable), workers, kwargs...)
+function ITNNP.DaggerNestedAlgorithm(f, iterable; kwargs...)
+    return DaggerNestedAlgorithm(; algorithms = map(f, iterable), kwargs...)
 end
 
-function initialize_dagger_state(problem::AIE.Problem, algorithm::AIE.Algorithm; iterate)
+function ITNNP.dagger_algorithm(f::Base.Callable, iterable; kwargs...)
+    return DaggerNestedAlgorithm(f, iterable; kwargs...)
+end
+
+function ITNNP.initialize_dagger_state(
+        problem::AIE.Problem, algorithm::AIE.Algorithm; iterate
+    )
     stopping_criterion_state = AI.initialize_state(
         problem, algorithm, algorithm.stopping_criterion
     )
 
-    remote_results = Dict{Int, Dagger.DTask}()
+    remote_results = Dictionary{Int, Dagger.DTask}()
 
     return ITNNP.DaggerState(;
         iterate,
@@ -30,37 +37,23 @@ function AI.initialize_state(
         algorithm::ITNNP.DaggerNestedAlgorithm;
         kwargs...
     )
-    return initialize_dagger_state(problem, algorithm; kwargs...)
-end
-
-function AIE.get_subproblem(
-        problem::AIE.Problem,
-        algorithm::ITNNP.DaggerNestedAlgorithm,
-        state::ITNNP.DaggerState
-    )
-    subproblem = problem
-    subalgorithm = algorithm.algorithms[state.iteration]
-
-    # This might be a Dagger.chun object.
-    iterate = ITNNP.get_subiterate(subproblem, subalgorithm, state)
-
-    substate = Dagger.@spawn AI.initialize_state(subproblem, subalgorithm; iterate)
-
-    return subproblem, subalgorithm, substate
+    return ITNNP.initialize_dagger_state(problem, algorithm; kwargs...)
 end
 
 function AI.step!(
-        problem::AI.Problem,
+        problem::AIE.Problem,
         algorithm::ITNNP.DaggerNestedAlgorithm,
         state::ITNNP.DaggerState;
         kwargs...
     )
-    subproblem, subalgorithm, substate_future =
-        AIE.get_subproblem(problem, algorithm, state)
+    subproblem = problem
+    subalgorithm = algorithm.algorithms[state.iteration]
 
-    dtask = Dagger.@spawn AI.solve(subproblem, subalgorithm, substate_future)
+    iterate = ITNNP.get_subiterate(subproblem, subalgorithm, state)
 
-    state.remote_results[state.iteration] = dtask
+    dtask = Dagger.@spawn AI.solve(subproblem, subalgorithm; iterate)
+
+    set!(state.remote_results, state.iteration, dtask)
 
     return state
 end

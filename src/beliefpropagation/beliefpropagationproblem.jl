@@ -60,7 +60,7 @@ end
         ChildAlgorithm <: AIE.Algorithm,
         Algorithms <: AbstractVector{ChildAlgorithm},
         StoppingCriterion <: AI.StoppingCriterion,
-    } <: AIE.NestedAlgorithm
+    } <: AIE.NestedAlgorithm{ChildAlgorithm}
     algorithms::Algorithms
     stopping_criterion::StoppingCriterion = AI.StopAfterIteration(length(algorithms))
 end
