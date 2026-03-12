@@ -3,7 +3,7 @@ using Dictionaries: Dictionary, set!
 using Graphs: AbstractGraph, dst, edges, src, vertices
 using ITensorBase: ITensor, Index, noprime, prime
 using ITensorNetworksNext:
-    ITensorNetworksNext, BeliefPropagationCache, TensorNetwork, partitionfunction
+    ITensorNetworksNext, BeliefPropagationCache, TensorNetwork, scalar
 using LinearAlgebra: LinearAlgebra
 using NamedDimsArrays: inds, name
 using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges, vertextype
@@ -43,6 +43,7 @@ function ising_tensornetwork(g::AbstractGraph, β::Real; h = 0.0)
     end
     return TensorNetwork(g, ts)
 end
+
 @testset "BeliefPropagation" begin
 
     #Chain of tensors
@@ -57,7 +58,7 @@ end
 
     bpc = BeliefPropagationCache(tn)
     bpc = ITensorNetworksNext.beliefpropagation(bpc; maxiter = 1)
-    z_bp = partitionfunction(bpc)
+    z_bp = scalar(bpc)
     z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
     @test z_bp ≈ z_exact atol = 1.0e-14
 
@@ -73,7 +74,7 @@ end
 
     bpc = BeliefPropagationCache(tn)
     bpc = ITensorNetworksNext.beliefpropagation(bpc; maxiter = 1)
-    z_bp = partitionfunction(bpc)
+    z_bp = scalar(bpc)
     z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
     @test z_bp ≈ z_exact atol = 1.0e-10
 
@@ -84,7 +85,7 @@ end
     bpc = ITensorNetworksNext.BeliefPropagationCache(tn)
     bpc = ITensorNetworksNext.beliefpropagation(bpc; maxiter = 50, tol = 1.0e-10)
 
-    z_bp = partitionfunction(bpc)
+    z_bp = scalar(bpc)
     z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
     @test z_bp ≈ z_exact rtol = 1.0e-4
 end

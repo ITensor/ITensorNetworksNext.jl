@@ -22,12 +22,12 @@ function AI.initialize_state!(
 end
 
 function AI.initialize_state(
-        problem::Problem, algorithm::Algorithm; kwargs...
+        problem::Problem, algorithm::Algorithm; iterate, kwargs...
     )
     stopping_criterion_state = AI.initialize_state(
-        problem, algorithm, algorithm.stopping_criterion
+        problem, algorithm, algorithm.stopping_criterion; iterate
     )
-    return DefaultState(; stopping_criterion_state, kwargs...)
+    return DefaultState(; iterate, stopping_criterion_state, kwargs...)
 end
 
 # ============================ DefaultState ================================================

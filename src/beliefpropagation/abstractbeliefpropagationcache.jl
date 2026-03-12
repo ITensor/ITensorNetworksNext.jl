@@ -58,15 +58,18 @@ function setfactor!(bpc::AbstractDataGraph, vertex, factor)
     return bpc
 end
 
-function region_scalar(bp_cache::AbstractGraph, edge::AbstractEdge)
-    return (message(bp_cache, edge) * message(bp_cache, reverse(edge)))[]
+function region_scalar(bp_cache::AbstractGraph, edge::AbstractEdge; alg = "exact")
+    # Make generic to deal with the possibilty of multiple messages.
+    m1s = messages(bp_cache, [edge])
+    m2s = messages(bp_cache, [reverse(edge)])
+    return contract_network(vcat(m1s, m2s); alg)[]
 end
 
-function region_scalar(bp_cache::AbstractGraph, vertex)
+function region_scalar(bp_cache::AbstractGraph, vertex; alg = "exact")
     messages = incoming_messages(bp_cache, vertex)
     state = factors(bp_cache, vertex)
 
-    return (reduce(*, messages) * reduce(*, state))[]
+    return contract_network(vcat(messages, state); alg)[]
 end
 
 message_type(bpc::AbstractGraph) = message_type(typeof(bpc))
@@ -124,7 +127,7 @@ factor_type(::Type{<:AbstractBeliefPropagationCache{<:Any, VD}}) where {VD} = VD
 message_type(bpc::AbstractBeliefPropagationCache) = message_type(typeof(bpc))
 message_type(::Type{<:AbstractBeliefPropagationCache{<:Any, <:Any, ED}}) where {ED} = ED
 
-function free_energy(bp_cache::AbstractBeliefPropagationCache)
+function logscalar(bp_cache::AbstractBeliefPropagationCache)
     numerator_terms, denominator_terms = scalar_factors_quotient(bp_cache)
 
     if any(t -> real(t) < 0, numerator_terms)
@@ -140,4 +143,4 @@ function free_energy(bp_cache::AbstractBeliefPropagationCache)
 
     return sum(log.(numerator_terms)) - sum(log.((denominator_terms)))
 end
-partitionfunction(bp_cache::AbstractBeliefPropagationCache) = exp(free_energy(bp_cache))
+scalar(bp_cache::AbstractBeliefPropagationCache) = exp(logscalar(bp_cache))
