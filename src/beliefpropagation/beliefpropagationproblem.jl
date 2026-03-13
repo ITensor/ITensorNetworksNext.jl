@@ -74,13 +74,14 @@ struct BeliefPropagationProblem{Network} <: AIE.Problem
     network::Network
 end
 
-function iterate_diff(cache1, cache2)
+function iterate_diff(
+        cache1::AbstractBeliefPropagationCache,
+        cache2::AbstractBeliefPropagationCache
+    )
     return maximum(edges(cache1)) do edge
         m1 = cache1[edge]
         m2 = cache2[edge]
-        #FIXME: `abs2` not defined for `ITensor`
-        m1m2 = LinearAlgebra.dot(normalize(m1), normalize(m2))
-        return 1 - abs(m1m2)^2
+        return 1 - abs2(LinearAlgebra.dot(normalize(m1), normalize(m2)))
     end
 end
 
