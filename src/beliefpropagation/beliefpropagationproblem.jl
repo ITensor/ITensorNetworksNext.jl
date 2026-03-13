@@ -78,7 +78,9 @@ function iterate_diff(cache1, cache2)
     return maximum(edges(cache1)) do edge
         m1 = cache1[edge]
         m2 = cache2[edge]
-        return 1 - abs2(LinearAlgebra.dot(normalize(m1), normalize(m2)))
+        #FIXME: `abs2` not defined for `ITensor`
+        m1m2 = LinearAlgebra.dot(normalize(m1), normalize(m2))
+        return 1 - abs(m1m2)^2
     end
 end
 
@@ -212,7 +214,7 @@ function select_algorithm(
         cache::AbstractBeliefPropagationCache;
         edges = forest_cover_edge_sequence(cache),
         maxiter = is_tree(cache) ? 1 : nothing,
-        tol = -Inf,
+        tol = NaN,
         kwargs...
     )
     if isnothing(maxiter)
@@ -221,7 +223,7 @@ function select_algorithm(
 
     stopping_criterion = AI.StopAfterIteration(maxiter)
 
-    if tol > -Inf
+    if !isnan(tol)
         stopping_criterion = stopping_criterion | StopWhenConverged(tol)
     end
 
