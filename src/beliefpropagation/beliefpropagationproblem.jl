@@ -167,8 +167,6 @@ function AI.solve!(
     return cache
 end
 
-default_message_diff_function(m1, m2) = norm(normalize(m1) - normalize(m2))
-
 function updated_message(algorithm, cache)
     edge = algorithm.edge
 
