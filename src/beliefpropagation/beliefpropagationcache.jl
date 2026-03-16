@@ -61,17 +61,23 @@ function BeliefPropagationCache(network::AbstractGraph)
     graph = underlying_graph(network)
     return BeliefPropagationCache(graph, copy(vertex_data(network)))
 end
-function BeliefPropagationCache(MT::Type, network::AbstractGraph)
+function BeliefPropagationCache(callable::Base.Callable, network::AbstractGraph)
     graph = underlying_graph(network)
-    return BeliefPropagationCache(MT, graph, copy(vertex_data(network)))
+    return BeliefPropagationCache(callable, graph, copy(vertex_data(network)))
 end
 
 function BeliefPropagationCache(graph::AbstractGraph, factors::Dictionary)
     MT = vertex_data_type(typeof(graph))
     return BeliefPropagationCache(MT, graph, factors)
 end
+
 function BeliefPropagationCache(MT::Type, graph::AbstractGraph, factors::Dictionary)
     messages = Dictionary{edgetype(graph), MT}()
+    return BeliefPropagationCache(graph, factors, messages)
+end
+
+function BeliefPropagationCache(f::Function, graph::AbstractGraph, factors::Dictionary)
+    messages = map(f, Indices(edges(graph)))
     return BeliefPropagationCache(graph, factors, messages)
 end
 

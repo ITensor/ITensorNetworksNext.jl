@@ -3,7 +3,7 @@ using Dictionaries: Dictionary, set!
 using Graphs: AbstractGraph, dst, edges, src, vertices
 using ITensorBase: ITensor, Index, noprime, prime
 using ITensorNetworksNext:
-    ITensorNetworksNext, BeliefPropagationCache, TensorNetwork, scalar
+    ITensorNetworksNext, BeliefPropagationCache, TensorNetwork, linkinds, scalar
 using LinearAlgebra: LinearAlgebra
 using NamedDimsArrays: inds, name
 using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges, vertextype
@@ -68,14 +68,17 @@ end
     z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
     @test z_bp ≈ z_exact atol = 1.0e-10
 
-    #Spin Ice Model
+    #Spin Ice Model (has analytical bp solution given by 1.5^(n^2))
     for n in (3, 4, 5)
         dims = (n, n)
         g = named_grid(dims; periodic = true)
         tn = spin_ice_tensornetwork(g)
 
-        bpc = ITensorNetworksNext.BeliefPropagationCache(tn)
-        bpc = ITensorNetworksNext.beliefpropagation(bpc; maxiter = 1)
+        bpc = ITensorNetworksNext.BeliefPropagationCache(tn) do edge
+            # Use `rand` so messages have positive elements.
+            return rand(Tuple(linkinds(tn, edge)))
+        end
+        bpc = ITensorNetworksNext.beliefpropagation(bpc; tol = 1.0e-10, maxiter = 10)
 
         z_bp = scalar(bpc)
 
