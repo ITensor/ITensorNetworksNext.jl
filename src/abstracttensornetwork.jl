@@ -8,10 +8,9 @@ using Graphs: Graphs, AbstractEdge, AbstractGraph, add_edge!, add_vertex!, dst, 
 using LinearAlgebra: LinearAlgebra
 using MacroTools: @capture
 using NamedDimsArrays: dimnames, inds
-using NamedGraphs.GraphsExtensions:
-    directed_graph, incident_edges, rem_edges!, similar_graph, vertextype
+using NamedGraphs.GraphsExtensions: directed_graph, incident_edges, rem_edges!, vertextype
 using NamedGraphs.OrdinalIndexing: OrdinalSuffixedInteger
-using NamedGraphs: NamedGraphs, NamedGraph, not_implemented
+using NamedGraphs: NamedGraphs, NamedGraph, not_implemented, similar_graph
 
 abstract type AbstractTensorNetwork{V, VD} <: AbstractDataGraph{V, VD, Nothing} end
 

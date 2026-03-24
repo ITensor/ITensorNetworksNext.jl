@@ -136,15 +136,16 @@ function Graphs.rem_edge!(tn::TensorNetwork, e)
     return true
 end
 
-function GraphsExtensions.similar_graph(type::Type{<:TensorNetwork})
+function NamedGraphs.similar_graph(
+        type::Type{<:TensorNetwork},
+        underlying_graph::AbstractGraph
+    )
     DT = fieldtype(type, :tensors)
     empty_dict = DT()
-    return TensorNetwork(similar_graph(underlying_graph_type(type)), empty_dict)
-end
-function GraphsExtensions.similar_graph(tn::TensorNetwork, underlying_graph::AbstractGraph)
-    DT = fieldtype(typeof(tn), :tensors)
-    empty_dict = DT()
     return _TensorNetwork(underlying_graph, empty_dict)
+end
+function NamedGraphs.similar_graph(tn::TensorNetwork, underlying_graph::AbstractGraph)
+    return similar_graph(typeof(tn), underlying_graph)
 end
 
 function NamedGraphs.induced_subgraph_from_vertices(graph::TensorNetwork, subvertices)
