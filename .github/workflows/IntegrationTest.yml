@@ -3,9 +3,6 @@ on:
   push:
     branches:
       - "main"
-    tags: "*"
-    paths:
-      - "Project.toml"
   pull_request_target:
     types:
       - "opened"
@@ -13,8 +10,6 @@ on:
       - "reopened"
       - "ready_for_review"
       - "converted_to_draft"
-    paths:
-      - "Project.toml"
 jobs:
   integration-test:
     name: "IntegrationTest"
