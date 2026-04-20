@@ -132,6 +132,10 @@ end
 
 ## PartitionedGraphs
 
+function PartitionedGraphs.partitioned_vertices(bpc::BeliefPropagationCache)
+    return partitioned_vertices(bpc.underlying_graph)
+end
+
 # Take a QuotientView of the underlying graph.
 function PartitionedGraphs.quotientview(bpc::BeliefPropagationCache)
     graph = underlying_graph(bpc)
