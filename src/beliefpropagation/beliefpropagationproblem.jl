@@ -1,5 +1,6 @@
 import .AlgorithmsInterfaceExtensions as AIE
 import AlgorithmsInterface as AI
+using BackendSelection: @Algorithm_str, Algorithm
 using DataGraphs: edge_data
 using Graphs: AbstractEdge, edges, has_edge, vertices
 using LinearAlgebra: norm, normalize
@@ -98,9 +99,7 @@ function BeliefPropagation(f::Function, niterations::Int; kwargs...)
     return BeliefPropagation(; algorithms = f.(1:niterations), kwargs...)
 end
 
-abstract type AbstractMessageUpdate end
-
-struct SimpleMessageUpdate{E <: AbstractEdge, Kwargs <: NamedTuple} <: AbstractMessageUpdate
+struct SimpleMessageUpdate{E <: AbstractEdge, Kwargs <: NamedTuple}
     edge::E
     kwargs::Kwargs
 end
@@ -108,7 +107,7 @@ end
 function SimpleMessageUpdate(
         edge;
         normalize = true,
-        contraction_alg = "exact",
+        contraction_alg = Algorithm"exact",
         kwargs...
     )
     return SimpleMessageUpdate(
@@ -160,20 +159,12 @@ function AI.solve!(
     )
     edge = algorithm.edge
 
-    new_message = updated_message(algorithm, cache)
-
-    setmessage!(cache, edge, new_message)
-
-    return cache
-end
-
-function updated_message(algorithm, cache)
-    edge = algorithm.edge
-
     vertex = src(edge)
-    messages = incoming_messages(cache, vertex; ignore_edges = typeof(edge)[reverse(edge)])
+    messages = incoming_messages(cache, vertex; ignore_edges = [reverse(edge)])
 
-    new_message = contract_messages(algorithm.contraction_alg, cache[vertex], messages)
+    tensors = vcat([factor(cache, vertex)], messages)
+
+    new_message = contract_network(tensors; algorithm.contraction_alg)
 
     if algorithm.normalize
         message_norm = sum(new_message)
@@ -182,12 +173,9 @@ function updated_message(algorithm, cache)
         end
     end
 
-    return new_message
-end
+    setmessage!(cache, edge, new_message)
 
-function contract_messages(alg, factor::AbstractArray, messages)
-    factors = typeof(factor)[factor]
-    return contract_network(vcat(factors, messages); alg)
+    return cache
 end
 
 function beliefpropagation(network; kwargs...)
