@@ -177,6 +177,10 @@ function induced_subgraph_tensornetwork(graph, subvertices)
 end
 
 ## PartitionedGraphs
+function PartitionedGraphs.partitioned_vertices(tn::TensorNetwork)
+    return partitioned_vertices(tn.underlying_graph)
+end
+
 function PartitionedGraphs.quotient_graph(tn::TensorNetwork)
     ug = quotient_graph(underlying_graph(tn))
 
