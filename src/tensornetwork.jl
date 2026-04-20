@@ -138,13 +138,12 @@ end
 
 function NamedGraphs.similar_graph(
         type::Type{<:TensorNetwork},
-        vertices,
-        edges
+        vertices
     )
     DT = fieldtype(type, :tensors)
     empty_dict = DT()
 
-    underlying_graph = similar_graph(underlying_graph_type(type), vertices, edges)
+    underlying_graph = similar_graph(underlying_graph_type(type), vertices)
 
     return _TensorNetwork(underlying_graph, empty_dict)
 end
@@ -152,15 +151,14 @@ function NamedGraphs.similar_graph(
         graph::TensorNetwork,
         VD::Type,
         ::Type{<:Nothing},
-        vertices,
-        edges
+        vertices
     )
     V = eltype(vertices)
     empty_dict = Dictionary{V, VD}()
 
-    underlying_graph = similar_graph(underlying_graph(graph), vertices, edges)
+    new_underlying_graph = similar_graph(underlying_graph(graph), vertices)
 
-    return _TensorNetwork(underlying_graph, empty_dict)
+    return _TensorNetwork(new_underlying_graph, empty_dict)
 end
 
 function NamedGraphs.induced_subgraph_from_vertices(graph::TensorNetwork, subvertices)
