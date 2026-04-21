@@ -35,53 +35,56 @@ function spin_ice_tensornetwork(g)
 end
 
 @testset "BeliefPropagation" begin
+    @testset "$T" for T in (Float32, Float64, ComplexF64, BigFloat)
+        #Chain of tensors
+        dims = (2, 1)
+        g = named_grid(dims)
+        l = Dict(e => Index(2) for e in edges(g))
+        l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
 
-    #Chain of tensors
-    dims = (2, 1)
-    g = named_grid(dims)
-    l = Dict(e => Index(2) for e in edges(g))
-    l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
-    tn = TensorNetwork(g) do v
-        is = map(e -> l[e], incident_edges(g, v))
-        return randn(Tuple(is))
-    end
-
-    bpc = BeliefPropagationCache(tn)
-    bpc = ITensorNetworksNext.beliefpropagation(bpc; maxiter = 1)
-    z_bp = scalar(bpc)
-    z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
-    @test z_bp ≈ z_exact atol = 1.0e-14
-
-    #Tree of tensors
-    dims = (4, 3)
-    g = named_comb_tree(dims)
-    l = Dict(e => Index(3) for e in edges(g))
-    l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
-    tn = TensorNetwork(g) do v
-        is = map(e -> l[e], incident_edges(g, v))
-        return randn(Tuple(is))
-    end
-
-    bpc = BeliefPropagationCache(tn)
-    bpc = ITensorNetworksNext.beliefpropagation(bpc; maxiter = 1)
-    z_bp = scalar(bpc)
-    z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
-    @test z_bp ≈ z_exact atol = 1.0e-10
-
-    #Spin Ice Model (has analytical bp solution given by 1.5^(n^2))
-    for n in (3, 4, 5)
-        dims = (n, n)
-        g = named_grid(dims; periodic = true)
-        tn = spin_ice_tensornetwork(g)
-
-        bpc = ITensorNetworksNext.BeliefPropagationCache(tn) do edge
-            # Use `rand` so messages have positive elements.
-            return rand(Tuple(linkinds(tn, edge)))
+        tn = TensorNetwork(g) do v
+            is = map(e -> l[e], incident_edges(g, v))
+            return randn(T, Tuple(is))
         end
-        bpc = ITensorNetworksNext.beliefpropagation(bpc; tol = 1.0e-10, maxiter = 10)
 
+        bpc = BeliefPropagationCache(tn)
+        bpc = ITensorNetworksNext.beliefpropagation(bpc; maxiter = 1)
         z_bp = scalar(bpc)
+        z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
+        @test z_bp ≈ z_exact
 
-        @test z_bp ≈ 1.5^(n^2)
+        #Tree of tensors
+        dims = (4, 3)
+        g = named_comb_tree(dims)
+        l = Dict(e => Index(3) for e in edges(g))
+        l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
+        tn = TensorNetwork(g) do v
+            is = map(e -> l[e], incident_edges(g, v))
+            return randn(T, Tuple(is))
+        end
+
+        bpc = BeliefPropagationCache(tn)
+        bpc = ITensorNetworksNext.beliefpropagation(bpc; maxiter = 1)
+        z_bp = scalar(bpc)
+        z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
+        @test z_bp ≈ z_exact
+
+        #Spin Ice Model (has analytical bp solution given by 1.5^(n^2))
+        for n in (3, 4, 5)
+            dims = (n, n)
+            g = named_grid(dims; periodic = true)
+            tn = spin_ice_tensornetwork(g)
+
+            bpc = ITensorNetworksNext.BeliefPropagationCache(tn) do edge
+                # Use `rand` so messages have positive elements.
+                return rand(T, Tuple(linkinds(tn, edge)))
+            end
+            bpc =
+                ITensorNetworksNext.beliefpropagation(bpc; tol = 1.0e-10, maxiter = 10)
+
+            z_bp = scalar(bpc)
+
+            @test z_bp ≈ 1.5^(n^2)
+        end
     end
 end
