@@ -4,7 +4,7 @@ using NamedGraphs.GraphsExtensions: boundary_edges
 using NamedGraphs.PartitionedGraphs: QuotientEdge, QuotientView, parent
 
 messages(bp_cache::AbstractGraph) = edge_data(bp_cache)
-messages(bp_cache::AbstractGraph, edges) = [message(bp_cache, e) for e in edges]
+messages(bp_cache::AbstractGraph, edges) = map(e -> message(bp_cache, e), edges)
 
 message(bp_cache::AbstractGraph, edge::AbstractEdge) = messages(bp_cache)[edge]
 
