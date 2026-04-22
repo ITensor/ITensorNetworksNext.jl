@@ -2,41 +2,32 @@ using DataGraphs: AbstractDataGraph, edge_data, edge_data_type, vertex_data
 using Graphs: AbstractEdge, AbstractGraph
 using NamedGraphs.GraphsExtensions: boundary_edges
 using NamedGraphs.PartitionedGraphs: QuotientEdge, QuotientView, parent
+using NamedGraphs: AbstractEdges, AbstractVertices, to_graph_index
 
-messages(bp_cache::AbstractGraph) = edge_data(bp_cache)
-messages(bp_cache::AbstractGraph, edges) = map(e -> message(bp_cache, e), edges)
+messages(bpc::AbstractDataGraph) = edge_data(bpc)
+messages(bpc::AbstractGraph, edges) = map(e -> message(bpc, e), edges)
 
-message(bp_cache::AbstractGraph, edge::AbstractEdge) = messages(bp_cache)[edge]
+message(bpc::AbstractGraph, edge) = messages(bpc)[edge]
 
-deletemessage!(bp_cache::AbstractGraph, edge) = not_implemented()
-function deletemessage!(bp_cache::AbstractDataGraph, edge)
-    ms = messages(bp_cache)
-    delete!(ms, edge)
-    return bp_cache
-end
+deletemessage!(bpc::AbstractGraph, edge) = not_implemented()
 
-function deletemessages!(bp_cache::AbstractGraph, edges = edges(bp_cache))
+function deletemessages!(bpc::AbstractGraph, edges = edges(bpc))
     for e in edges
-        deletemessage!(bp_cache, e)
+        deletemessage!(bpc, e)
     end
-    return bp_cache
+    return bpc
 end
 
-setmessage!(bp_cache::AbstractGraph, edge, message) = not_implemented()
-function setmessage!(bp_cache::AbstractDataGraph, edge, message)
-    setindex!(bp_cache, message, edge)
-    return bp_cache
+# Fallback; assume `setindex!` is implemented.
+function setmessage!(bpc::AbstractGraph, edge, message)
+    bpc[edge] = message
+    return bpc
 end
-function setmessage!(bp_cache::QuotientView, edge, message)
-    setmessages!(parent(bp_cache), QuotientEdge(edge), message)
-    return bp_cache
-end
-
-function setmessages!(bp_cache::AbstractGraph, edge::QuotientEdge, message)
-    for e in edges(bp_cache, edge)
-        setmessage!(parent(bp_cache), e, message[e])
+function setmessages!(bpc::AbstractGraph, messages)
+    for (key, val) in messages
+        setmessage!(bpc, key, val)
     end
-    return bp_cache
+    return bpc
 end
 function setmessages!(bpc_dst::AbstractGraph, bpc_src::AbstractGraph, edges)
     for e in edges
@@ -45,31 +36,32 @@ function setmessages!(bpc_dst::AbstractGraph, bpc_src::AbstractGraph, edges)
     return bpc_dst
 end
 
-factors(bpc::AbstractGraph) = vertex_data(bpc)
-factors(bpc::AbstractGraph, vertices::Vector) = [factor(bpc, v) for v in vertices]
-factors(bpc::AbstractGraph{V}, vertex::V) where {V} = factors(bpc, V[vertex])
+factors(bpc::AbstractDataGraph) = vertex_data(bpc)
+factors(bpc::AbstractGraph, vertices) = map(v -> factor(bpc, v), vertices)
 
 factor(bpc::AbstractGraph, vertex) = bpc[vertex]
 
-setfactor!(bpc::AbstractGraph, vertex, factor) = not_implemented()
-function setfactor!(bpc::AbstractDataGraph, vertex, factor)
-    fs = factors(bpc)
-    setindex!(fs, vertex, factor)
+function setfactor!(bpc::AbstractGraph, vertex, factor)
+    bpc[vertex] = factor
     return bpc
 end
 
-function region_scalar(bp_cache::AbstractGraph, edge::AbstractEdge; alg = "exact")
+# Internal convenience only
+_graph_index_scalar(bpc::AbstractGraph, vertex) = vertex_scalar(bpc, vertex)
+_graph_index_scalar(bpc::AbstractGraph, edge::AbstractEdge) = edge_scalar(bpc, edge)
+
+function edge_scalar(bp_cache::AbstractGraph, edge; kwargs...)
     # Make generic to deal with the possibilty of multiple messages.
     m1s = messages(bp_cache, [edge])
     m2s = messages(bp_cache, [reverse(edge)])
-    return contract_network(vcat(m1s, m2s); alg)[]
+    return contract_network(vcat(m1s, m2s); kwargs...)[]
 end
 
-function region_scalar(bp_cache::AbstractGraph, vertex; alg = "exact")
+function vertex_scalar(bp_cache::AbstractGraph, vertex; kwargs...)
     messages = incoming_messages(bp_cache, vertex)
-    state = factors(bp_cache, vertex)
+    state = factors(bp_cache, [vertex])
 
-    return contract_network(vcat(messages, state); alg)[]
+    return contract_network(vcat(messages, state); kwargs...)[]
 end
 
 message_type(bpc::AbstractGraph) = message_type(typeof(bpc))
@@ -77,18 +69,18 @@ message_type(G::Type{<:AbstractGraph}) = eltype(Base.promote_op(messages, G))
 message_type(type::Type{<:AbstractDataGraph}) = edge_data_type(type)
 
 function vertex_scalars(bp_cache::AbstractGraph, vertices = vertices(bp_cache))
-    return map(v -> region_scalar(bp_cache, v), vertices)
+    return map(v -> vertex_scalar(bp_cache, v), vertices)
 end
 
 function edge_scalars(
         bp_cache::AbstractGraph,
         edges = edges(undirected_graph(underlying_graph(bp_cache)))
     )
-    return map(e -> region_scalar(bp_cache, e), edges)
+    return map(e -> edge_scalar(bp_cache, e), edges)
 end
 
-function scalar_factors_quotient(bp_cache::AbstractGraph)
-    return vertex_scalars(bp_cache), edge_scalars(bp_cache)
+function region_scalar(bpc::AbstractGraph, region)
+    return mapreduce(ind -> _graph_index_scalar(bpc, ind), *, region)
 end
 
 function incoming_messages(bp_cache::AbstractGraph, vertices; ignore_edges = [])
@@ -127,8 +119,9 @@ factor_type(::Type{<:AbstractBeliefPropagationCache{<:Any, VD}}) where {VD} = VD
 message_type(bpc::AbstractBeliefPropagationCache) = message_type(typeof(bpc))
 message_type(::Type{<:AbstractBeliefPropagationCache{<:Any, <:Any, ED}}) where {ED} = ED
 
-function logscalar(bp_cache::AbstractBeliefPropagationCache)
-    numerator_terms, denominator_terms = scalar_factors_quotient(bp_cache)
+function logscalar(bpc::AbstractBeliefPropagationCache)
+    numerator_terms = vertex_scalars(bpc)
+    denominator_terms = edge_scalars(bpc)
 
     if any(t -> real(t) < 0, numerator_terms)
         numerator_terms = complex.(numerator_terms)
