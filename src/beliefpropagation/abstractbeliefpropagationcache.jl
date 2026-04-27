@@ -51,7 +51,6 @@ _graph_index_scalar(bpc::AbstractGraph, vertex) = vertex_scalar(bpc, vertex)
 _graph_index_scalar(bpc::AbstractGraph, edge::AbstractEdge) = edge_scalar(bpc, edge)
 
 function edge_scalar(bp_cache::AbstractGraph, edge; kwargs...)
-    # Make generic to deal with the possibilty of multiple messages.
     m1s = messages(bp_cache, [edge])
     m2s = messages(bp_cache, [reverse(edge)])
     return contract_network(vcat(m1s, m2s); kwargs...)[]
