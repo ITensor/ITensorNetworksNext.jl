@@ -117,10 +117,6 @@ end
 NamedGraphs.convert_vertextype(::Type{V}, tn::TensorNetwork{V}) where {V} = tn
 NamedGraphs.convert_vertextype(V::Type, tn::TensorNetwork) = TensorNetwork{V}(tn)
 
-function Graphs.connected_components(tn::TensorNetwork)
-    return Graphs.connected_components(underlying_graph(tn))
-end
-
 function Graphs.rem_edge!(tn::TensorNetwork, e)
     if !has_edge(underlying_graph(tn), e)
         return false
