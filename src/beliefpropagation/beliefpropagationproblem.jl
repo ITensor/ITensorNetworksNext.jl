@@ -218,13 +218,8 @@ function select_algorithm(
     edge_kwargs = rows(extended_kwargs, maxiter)
 
     return BeliefPropagation(maxiter; stopping_criterion) do repnum
-        return beliefpropagation_sweep(cache; edges, edge_kwargs[repnum]...)
-    end
-end
-
-# A single sweep across the given edges.
-function beliefpropagation_sweep(::BeliefPropagationCache; edges, kwargs...)
-    return BeliefPropagationSweep(edges) do edge
-        return SimpleMessageUpdate(edge; kwargs...)
+        return BeliefPropagationSweep(edges) do edge
+            return SimpleMessageUpdate(edge; edge_kwargs[repnum]...)
+        end
     end
 end
