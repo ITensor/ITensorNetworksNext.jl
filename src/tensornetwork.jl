@@ -110,7 +110,7 @@ TensorNetwork(tn::TensorNetwork) = copy(tn)
 TensorNetwork{V}(tn::TensorNetwork{V}) where {V} = copy(tn)
 function TensorNetwork{V}(tn::TensorNetwork) where {V}
     g = convert_vertextype(V, underlying_graph(tn))
-    d = dictionary(V(k) => tn[k] for k in keys(d))
+    d = dictionary(V(k) => tn[k] for k in vertices(tn))
     return TensorNetwork(g, d)
 end
 
@@ -134,7 +134,7 @@ end
 
 function NamedGraphs.similar_graph(
         type::Type{<:TensorNetwork},
-        vertices
+        vertices = vertextype(type)[]
     )
     DT = fieldtype(type, :tensors)
     empty_dict = DT()

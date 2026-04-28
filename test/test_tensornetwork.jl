@@ -1,9 +1,10 @@
-using DataGraphs: assigned_edge_data, assigned_vertex_data
+using DataGraphs: assigned_edge_data, assigned_vertex_data, vertex_data
 using Graphs: dst, edges, has_edge, ne, nv, src, vertices
 using ITensorBase: Index
 using ITensorNetworksNext: TensorNetwork
+using NamedGraphs.GraphsExtensions: vertextype
 using NamedGraphs.NamedGraphGenerators: named_grid
-using NamedGraphs: similar_graph
+using NamedGraphs: convert_vertextype, similar_graph
 using Test: @test, @testset
 
 @testset "`TensorNetwork`" begin
@@ -27,5 +28,19 @@ using Test: @test, @testset
         @test ne(stn) == 0
         @test isempty(assigned_vertex_data(stn))
         @test isempty(assigned_edge_data(stn))
+
+        stn = similar_graph(typeof(tn))
+        @test nv(stn) == 0
+        @test stn isa typeof(tn)
+
+        stn = similar_graph(typeof(tn), vertices(tn))
+        @test nv(stn) == nv(tn)
+        @test ne(stn) == 0
+        @test stn isa typeof(tn)
+
+        ctn = convert_vertextype(Tuple{Float64, Float64}, tn)
+        @test ctn isa TensorNetwork
+        @test vertextype(ctn) == Tuple{Float64, Float64}
+        @test collect(vertex_data(ctn)) == collect(vertex_data(tn))
     end
 end
