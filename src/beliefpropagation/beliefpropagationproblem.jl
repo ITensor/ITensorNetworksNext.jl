@@ -9,12 +9,12 @@ using NamedGraphs.GraphsExtensions: add_edges!, boundary_edges, subgraph
 using NamedGraphs.PartitionedGraphs: quotientvertices
 
 @kwdef struct StopWhenConverged{Tol <: Real} <: AI.StoppingCriterion
-    tol::Tol = NaN
+    tol::Tol = 0.0
 end
 
 @kwdef mutable struct StopWhenConvergedState{Iterate, Delta <: Real} <:
     AI.StoppingCriterionState
-    delta::Delta = NaN
+    delta::Delta = Inf
     at_iteration::Int = -1
     previous_iterate::Iterate
 end
@@ -29,7 +29,7 @@ function AI.initialize_state!(
         ::StopWhenConverged,
         st::StopWhenConvergedState
     )
-    st.delta = NaN
+    st.delta = Inf
     return st
 end
 
@@ -201,7 +201,7 @@ function select_algorithm(
         cache::AbstractBeliefPropagationCache;
         edges = forest_cover_edge_sequence(cache),
         maxiter = is_tree(cache) ? 1 : nothing,
-        tol = NaN,
+        tol = nothing,
         kwargs...
     )
     if isnothing(maxiter)
@@ -210,7 +210,7 @@ function select_algorithm(
 
     stopping_criterion = AI.StopAfterIteration(maxiter)
 
-    if !isnan(tol)
+    if !isnothing(tol)
         stopping_criterion = stopping_criterion | StopWhenConverged(tol)
     end
 
