@@ -152,7 +152,9 @@ end
 abstract type NestedAlgorithm <: Algorithm end
 
 nested_algorithm(f::Function, int::Int; kwargs...) = nested_algorithm(f, 1:int; kwargs...)
-nested_algorithm(f::Function, iterable; kwargs...) = DefaultNestedAlgorithm(f, iterable; kwargs...)
+function nested_algorithm(f::Function, iterable; kwargs...)
+    return DefaultNestedAlgorithm(f, iterable; kwargs...)
+end
 
 max_iterations(algorithm::NestedAlgorithm) = length(algorithm.algorithms)
 
