@@ -67,7 +67,7 @@ function BeliefPropagationCache(callable::Base.Callable, network::AbstractGraph)
 end
 
 function BeliefPropagationCache(graph::AbstractGraph, factors::Dictionary)
-    MT = vertex_data_type(typeof(graph))
+    MT = eltype(factors)
     return BeliefPropagationCache(MT, graph, factors)
 end
 
