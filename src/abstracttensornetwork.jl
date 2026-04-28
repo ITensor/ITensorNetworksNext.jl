@@ -17,8 +17,6 @@ abstract type AbstractTensorNetwork{V, VD} <: AbstractDataGraph{V, VD, Nothing} 
 # Need to be careful about removing edges from tensor networks in case there is a bond
 Graphs.rem_edge!(::AbstractTensorNetwork, edge) = not_implemented()
 
-DataGraphs.edge_data_type(::Type{<:AbstractTensorNetwork}) = not_implemented()
-
 # Graphs.jl overloads
 function Graphs.weights(graph::AbstractTensorNetwork)
     V = vertextype(graph)
