@@ -160,7 +160,12 @@ end
 # Fix the edges of the TensorNetwork `tn` to match
 # the tensor connectivity at vertex `v`.
 function fix_edges!(tn::AbstractGraph, v)
-    rem_edges!(tn, incident_edges(tn, v))
+    for e in incident_edges(tn, v)
+        # Remove an edge if there is no index on that edge.
+        if isempty(linkinds(tn, e))
+            rem_edge!(tn, e)
+        end
+    end
     add_missing_edges!(tn, v)
     return tn
 end
