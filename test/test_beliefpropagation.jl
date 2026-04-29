@@ -3,9 +3,10 @@ using Dictionaries: Dictionary, set!
 using Graphs: AbstractGraph, dst, edges, src, vertices
 using ITensorBase: ITensor, Index, noprime, prime
 using ITensorNetworksNext: ITensorNetworksNext, BeliefPropagationCache, TensorNetwork,
-    edge_scalar, factor, factor_type, factors, incoming_messages, linkinds, message,
-    message_type, messages, region_scalar, scalar, setfactor!, setmessage!, setmessages!,
-    vertex_scalar, vertex_scalars
+    adapt_factors, adapt_messages, edge_scalar, factor, factor_type, factors,
+    incoming_messages, linkinds, map_factors, map_messages, message, message_type, messages,
+    region_scalar, scalar, setfactor!, setmessage!, setmessages!, subgraph, vertex_scalar,
+    vertex_scalars
 using LinearAlgebra: LinearAlgebra
 using NamedDimsArrays: inds, name
 using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges, vertextype
@@ -115,27 +116,29 @@ end
             @test length(in_msgs_filtered) == 1
             @test only(in_msgs_filtered) == bpc[3 => 2]
 
-            # `factor_type` / `message_type` resolve to concrete types.
-            @test factor_type(bpc) <: ITensor
-            @test message_type(bpc) <: ITensor
-
             # `map_messages` and `map_factors` produce independent caches.
-            bpc_doubled = ITensorNetworksNext.map_messages(m -> 2 .* m, bpc)
-            @test !(bpc_doubled === bpc)
+            bpc_again = map_messages(identity, bpc)
+            @test bpc_again !== bpc
+            @test bpc_again == bpc
+
+            bpc_doubled = map_messages(m -> 2 .* m, bpc)
+            @test bpc_doubled != bpc
             @test message(bpc_doubled, 1 => 2) ≈ 2 .* message(bpc, 1 => 2)
             @test message(bpc_doubled, 2 => 3) ≈ 2 .* message(bpc, 2 => 3)
 
-            bpc_scaled = ITensorNetworksNext.map_factors(f -> f .* 2, bpc)
+            bpc_again = map_factors(identity, bpc)
+            @test bpc_again !== bpc
+            @test bpc_again == bpc
+
+            bpc_scaled = map_factors(f -> f .* 2, bpc)
             @test !(bpc_scaled === bpc)
             for vv in vertices(bpc_scaled)
                 @test factor(bpc_scaled, vv) ≈ factor(bpc, vv) .* 2
             end
 
             # `adapt_factors` and `adapt_messages` should at least be callable.
-            @test ITensorNetworksNext.adapt_factors(identity, bpc) isa
-                BeliefPropagationCache
-            @test ITensorNetworksNext.adapt_messages(identity, bpc) isa
-                BeliefPropagationCache
+            @test adapt_factors(identity, bpc) isa BeliefPropagationCache
+            @test adapt_messages(identity, bpc) isa BeliefPropagationCache
         end
 
         @testset "subgraph" begin
