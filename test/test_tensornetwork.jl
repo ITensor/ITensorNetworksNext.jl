@@ -1,9 +1,10 @@
 using DataGraphs: assigned_edge_data, assigned_vertex_data, underlying_graph, vertex_data
-using Graphs: dst, edges, edgetype, has_edge, is_directed, ne, nv, src, vertices
+using Graphs: add_edge!, add_vertex!, dst, edges, edgetype, has_edge, has_vertex,
+    is_directed, ne, nv, rem_vertex!, src, vertices
 using ITensorBase: Index
 using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArray
 using ITensorNetworksNext:
-    TensorNetwork, linkaxes, linkinds, linknames, siteaxes, siteinds, sitenames
+    TensorNetwork, fix_edges!, linkaxes, linkinds, linknames, siteaxes, siteinds, sitenames
 using NamedGraphs.GraphsExtensions: incident_edges, subgraph, vertextype
 using NamedGraphs.NamedGraphGenerators: named_grid, named_path_graph
 using NamedGraphs.PartitionedGraphs: AbstractPartitionedGraph, QuotientVertex, departition,
@@ -40,6 +41,19 @@ using Test: @test, @test_throws, @testset
         e = first(edges(tn))
         @test_throws ErrorException tn[e] = randn(2, 2)
         @test_throws ErrorException tn[src(e) => dst(e)] = randn(2, 2)
+
+        rem_vertex!(tn, (2, 2))
+        @test !has_vertex(tn, (2, 2))
+        add_vertex!(tn, (2, 2))
+        @test has_vertex(tn, (2, 2))
+        @test !isassigned(tn, (2, 2))
+
+        # Test `fix_edges!` removes edges where there is no link index
+        t = randn(s[(2, 2)])
+        tn[(2, 2)] = t
+        add_edge!(tn.underlying_graph, (1, 2) => (2, 2))
+        fix_edges!(tn, (2, 2))
+        @test !has_edge(tn, (1, 2) => (2, 2))
     end
 
     @testset "link and site functions" begin
