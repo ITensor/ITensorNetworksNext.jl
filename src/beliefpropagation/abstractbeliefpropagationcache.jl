@@ -79,16 +79,16 @@ function edge_scalars(
 end
 
 function region_scalar(bpc::AbstractGraph, region)
-    return mapreduce(ind -> _graph_index_scalar(bpc, ind), *, region)
+    return mapreduce(ind -> _graph_index_scalar(bpc, to_graph_index(bpc, ind)), *, region)
 end
 
 function incoming_messages(bp_cache::AbstractGraph, vertices; ignore_edges = [])
     b_edges = boundary_edges(bp_cache, [vertices;]; dir = :in)
-    b_edges = !isempty(ignore_edges) ? setdiff(b_edges, ignore_edges) : b_edges
+    if !isempty(ignore_edges)
+        b_edges = setdiff(b_edges, to_graph_index(bp_cache, ignore_edges))
+    end
     return messages(bp_cache, b_edges)
 end
-
-default_messages(::AbstractGraph) = not_implemented()
 
 #Adapt interface for changing device
 map_messages(f, bp_cache, es = edges(bp_cache)) = map_messages!(f, copy(bp_cache), es)
@@ -112,7 +112,7 @@ adapt_factors(to, bp_cache, vs = vertices(bp_cache)) = map_factors(adapt(to), bp
 
 abstract type AbstractBeliefPropagationCache{V, VD, ED} <: AbstractDataGraph{V, VD, ED} end
 
-factor_type(bpc::AbstractBeliefPropagationCache) = typeof(bpc)
+factor_type(bpc::AbstractBeliefPropagationCache) = factor_type(typeof(bpc))
 factor_type(::Type{<:AbstractBeliefPropagationCache{<:Any, VD}}) where {VD} = VD
 
 message_type(bpc::AbstractBeliefPropagationCache) = message_type(typeof(bpc))
