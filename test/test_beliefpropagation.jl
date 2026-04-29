@@ -1,6 +1,6 @@
 using DiagonalArrays: δ
 using Dictionaries: Dictionary, set!
-using Graphs: AbstractGraph, dst, edges, src, vertices
+using Graphs: AbstractGraph, dst, edges, has_edge, src, vertices
 using ITensorBase: ITensor, Index, noprime, prime
 using ITensorNetworksNext: ITensorNetworksNext, BeliefPropagationCache, TensorNetwork,
     adapt_factors, adapt_messages, edge_scalar, factor, factor_type, factors,
@@ -10,7 +10,7 @@ using ITensorNetworksNext: ITensorNetworksNext, BeliefPropagationCache, TensorNe
 using LinearAlgebra: LinearAlgebra
 using NamedDimsArrays: inds, name
 using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges, vertextype
-using NamedGraphs.NamedGraphGenerators: named_comb_tree, named_grid
+using NamedGraphs.NamedGraphGenerators: named_comb_tree, named_grid, named_path_graph
 using Test: @test, @testset
 
 function spin_ice_tensornetwork(g)

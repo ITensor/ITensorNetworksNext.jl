@@ -1,11 +1,11 @@
 using DataGraphs: assigned_edge_data, assigned_vertex_data, underlying_graph, vertex_data
-using Graphs: dst, edges, edgetype, has_edge, ne, nv, src, vertices
+using Graphs: dst, edges, edgetype, has_edge, ne, nv, src, vertices, is_directed
 using ITensorBase: Index
 using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArray
 using ITensorNetworksNext:
     TensorNetwork, linkaxes, linkinds, linknames, siteaxes, siteinds, sitenames
-using NamedGraphs.GraphsExtensions: vertextype
-using NamedGraphs.NamedGraphGenerators: named_grid
+using NamedGraphs.GraphsExtensions: incident_edges, subgraph, vertextype
+using NamedGraphs.NamedGraphGenerators: named_grid, named_path_graph
 using NamedGraphs.PartitionedGraphs: AbstractPartitionedGraph, QuotientVertex, departition,
     partitioned_vertices, partitionedgraph, quotient_graph, quotient_graph_type,
     quotientvertices
@@ -27,7 +27,7 @@ using Test: @test, @test_throws, @testset
         # `eltype` matches the eltype of the vertex data.
         @test eltype(tn) === eltype(vertex_data(tn))
         # `is_directed` is `false` for AbstractTensorNetwork.
-        @test !Graphs.is_directed(typeof(tn))
+        @test !is_directed(typeof(tn))
 
         # `show` MIME and default both succeed and mention vertices/edges.
         s_plain = sprint(show, MIME"text/plain"(), tn)
@@ -82,7 +82,6 @@ using Test: @test, @test_throws, @testset
         @test issetequal(vertices(subtn), sub_vs)
         @test has_edge(subtn, (1,) => (2,))
     end
-
 
     @testset "DataGraphs/NamedGraphs interface" begin
         dims = (3, 3)
