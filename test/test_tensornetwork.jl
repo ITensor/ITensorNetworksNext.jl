@@ -1,5 +1,5 @@
 using DataGraphs: assigned_edge_data, assigned_vertex_data, underlying_graph, vertex_data
-using Graphs: dst, edges, edgetype, has_edge, ne, nv, src, vertices, is_directed
+using Graphs: dst, edges, edgetype, has_edge, is_directed, ne, nv, src, vertices
 using ITensorBase: Index
 using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArray
 using ITensorNetworksNext:
