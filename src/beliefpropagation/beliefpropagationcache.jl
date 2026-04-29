@@ -3,10 +3,11 @@ using DataGraphs: DataGraphs, AbstractDataGraph, edge_data, edge_data_type,
 using Dictionaries: Dictionary, delete!, getindices, set!
 using Graphs: AbstractGraph, connected_components, is_directed, is_tree
 using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArray, lazy, parenttype
-using NamedGraphs.GraphsExtensions:
-    default_root_vertex, forest_cover, post_order_dfs_edges, undirected_graph, vertextype
+using NamedGraphs.GraphsExtensions: IsDirected, default_root_vertex, directed_graph,
+    forest_cover, post_order_dfs_edges, undirected_graph, vertextype
 using NamedGraphs.PartitionedGraphs: QuotientEdge, QuotientView, quotient_graph
 using NamedGraphs: Vertices, convert_vertextype, parent_graph_indices
+using SimpleTraits: SimpleTraits, @traitfn, Not
 
 struct BeliefPropagationCache{V, VD, ED, E, G <: AbstractGraph{V}} <:
     AbstractBeliefPropagationCache{V, VD, ED}
@@ -18,8 +19,8 @@ struct BeliefPropagationCache{V, VD, ED, E, G <: AbstractGraph{V}} <:
             factors::Dictionary,
             messages::Dictionary
         )
-        # Ensure the graph is directed, if not make it directed.
-        digraph = is_directed(graph) ? graph : directed_graph(graph)
+        # Ensure the graph is directed and if not, make it directed.
+        digraph = directed_graph(graph)
 
         V = keytype(factors)
         VD = eltype(factors)
@@ -29,9 +30,6 @@ struct BeliefPropagationCache{V, VD, ED, E, G <: AbstractGraph{V}} <:
 
         bpc = new{V, VD, ED, E, typeof(digraph)}(digraph, factors, messages)
 
-        for edge in edges(bpc)
-            get!(() -> default_message(bpc, edge), messages, edge)
-        end
         return bpc
     end
 end
@@ -71,13 +69,24 @@ function BeliefPropagationCache(graph::AbstractGraph, factors::Dictionary)
     return BeliefPropagationCache(MT, graph, factors)
 end
 
-function BeliefPropagationCache(MT::Type, graph::AbstractGraph, factors::Dictionary)
-    messages = Dictionary{edgetype(graph), MT}()
+@traitfn function BeliefPropagationCache(
+        f::Function,
+        graph::AbstractGraph::!(IsDirected),
+        factors::Dictionary
+    )
+    return BeliefPropagationCache(f, directed_graph(graph), factors)
+end
+@traitfn function BeliefPropagationCache(
+        f::Function,
+        graph::AbstractGraph::IsDirected,
+        factors::Dictionary
+    )
+    messages = map(f, Indices(edges(graph)))
     return BeliefPropagationCache(graph, factors, messages)
 end
 
-function BeliefPropagationCache(f::Function, graph::AbstractGraph, factors::Dictionary)
-    messages = map(f, Indices(edges(graph)))
+function BeliefPropagationCache(MT::Type, graph::AbstractGraph, factors::Dictionary)
+    messages = Dictionary{edgetype(graph), MT}()
     return BeliefPropagationCache(graph, factors, messages)
 end
 
@@ -146,18 +155,6 @@ function PartitionedGraphs.quotientview(bpc::BeliefPropagationCache)
     messages = map(e -> bpc[QuotientEdge(e)], Indices(edges(quotient_view)))
 
     return BeliefPropagationCache(quotient_view, factors, messages)
-end
-
-function default_message(bpc::BeliefPropagationCache, edge)
-    return default_message(message_type(bpc), bpc[src(edge)], bpc[dst(edge)])
-end
-function default_message(T::Type, src, dst)
-    array = ones(Tuple(inds(src) ∩ inds(dst)))
-    return convert(T, array)
-end
-function default_message(T::Type{<:LazyNamedDimsArray}, src, dst)
-    message = default_message(parenttype(T), src, dst)
-    return convert(T, lazy(message))
 end
 
 NamedGraphs.to_graph_index(::BeliefPropagationCache, vertex::QuotientVertex) = vertex
