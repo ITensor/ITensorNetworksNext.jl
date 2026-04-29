@@ -1,8 +1,9 @@
 using DataGraphs: assigned_edge_data, assigned_vertex_data, underlying_graph, vertex_data
-using Graphs: dst, edges, has_edge, ne, nv, src, vertices
+using Graphs: dst, edges, edgetype, has_edge, ne, nv, src, vertices
 using ITensorBase: Index
 using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArray
-using ITensorNetworksNext: TensorNetwork
+using ITensorNetworksNext:
+    TensorNetwork, linkaxes, linkinds, linknames, siteaxes, siteinds, sitenames
 using NamedGraphs.GraphsExtensions: vertextype
 using NamedGraphs.NamedGraphGenerators: named_grid
 using NamedGraphs.PartitionedGraphs: AbstractPartitionedGraph, QuotientVertex, departition,
@@ -12,6 +13,77 @@ using NamedGraphs: convert_vertextype, similar_graph
 using Test: @test, @test_throws, @testset
 
 @testset "`TensorNetwork`" begin
+    @testset "Basics" begin
+        g = named_grid((2, 2))
+        s = Dict(v => Index(2) for v in vertices(g))
+        tn = TensorNetwork(g) do v
+            return randn(s[v])
+        end
+
+        # `iterate` works (delegates to `vertex_data`).
+        @test !isempty(collect(tn))
+        # `keys` returns vertices.
+        @test issetequal(keys(tn), vertices(tn))
+        # `eltype` matches the eltype of the vertex data.
+        @test eltype(tn) === eltype(vertex_data(tn))
+        # `is_directed` is `false` for AbstractTensorNetwork.
+        @test !Graphs.is_directed(typeof(tn))
+
+        # `show` MIME and default both succeed and mention vertices/edges.
+        s_plain = sprint(show, MIME"text/plain"(), tn)
+        @test occursin("vertices", s_plain)
+        @test occursin("edge", s_plain)
+        s_default = sprint(show, tn)
+        @test occursin("vertices", s_default)
+
+        # `setindex!` for edges is intentionally unimplemented.
+        e = first(edges(tn))
+        @test_throws ErrorException tn[e] = randn(2, 2)
+        @test_throws ErrorException tn[src(e) => dst(e)] = randn(2, 2)
+    end
+
+    @testset "link and site functions" begin
+        g = named_path_graph(3)
+        l = Dict(e => Index(2) for e in edges(g))
+        l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
+        s = Dict(v => Index(2) for v in vertices(g))
+        tn = TensorNetwork(g) do v
+            is = map(e -> l[e], incident_edges(g, v))
+            return randn((s[v], is...))
+        end
+
+        E = edgetype(tn)
+        @test linkinds(tn, 1 => 2) == [l[E(1 => 2)]]
+        @test linkinds(tn, E(1 => 2)) == [l[E(1 => 2)]]
+
+        @test linkaxes(tn, 1 => 2) == [l[E(1 => 2)]]
+        @test linkaxes(tn, E(1 => 2)) == [l[E(1 => 2)]]
+
+        @test linknames(tn, 1 => 2) == [l[E(1 => 2)].name]
+        @test linknames(tn, E(1 => 2)) == [l[E(1 => 2)].name]
+
+        @test siteinds(tn, 1) == [s[1]]
+        @test siteaxes(tn, 2) == [s[2]]
+        @test sitenames(tn, 3) == [s[3].name]
+    end
+
+    @testset "`subgraph`" begin
+        g = named_grid((3,))
+        l = Dict(e => Index(2) for e in edges(g))
+        l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
+        tn = TensorNetwork(g) do v
+            is = map(e -> l[e], incident_edges(g, v))
+            return randn(Tuple(is))
+        end
+
+        sub_vs = [(1,), (2,)]
+        subtn = subgraph(tn, sub_vs)
+        @test subtn isa TensorNetwork
+        @test issetequal(vertices(subtn), sub_vs)
+        @test has_edge(subtn, (1,) => (2,))
+    end
+
+
     @testset "DataGraphs/NamedGraphs interface" begin
         dims = (3, 3)
         g = named_grid(dims)
