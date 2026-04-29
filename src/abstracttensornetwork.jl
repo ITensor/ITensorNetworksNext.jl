@@ -85,15 +85,15 @@ function siteinds(tn::AbstractGraph, v)
     end
     return s
 end
-function siteaxes(tn::AbstractGraph, edge::AbstractEdge)
-    s = axes(tn[src(edge)]) ∩ axes(tn[dst(edge)])
+function siteaxes(tn::AbstractGraph, v)
+    s = axes(tn[v])
     for v′ in neighbors(tn, v)
         s = setdiff(s, axes(tn[v′]))
     end
     return s
 end
-function sitenames(tn::AbstractGraph, edge::AbstractEdge)
-    s = dimnames(tn[src(edge)]) ∩ dimnames(tn[dst(edge)])
+function sitenames(tn::AbstractGraph, v)
+    s = dimnames(tn[v])
     for v′ in neighbors(tn, v)
         s = setdiff(s, dimnames(tn[v′]))
     end
