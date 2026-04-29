@@ -44,6 +44,12 @@ function TensorNetwork{V, VD, UG, Tensors}(
     return _TensorNetwork(graph, Tensors())
 end
 
+function Graphs.rem_vertex!(tn::TensorNetwork, v)
+    delete!(tn.tensors, v)
+    rem_vertex!(tn.underlying_graph, v)
+    return tn
+end
+
 # DataGraphs interface
 
 DataGraphs.underlying_graph(tn::TensorNetwork) = tn.underlying_graph
