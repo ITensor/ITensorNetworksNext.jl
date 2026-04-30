@@ -1,12 +1,12 @@
+using DataGraphs: edge_data
 using DiagonalArrays: δ
 using Dictionaries: Dictionary, set!
 using Graphs: AbstractGraph, dst, edges, has_edge, src, vertices
 using ITensorBase: ITensor, Index, noprime, prime
-using ITensorNetworksNext: ITensorNetworksNext, BeliefPropagationCache, TensorNetwork,
-    adapt_factors, adapt_messages, edge_scalar, factor, factor_type, factors,
-    incoming_messages, linkinds, map_factors, map_messages, message, message_type, messages,
-    region_scalar, scalar, setfactor!, setmessage!, setmessages!, subgraph, vertex_scalar,
-    vertex_scalars
+using ITensorNetworksNext: ITensorNetworksNext, MessageCache, TensorNetwork, adapt_messages,
+    edge_scalar, factor, factors, incoming_messages, linkinds, map_messages, message,
+    message_type, messages, region_scalar, scalar, setmessage!, setmessages!, subgraph,
+    vertex_scalar, vertex_scalars
 using LinearAlgebra: LinearAlgebra
 using NamedDimsArrays: inds, name
 using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges, vertextype
@@ -37,8 +37,8 @@ function spin_ice_tensornetwork(g)
     return TensorNetwork(g, ts)
 end
 
-@testset "BeliefPropagation" begin
-    @testset "`BeliefPropagationCache`" begin
+@testset "Belief propagation" begin
+    @testset "`MessageCache`" begin
         @testset "Basics" begin
             dims = (3, 3)
             g = named_grid(dims)
@@ -50,23 +50,18 @@ end
                 return randn(Tuple(is))
             end
 
-            bpc = BeliefPropagationCache(tn) do edge
+            # By default for graphs, assume factors refers to the vertex data
+            @test length(factors(tn)) == 9
+            @test factor(tn, (1, 1)) == tn[(1, 1)]
+
+            bpc = MessageCache(tn) do edge
                 return "$(src(edge)) => $(dst(edge))"
             end
 
-            @test factor_type(bpc) <: ITensor
             @test message_type(bpc) <: String
-            @test length(factors(bpc)) == 9
             @test length(messages(bpc)) == 2 * length(edges(g))
-            @test bpc[(2, 2)] == tn[(2, 2)]
-            @test factor(bpc, (1, 1)) == tn[(1, 1)]
             @test bpc[(1, 1) => (1, 2)] == "(1, 1) => (1, 2)"
             @test message(bpc, (2, 1) => (1, 1)) == "(2, 1) => (1, 1)"
-
-            # set factor
-            f = factor(bpc, (1, 1))
-            setfactor!(bpc, (1, 1), 2 * f)
-            @test factor(bpc, (1, 1)) == 2 * f
 
             # set message
             setmessage!(bpc, (1, 1) => (1, 2), "new message")
@@ -77,7 +72,7 @@ end
             @test message(bpc, (1, 2) => (2, 2)) == "m1"
             @test message(bpc, (2, 2) => (2, 3)) == "m2"
 
-            bpc_dst = BeliefPropagationCache(tn) do edge
+            bpc_dst = MessageCache(tn) do edge
                 return ""
             end
             setmessages!(bpc_dst, bpc, [(1, 2) => (2, 2), (2, 2) => (2, 3)])
@@ -94,18 +89,16 @@ end
                 return randn(ComplexF32, Tuple(is))
             end
 
-            bpc = BeliefPropagationCache(tn) do edge
+            bpc = MessageCache(tn) do edge
                 return ones(Float64, Tuple(linkinds(tn, edge)))
             end
 
             # Vertex/edge/region scalars.
-            @test vertex_scalar(bpc, 2) isa ComplexF64
+            @test vertex_scalar(tn, bpc, 2) isa ComplexF64
             @test edge_scalar(bpc, 1 => 2) isa Float64
 
-            @test region_scalar(bpc, [1]) == vertex_scalar(bpc, 1)
-            @test region_scalar(bpc, [1 => 2]) == edge_scalar(bpc, 1 => 2)
-            @test region_scalar(bpc, [2 => 1]) == edge_scalar(bpc, 1 => 2)
-            @test region_scalar(bpc, [1, 2, 3]) == prod(vertex_scalars(bpc))
+            @test region_scalar(tn, bpc, [1]) == vertex_scalar(tn, bpc, 1)
+            @test region_scalar(tn, bpc, [2, 3]) == prod(vertex_scalars(tn, bpc, [2, 3]))
 
             # `incoming_messages` excludes specified edges.
             in_msgs = incoming_messages(bpc, 2)
@@ -126,19 +119,7 @@ end
             @test message(bpc_doubled, 1 => 2) ≈ 2 .* message(bpc, 1 => 2)
             @test message(bpc_doubled, 2 => 3) ≈ 2 .* message(bpc, 2 => 3)
 
-            bpc_again = map_factors(identity, bpc)
-            @test bpc_again !== bpc
-            @test bpc_again == bpc
-
-            bpc_scaled = map_factors(f -> f .* 2, bpc)
-            @test !(bpc_scaled === bpc)
-            for vv in vertices(bpc_scaled)
-                @test factor(bpc_scaled, vv) ≈ factor(bpc, vv) .* 2
-            end
-
-            # `adapt_factors` and `adapt_messages` should at least be callable.
-            @test adapt_factors(identity, bpc) isa BeliefPropagationCache
-            @test adapt_messages(identity, bpc) isa BeliefPropagationCache
+            @test adapt_messages(identity, bpc) == bpc
         end
 
         @testset "subgraph" begin
@@ -149,13 +130,13 @@ end
                 is = map(e -> l[e], incident_edges(g, v))
                 return randn(Tuple(is))
             end
-            bpc = BeliefPropagationCache(tn) do edge
+            bpc = MessageCache(tn) do edge
                 return ones(Tuple(linkinds(tn, edge)))
             end
 
             sub_vs = [(1,), (2,)]
             subbpc = subgraph(bpc, sub_vs)
-            @test subbpc isa BeliefPropagationCache
+            @test subbpc isa MessageCache
             @test issetequal(vertices(subbpc), sub_vs)
             @test has_edge(subbpc, (1,) => (2,))
         end
@@ -168,10 +149,10 @@ end
                 return randn(Tuple(is))
             end
 
-            bpc1 = BeliefPropagationCache(tn) do edge
+            bpc1 = MessageCache(tn) do edge
                 return ones(Tuple(linkinds(tn, edge)))
             end
-            bpc2 = BeliefPropagationCache(tn) do edge
+            bpc2 = MessageCache(tn) do edge
                 return ones(Tuple(linkinds(tn, edge)))
             end
 
@@ -193,11 +174,11 @@ end
                 return randn(T, Tuple(is))
             end
 
-            bpc = BeliefPropagationCache(tn) do edge
+            bpc = MessageCache(tn) do edge
                 return ones(T, Tuple(linkinds(tn, edge)))
             end
-            bpc = ITensorNetworksNext.beliefpropagation(bpc; maxiter = 1)
-            z_bp = scalar(bpc)
+            bpc = ITensorNetworksNext.beliefpropagation(tn, bpc; maxiter = 1)
+            z_bp = scalar(tn, bpc)
             z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
             @test z_bp ≈ z_exact
 
@@ -211,11 +192,11 @@ end
                 return randn(T, Tuple(is))
             end
 
-            bpc = BeliefPropagationCache(tn) do edge
+            bpc = MessageCache(tn) do edge
                 return ones(T, Tuple(linkinds(tn, edge)))
             end
-            bpc = ITensorNetworksNext.beliefpropagation(bpc; maxiter = 1)
-            z_bp = scalar(bpc)
+            bpc = ITensorNetworksNext.beliefpropagation(tn, bpc; maxiter = 1)
+            z_bp = scalar(tn, bpc)
             z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
             @test z_bp ≈ z_exact
 
@@ -226,18 +207,19 @@ end
                     g = named_grid(dims; periodic = true)
                     tn = spin_ice_tensornetwork(g)
 
-                    bpc = ITensorNetworksNext.BeliefPropagationCache(tn) do edge
+                    bpc = ITensorNetworksNext.MessageCache(tn) do edge
                         # Use `rand` so messages have positive elements.
                         return rand(T, Tuple(linkinds(tn, edge)))
                     end
                     bpc =
                         ITensorNetworksNext.beliefpropagation(
+                        tn,
                         bpc;
                         tol = 1.0e-10,
                         maxiter = 10
                     )
 
-                    z_bp = scalar(bpc)
+                    z_bp = scalar(tn, bpc)
 
                     @test z_bp ≈ 1.5^(n^2)
                 end
