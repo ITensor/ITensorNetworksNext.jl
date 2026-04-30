@@ -8,13 +8,12 @@ using NamedDimsArrays: AbstractNamedDimsArray
 using NamedGraphs.GraphsExtensions: add_edges!, boundary_edges, subgraph
 using NamedGraphs.PartitionedGraphs: quotientvertices
 
-@kwdef struct StopWhenConverged{Tol <: Real} <: AI.StoppingCriterion
-    tol::Tol = 0.0
+@kwdef struct StopWhenConverged <: AI.StoppingCriterion
+    tol::Float64
 end
 
-@kwdef mutable struct StopWhenConvergedState{Iterate, Delta <: Real} <:
-    AI.StoppingCriterionState
-    delta::Delta = Inf
+@kwdef mutable struct StopWhenConvergedState{Iterate} <: AI.StoppingCriterionState
+    delta::Float64 = Inf
     at_iteration::Int = -1
     previous_iterate::Iterate
 end
@@ -40,8 +39,6 @@ function AI.is_finished!(
         c::StopWhenConverged,
         st::StopWhenConvergedState
     )
-
-    # maxdiff = 0.0 initially, so skip this the first time.
     iterate = state.iterate
     previous_iterate = st.previous_iterate
 
@@ -49,6 +46,7 @@ function AI.is_finished!(
 
     st.previous_iterate = copy(iterate)
 
+    # maxdiff = 0.0 initially, so skip this the first time.
     state.iteration == 0 && return false
 
     st.delta = delta
@@ -71,13 +69,13 @@ function AI.is_finished(
     return st.delta < c.tol
 end
 
-struct BeliefPropagationProblem{Network} <: AIE.Problem
-    network::Network
+struct BeliefPropagationProblem{Factors} <: AIE.Problem
+    factors::Factors
 end
 
 function iterate_diff(
-        cache1::AbstractBeliefPropagationCache,
-        cache2::AbstractBeliefPropagationCache
+        cache1::MessageCache,
+        cache2::MessageCache
     )
     return maximum(edges(cache1)) do edge
         m1 = cache1[edge]
@@ -145,7 +143,7 @@ function AIE.set_substate!(
         ::BeliefPropagationProblem,
         ::BeliefPropagationSweep,
         state::AIE.DefaultState,
-        cache::AbstractBeliefPropagationCache
+        cache::MessageCache
     )
     state.iterate = cache
 
@@ -153,18 +151,19 @@ function AIE.set_substate!(
 end
 
 function AI.solve!(
-        ::BeliefPropagationProblem,
+        problem::BeliefPropagationProblem,
         algorithm::SimpleMessageUpdate,
-        cache::AbstractBeliefPropagationCache; kwargs...
+        cache::MessageCache;
+        logging_context_prefix = AIE.default_logging_context_prefix(problem, algorithm)
     )
     edge = algorithm.edge
 
     vertex = src(edge)
+
     messages = incoming_messages(cache, vertex; ignore_edges = [reverse(edge)])
+    factors = vcat([factor(problem.factors, vertex)], messages)
 
-    tensors = vcat([factor(cache, vertex)], messages)
-
-    new_message = contract_network(tensors; algorithm.contraction_alg)
+    new_message = contract_network(factors; algorithm.contraction_alg)
 
     if algorithm.normalize
         message_norm = sum(new_message)
@@ -178,32 +177,22 @@ function AI.solve!(
     return cache
 end
 
-function beliefpropagation(network; kwargs...)
-    return beliefpropagation(BeliefPropagationCache(network), network; kwargs...)
+function beliefpropagation(network::AbstractGraph, messages::Dictionary; kwargs...)
+    cache = MessageCache(messages, network)
+    return beliefpropagation(network, cache; kwargs...)
 end
 
-function beliefpropagation(
-        cache::AbstractBeliefPropagationCache,
-        network = nothing;
-        kwargs...
-    )
+function beliefpropagation(network, cache; kwargs...)
     problem = BeliefPropagationProblem(network)
 
     algorithm = select_algorithm(beliefpropagation, cache; kwargs...)
 
     state = AI.solve(problem, algorithm; iterate = cache)
 
-    return state.iterate
+    return state.iterate # -> typeof(cache)
 end
 
-function select_algorithm(
-        ::typeof(beliefpropagation),
-        cache::AbstractBeliefPropagationCache;
-        edges = forest_cover_edge_sequence(cache),
-        maxiter = is_tree(cache) ? 1 : nothing,
-        tol = nothing,
-        kwargs...
-    )
+function default_stopping_criterion(::typeof(beliefpropagation); maxiter, tol)
     if isnothing(maxiter)
         throw(ArgumentError("`maxiter` must be specified for non-tree graphs"))
     end
@@ -214,6 +203,18 @@ function select_algorithm(
         stopping_criterion = stopping_criterion | StopWhenConverged(tol)
     end
 
+    return stopping_criterion
+end
+
+function select_algorithm(
+        alg::typeof(beliefpropagation),
+        cache::MessageCache;
+        edges = forest_cover_edge_sequence(cache),
+        maxiter = is_tree(cache) ? 1 : nothing,
+        tol = nothing,
+        stopping_criterion = default_stopping_criterion(alg; maxiter, tol),
+        kwargs...
+    )
     extended_kwargs = extend_columns((; kwargs...), maxiter)
     edge_kwargs = rows(extended_kwargs, maxiter)
 
