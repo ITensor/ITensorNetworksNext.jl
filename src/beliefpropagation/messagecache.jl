@@ -9,8 +9,8 @@ using NamedGraphs.PartitionedGraphs: QuotientEdge, QuotientView, quotient_graph
 using NamedGraphs:
     NamedDiGraph, Vertices, convert_vertextype, parent_graph_indices, to_graph_index
 
-struct MessageCache{MT, V, E} <: AbstractDataGraph{V, Nothing, MT}
-    messages::Dictionary{E, MT}
+struct MessageCache{MT, V} <: AbstractDataGraph{V, Nothing, MT}
+    messages::Dictionary{NamedEdge{V}, MT}
     underlying_graph::NamedDiGraph{V}
     global function _MessageCache(
             messages::Dictionary{E, MT},
