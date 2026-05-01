@@ -121,9 +121,7 @@ function factors(all_factors, vertices)
 end
 
 # Specific for graphs
-function factors(all_factors::AbstractGraph)
-    return map(vertex -> factor(all_factors, vertex), vertices(all_factors))
-end
+factors(all_factors::AbstractGraph) = factors(all_factors, vertices(all_factors))
 
 message(_messages, _edge) = not_implemented()
 message(messages::AbstractGraph, edge) = messages[edge]
@@ -133,9 +131,7 @@ function messages(all_messages, edges)
 end
 
 # Specific for graphs
-function messages(all_messages::AbstractGraph)
-    return map(edge -> message(all_messages, edge), edges(all_messages))
-end
+messages(all_messages::AbstractGraph) = messages(all_messages, edges(all_messages))
 
 # Specific to the concrete type.
 messages(cache::MessageCache) = cache.messages
