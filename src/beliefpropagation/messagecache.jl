@@ -100,25 +100,25 @@ message_type(::Type) = not_implemented()
 message_type(cache) = message_type(typeof(cache))
 message_type(T::Type{<:MessageCache}) = edge_data_type(T)
 
-factor(_factors, _vertex) = not_implemented()
-factor(factors::AbstractGraph, vertex) = factors[vertex]
+factor(_cache, _vertex) = not_implemented()
+factor(cache::AbstractGraph, vertex) = cache[vertex]
 
-function factors(all_factors, vertices)
-    return map(vertex -> factor(all_factors, vertex), vertices)
+function factors(cache, vertices)
+    return map(vertex -> factor(cache, vertex), vertices)
 end
 
 # Specific for graphs
-factors(all_factors::AbstractGraph) = factors(all_factors, vertices(all_factors))
+factors(cache::AbstractGraph) = factors(cache, vertices(cache))
 
-message(_messages, _edge) = not_implemented()
-message(messages::AbstractGraph, edge) = messages[edge]
+message(_cache, _edge) = not_implemented()
+message(cache::AbstractGraph, edge) = cache[edge]
 
-function messages(all_messages, edges)
-    return map(edge -> message(all_messages, edge), edges)
+function messages(cache, edges)
+    return map(edge -> message(cache, edge), edges)
 end
 
 # Specific for graphs
-messages(all_messages::AbstractGraph) = messages(all_messages, edges(all_messages))
+messages(cache::AbstractGraph) = messages(cache, edges(cache))
 
 # Specific to the concrete type.
 messages(cache::MessageCache) = cache.messages
