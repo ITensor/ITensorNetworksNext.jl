@@ -12,12 +12,6 @@ using NamedGraphs:
 struct MessageCache{MT, V} <: AbstractDataGraph{V, Nothing, MT}
     messages::Dictionary{NamedEdge{V}, MT}
     underlying_graph::NamedDiGraph{V}
-    global function _MessageCache(
-            messages::Dictionary{E, MT},
-            underlying_graph::NamedDiGraph{V}
-        ) where {MT, V, E}
-        return new{MT, V, E}(messages, underlying_graph)
-    end
 end
 
 DataGraphs.underlying_graph(c::MessageCache) = c.underlying_graph
@@ -44,13 +38,6 @@ function _message_cache_underlying_graph(graph::AbstractGraph)
     return digraph
 end
 
-MessageCache(::UndefInitializer, graph::AbstractGraph) = MessageCache{Any}(undef, graph)
-
-function MessageCache{ED}(::UndefInitializer, graph::AbstractGraph) where {ED}
-    messages = Dictionary{edgetype(graph), ED}()
-    return MessageCache(messages, graph)
-end
-
 function MessageCache(f::Function, graph::AbstractGraph)
     digraph = _message_cache_underlying_graph(graph)
     messages = map(f, Indices(edges(digraph)))
@@ -59,7 +46,7 @@ end
 
 function MessageCache(messages, graph::AbstractGraph)
     digraph = _message_cache_underlying_graph(graph)
-    return _MessageCache(Dictionary(messages), digraph) # Call the inner constructor.
+    return MessageCache(Dictionary(messages), digraph) # Call the inner constructor.
 end
 
 function Base.copy(cache::MessageCache)
