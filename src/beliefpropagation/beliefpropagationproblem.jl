@@ -185,36 +185,58 @@ end
 function beliefpropagation(network, cache; kwargs...)
     problem = BeliefPropagationProblem(network)
 
-    algorithm = select_algorithm(beliefpropagation, cache; kwargs...)
+    algorithm = select_algorithm(beliefpropagation, network, cache; kwargs...)
 
     state = AI.solve(problem, algorithm; iterate = cache)
 
     return state.iterate # -> typeof(cache)
 end
 
-function default_stopping_criterion(::typeof(beliefpropagation); maxiter, tol)
-    if isnothing(maxiter)
-        throw(ArgumentError("`maxiter` must be specified for non-tree graphs"))
-    end
+function default_stopping_criterion(
+        ::typeof(beliefpropagation);
+        maxiter,
+        tol,
+        stopping_criterion
+    )
+    base_stopping_criterion = AI.StopAfterIteration(maxiter)
 
-    stopping_criterion = AI.StopAfterIteration(maxiter)
+    if !isnothing(stopping_criterion)
+        base_stopping_criterion |= stopping_criterion
+    end
 
     if !isnothing(tol)
-        stopping_criterion = stopping_criterion | StopWhenConverged(tol)
+        base_stopping_criterion |= StopWhenConverged(tol)
     end
 
-    return stopping_criterion
+    return base_stopping_criterion
 end
 
 function select_algorithm(
-        alg::typeof(beliefpropagation),
+        ::typeof(beliefpropagation),
+        network::AbstractGraph,
         cache::MessageCache;
         edges = forest_cover_edge_sequence(cache),
-        maxiter = is_tree(cache) ? 1 : nothing,
+        maxiter = is_tree(network) ? 1 : nothing,
         tol = nothing,
-        stopping_criterion = default_stopping_criterion(alg; maxiter, tol),
+        stopping_criterion = nothing,
         kwargs...
     )
+    if isnothing(maxiter)
+        throw(
+            ArgumentError(
+                "`maxiter` must be specified for non-tree graphs, even when 
+                    `stopping_criterion` is provided."
+            )
+        )
+    end
+
+    stopping_criterion = default_stopping_criterion(
+        beliefpropagation;
+        maxiter,
+        tol,
+        stopping_criterion
+    )
+
     extended_kwargs = extend_columns((; kwargs...), maxiter)
     edge_kwargs = rows(extended_kwargs, maxiter)
 

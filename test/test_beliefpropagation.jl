@@ -1,12 +1,13 @@
+import AlgorithmsInterface as AI
 using DataGraphs: edge_data
 using DiagonalArrays: δ
 using Dictionaries: Dictionary, set!
 using Graphs: AbstractGraph, dst, edges, has_edge, src, vertices
 using ITensorBase: ITensor, Index, noprime, prime
-using ITensorNetworksNext: ITensorNetworksNext, MessageCache, TensorNetwork, adapt_messages,
-    edge_scalar, factor, factors, incoming_messages, linkinds, map_messages, message,
-    message_type, messages, region_scalar, scalar, setmessage!, setmessages!, subgraph,
-    vertex_scalar, vertex_scalars
+using ITensorNetworksNext: ITensorNetworksNext, MessageCache, StopWhenConverged,
+    TensorNetwork, adapt_messages, edge_scalar, factor, factors, incoming_messages,
+    linkinds, map_messages, message, message_type, messages, region_scalar, scalar,
+    setmessage!, setmessages!, subgraph, vertex_scalar, vertex_scalars
 using LinearAlgebra: LinearAlgebra
 using NamedDimsArrays: inds, name
 using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges, vertextype
@@ -211,12 +212,15 @@ end
                         # Use `rand` so messages have positive elements.
                         return rand(T, Tuple(linkinds(tn, edge)))
                     end
+
+                    stopping_criterion = StopWhenConverged(tol = 1.0e-10)
+
                     bpc =
                         ITensorNetworksNext.beliefpropagation(
                         tn,
                         bpc;
-                        tol = 1.0e-10,
-                        maxiter = 10
+                        maxiter = 10,
+                        stopping_criterion
                     )
 
                     z_bp = scalar(tn, bpc)
