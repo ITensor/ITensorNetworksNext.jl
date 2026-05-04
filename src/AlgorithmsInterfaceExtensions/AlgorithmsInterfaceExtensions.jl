@@ -22,12 +22,12 @@ function AI.initialize_state!(
 end
 
 function AI.initialize_state(
-        problem::Problem, algorithm::Algorithm; kwargs...
+        problem::Problem, algorithm::Algorithm; iterate, kwargs...
     )
     stopping_criterion_state = AI.initialize_state(
-        problem, algorithm, algorithm.stopping_criterion
+        problem, algorithm, algorithm.stopping_criterion; iterate
     )
-    return DefaultState(; stopping_criterion_state, kwargs...)
+    return DefaultState(; iterate, stopping_criterion_state, kwargs...)
 end
 
 # ============================ DefaultState ================================================
@@ -151,8 +151,9 @@ end
 
 abstract type NestedAlgorithm <: Algorithm end
 
-function nested_algorithm(f::Function, nalgorithms::Int; kwargs...)
-    return DefaultNestedAlgorithm(f, nalgorithms; kwargs...)
+nested_algorithm(f::Function, int::Int; kwargs...) = nested_algorithm(f, 1:int; kwargs...)
+function nested_algorithm(f::Function, iterable; kwargs...)
+    return DefaultNestedAlgorithm(f, iterable; kwargs...)
 end
 
 max_iterations(algorithm::NestedAlgorithm) = length(algorithm.algorithms)
@@ -206,8 +207,8 @@ from a list of stored algorithms.
     algorithms::Algorithms
     stopping_criterion::StoppingCriterion = AI.StopAfterIteration(length(algorithms))
 end
-function DefaultNestedAlgorithm(f::Function, nalgorithms::Int; kwargs...)
-    return DefaultNestedAlgorithm(; algorithms = f.(1:nalgorithms), kwargs...)
+function DefaultNestedAlgorithm(f::Function, iterable; kwargs...)
+    return DefaultNestedAlgorithm(; algorithms = f.(iterable), kwargs...)
 end
 
 # ============================ FlattenedAlgorithm ==========================================
