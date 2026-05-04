@@ -158,12 +158,10 @@ function AI.solve!(
     )
     edge = algorithm.edge
 
-    vertex = src(edge)
+    messages = collect(incoming_messages(cache, edge))
+    factor = problem.factors[src(edge)]
 
-    messages = incoming_messages(cache, vertex; ignore_edges = [reverse(edge)])
-    factors = vcat([factor(problem.factors, vertex)], messages)
-
-    new_message = contract_network(factors; algorithm.contraction_alg)
+    new_message = contract_network(vcat(messages, [factor]); algorithm.contraction_alg)
 
     if algorithm.normalize
         message_norm = sum(new_message)
@@ -172,25 +170,26 @@ function AI.solve!(
         end
     end
 
-    setmessage!(cache, edge, new_message)
+    cache[edge] = new_message
 
     return cache
 end
 
-function beliefpropagation(network::AbstractGraph, messages::Dictionary; kwargs...)
-    cache = MessageCache(messages, network)
-    return beliefpropagation(network, cache; kwargs...)
-end
+function beliefpropagation(factors, messages; kwargs...)
+    problem = BeliefPropagationProblem(factors)
 
-function beliefpropagation(network, cache; kwargs...)
-    problem = BeliefPropagationProblem(network)
+    cache = initialize_cache(beliefpropagation, factors, messages)
 
-    algorithm = select_algorithm(beliefpropagation, network, cache; kwargs...)
+    algorithm = select_algorithm(beliefpropagation, factors, cache; kwargs...)
 
     state = AI.solve(problem, algorithm; iterate = cache)
 
     return state.iterate # -> typeof(cache)
 end
+
+# Use a `MessageCache` by default. Note if `messages` is already a `MessageCache` this
+# will make a copy of the the existing cache, thus protecting the original from mutation.
+initialize_cache(::typeof(beliefpropagation), _factors, messages) = MessageCache(messages)
 
 function default_stopping_criterion(
         ::typeof(beliefpropagation);
