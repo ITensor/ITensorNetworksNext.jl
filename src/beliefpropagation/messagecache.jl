@@ -53,6 +53,7 @@ function MessageCache{T, V}(messages) where {T, V}
 end
 
 messagecache(pairs) = MessageCache(Dict(pairs))
+messagecache(f, edges) = messagecache(edge => f(edge) for edge in edges)
 
 # ================================ NamedGraphs interface ================================= #
 function NamedGraphs.add_edge!(c::MessageCache, edge)

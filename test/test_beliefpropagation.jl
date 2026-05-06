@@ -51,9 +51,7 @@ end
                 return randn(Tuple(is))
             end
 
-            bpc = messagecache(
-                edge => "$(src(edge)) => $(dst(edge))" for edge in all_edges(g)
-            )
+            bpc = messagecache(edge -> "$(src(edge)) => $(dst(edge))", all_edges(g))
 
             @test valtype(bpc) <: String
             @test edge_data_type(bpc) <: String
@@ -77,7 +75,7 @@ end
             @test new_bpc[(1, 2) => (2, 2)] == "m1"
             @test new_bpc[(2, 2) => (2, 3)] == "m2"
 
-            bpc_dst = messagecache(edge => "" for edge in all_edges(g))
+            bpc_dst = messagecache(edge -> "", all_edges(g))
 
             copyto!(bpc_dst, bpc, [(1, 2) => (2, 2), (2, 2) => (2, 3)])
             @test bpc_dst[(1, 1) => (1, 2)] == ""
@@ -93,10 +91,9 @@ end
                 return randn(ComplexF32, Tuple(is))
             end
 
-            bpc = messagecache(
-                edge => ones(Float64, Tuple(linkinds(tn, edge))) for
-                    edge in all_edges(g)
-            )
+            bpc = messagecache(all_edges(g)) do edge
+                return ones(Float64, Tuple(linkinds(tn, edge)))
+            end
 
             # Vertex/edge/region scalars.
             @test vertex_scalar(tn, bpc, 2) isa ComplexF64
@@ -126,9 +123,7 @@ end
                 is = map(e -> l[e], incident_edges(g, v))
                 return randn(Tuple(is))
             end
-            bpc = messagecache(
-                edge => ones(Tuple(linkinds(tn, edge))) for edge in all_edges(g)
-            )
+            bpc = messagecache(edge -> ones(Tuple(linkinds(tn, edge))), all_edges(g))
 
             sub_vs = [(1,), (2,)]
             subbpc = subgraph(bpc, sub_vs)
@@ -145,9 +140,7 @@ end
                 return randn(Tuple(is))
             end
 
-            bpc1 = messagecache(
-                edge => ones(Tuple(linkinds(tn, edge))) for edge in all_edges(g)
-            )
+            bpc1 = messagecache(edge -> ones(Tuple(linkinds(tn, edge))), all_edges(g))
 
             bpc2 = copy(bpc1)
 
