@@ -5,8 +5,8 @@ using Dictionaries: Dictionary, dictionary, set!
 using Graphs: AbstractGraph, dst, edges, has_edge, src, vertices
 using ITensorBase: ITensor, Index, noprime, prime
 using ITensorNetworksNext: ITensorNetworksNext, MessageCache, StopWhenConverged,
-    TensorNetwork, edge_scalar, incoming_messages, linkinds, messagecache, region_scalar,
-    scalar, subgraph, vertex_scalar, vertex_scalars
+    TensorNetwork, bethe_free_energy, edge_scalar, incoming_messages, linkinds,
+    messagecache, region_scalar, subgraph, vertex_scalar, vertex_scalars
 using LinearAlgebra: LinearAlgebra
 using NamedDimsArrays: inds, name
 using NamedGraphs.GraphsExtensions: all_edges, arranged_edges, incident_edges, vertextype
@@ -175,7 +175,7 @@ end
             messages = Dict(edge => onet(tn, edge) for edge in all_edges(g))
 
             cache = ITensorNetworksNext.beliefpropagation(tn, messages; maxiter = 1)
-            z_bp = scalar(tn, cache)
+            z_bp = exp(bethe_free_energy(tn, cache))
             z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
             @test z_bp ≈ z_exact
 
@@ -192,7 +192,7 @@ end
             messages = Dict(edge => onet(tn, edge) for edge in all_edges(g))
 
             cache = ITensorNetworksNext.beliefpropagation(tn, messages; maxiter = 1)
-            z_bp = scalar(tn, cache)
+            z_bp = exp(bethe_free_energy(tn, cache))
             z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
             @test z_bp ≈ z_exact
 
@@ -214,7 +214,7 @@ end
                         stopping_criterion
                     )
 
-                    z_bp = scalar(tn, cache)
+                    z_bp = exp(bethe_free_energy(tn, cache))
 
                     @test z_bp ≈ 1.5^(n^2)
                 end

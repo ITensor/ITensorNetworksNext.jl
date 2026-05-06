@@ -212,7 +212,7 @@ function region_scalar(factors, messages, region)
 end
 
 # We need a graph structure here, so assume `factors` is a graph.
-function logscalar(factors, messages)
+function bethe_free_energy(factors, messages)
     numerator_terms = vertex_scalars(factors, messages)
     denominator_terms = edge_scalars(messages)
 
@@ -229,8 +229,6 @@ function logscalar(factors, messages)
 
     return sum(log.(numerator_terms)) - sum(log.(denominator_terms))
 end
-
-scalar(factors, messages) = exp(logscalar(factors, messages))
 
 # TODO: This needs to go in NamedGraphs.GraphsExtensions
 function forest_cover_edge_sequence(gi::AbstractGraph; root_vertex = default_root_vertex)
