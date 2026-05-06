@@ -22,12 +22,12 @@ function AI.initialize_state!(
 end
 
 function AI.initialize_state(
-        problem::Problem, algorithm::Algorithm; kwargs...
+        problem::Problem, algorithm::Algorithm; iterate, kwargs...
     )
     stopping_criterion_state = AI.initialize_state(
-        problem, algorithm, algorithm.stopping_criterion
+        problem, algorithm, algorithm.stopping_criterion; iterate
     )
-    return DefaultState(; stopping_criterion_state, kwargs...)
+    return DefaultState(; iterate, stopping_criterion_state, kwargs...)
 end
 
 # ============================ DefaultState ================================================
@@ -45,61 +45,6 @@ end
 # Custom version of `increment!` that also takes the problem and algorithm as arguments.
 function AI.increment!(problem::Problem, algorithm::Algorithm, state::State)
     return AI.increment!(state)
-end
-# ============================ solve! ======================================================
-
-# Custom version of `solve!` that allows specifying the logger and also overloads
-# `increment!` on the problem and algorithm.
-function basetypenameof(x)
-    return Symbol(last(split(String(Symbol(Base.typename(typeof(x)).wrapper)), ".")))
-end
-default_logging_context_prefix(x) = Symbol(basetypenameof(x), :_)
-function default_logging_context_prefix(problem::Problem, algorithm::Algorithm)
-    return Symbol(
-        default_logging_context_prefix(problem),
-        default_logging_context_prefix(algorithm)
-    )
-end
-function AI.solve!(
-        problem::Problem, algorithm::Algorithm, state::State;
-        logging_context_prefix = default_logging_context_prefix(problem, algorithm),
-        kwargs...
-    )
-    logger = AI.algorithm_logger()
-
-    context_suffixes = [:Start, :PreStep, :PostStep, :Stop]
-    contexts = Dict(context_suffixes .=> Symbol.(logging_context_prefix, context_suffixes))
-
-    # initialize the state and emit message
-    AI.initialize_state!(problem, algorithm, state; kwargs...)
-    AI.emit_message(logger, problem, algorithm, state, contexts[:Start])
-
-    # main body of the algorithm
-    while !AI.is_finished!(problem, algorithm, state)
-        AI.increment!(problem, algorithm, state)
-
-        # logging event between convergence check and algorithm step
-        AI.emit_message(logger, problem, algorithm, state, contexts[:PreStep])
-
-        # algorithm step
-        AI.step!(problem, algorithm, state; logging_context_prefix)
-
-        # logging event between algorithm step and convergence check
-        AI.emit_message(logger, problem, algorithm, state, contexts[:PostStep])
-    end
-
-    # emit message about finished state
-    AI.emit_message(logger, problem, algorithm, state, contexts[:Stop])
-    return state
-end
-
-function AI.solve(
-        problem::Problem, algorithm::Algorithm;
-        logging_context_prefix = default_logging_context_prefix(problem, algorithm),
-        kwargs...
-    )
-    state = AI.initialize_state(problem, algorithm; kwargs...)
-    return AI.solve!(problem, algorithm, state; logging_context_prefix, kwargs...)
 end
 
 # ============================ AlgorithmIterator ===========================================
@@ -151,8 +96,9 @@ end
 
 abstract type NestedAlgorithm <: Algorithm end
 
-function nested_algorithm(f::Function, nalgorithms::Int; kwargs...)
-    return DefaultNestedAlgorithm(f, nalgorithms; kwargs...)
+nested_algorithm(f::Function, int::Int; kwargs...) = nested_algorithm(f, 1:int; kwargs...)
+function nested_algorithm(f::Function, iterable; kwargs...)
+    return DefaultNestedAlgorithm(f, iterable; kwargs...)
 end
 
 max_iterations(algorithm::NestedAlgorithm) = length(algorithm.algorithms)
@@ -173,18 +119,12 @@ function set_substate!(
     return state
 end
 
-function AI.step!(
-        problem::AI.Problem, algorithm::NestedAlgorithm, state::AI.State;
-        logging_context_prefix = Symbol()
-    )
+function AI.step!(problem::AI.Problem, algorithm::NestedAlgorithm, state::AI.State)
     # Get the subproblem, subalgorithm, and substate.
     subproblem, subalgorithm, substate = get_subproblem(problem, algorithm, state)
 
     # Solve the subproblem with the subalgorithm.
-    logging_context_prefix = Symbol(
-        logging_context_prefix, default_logging_context_prefix(subalgorithm)
-    )
-    AI.solve!(subproblem, subalgorithm, substate; logging_context_prefix)
+    AI.solve!(subproblem, subalgorithm, substate)
 
     # Update the state with the substate.
     set_substate!(problem, algorithm, state, substate)
@@ -206,8 +146,8 @@ from a list of stored algorithms.
     algorithms::Algorithms
     stopping_criterion::StoppingCriterion = AI.StopAfterIteration(length(algorithms))
 end
-function DefaultNestedAlgorithm(f::Function, nalgorithms::Int; kwargs...)
-    return DefaultNestedAlgorithm(; algorithms = f.(1:nalgorithms), kwargs...)
+function DefaultNestedAlgorithm(f::Function, iterable; kwargs...)
+    return DefaultNestedAlgorithm(; algorithms = f.(iterable), kwargs...)
 end
 
 # ============================ FlattenedAlgorithm ==========================================
@@ -246,15 +186,14 @@ function AI.increment!(
     return state
 end
 function AI.step!(
-        problem::AI.Problem, algorithm::FlattenedAlgorithm, state::FlattenedAlgorithmState;
-        logging_context_prefix = Symbol()
+        problem::AI.Problem, algorithm::FlattenedAlgorithm, state::FlattenedAlgorithmState
     )
     algorithm_sweep = algorithm.algorithms[state.parent_iteration]
     state_sweep = AI.initialize_state(
         problem, algorithm_sweep;
         state.iterate, iteration = state.child_iteration
     )
-    AI.step!(problem, algorithm_sweep, state_sweep; logging_context_prefix)
+    AI.step!(problem, algorithm_sweep, state_sweep)
     state.iterate = state_sweep.iterate
     return state
 end
@@ -291,10 +230,17 @@ abstract type NonIterativeAlgorithmState <: State end
 function AI.initialize_state(problem::Problem, algorithm::NonIterativeAlgorithm; kwargs...)
     return DefaultNonIterativeAlgorithmState(; kwargs...)
 end
-function AI.solve!(
-        problem::Problem, algorithm::NonIterativeAlgorithm, state::State; kwargs...
+
+function AI.initialize_state!(
+        problem::Problem,
+        algorithm::NonIterativeAlgorithm,
+        state::NonIterativeAlgorithmState
     )
-    return throw(MethodError(AI.solve!, (problem, algorithm, state)))
+    return state
+end
+
+function AI.solve_loop!(problem::Problem, algorithm::NonIterativeAlgorithm, state::State)
+    return throw(MethodError(AI.solve_loop!, (problem, algorithm, state)))
 end
 
 @kwdef mutable struct DefaultNonIterativeAlgorithmState{Iterate} <:

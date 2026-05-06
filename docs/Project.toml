@@ -10,5 +10,5 @@ path = ".."
 [compat]
 Documenter = "1"
 ITensorFormatter = "0.2.27"
-ITensorNetworksNext = "0.3"
+ITensorNetworksNext = "0.4"
 Literate = "2"

@@ -11,7 +11,7 @@ struct TestRegion{R, Kwargs <: NamedTuple} <: AIE.NonIterativeAlgorithm
 end
 TestRegion(region; kwargs...) = TestRegion(region, (; kwargs...))
 
-function AI.solve!(problem::TestProblem, algorithm::TestRegion, state::AIE.State; kwargs...)
+function AI.solve_loop!(problem::TestProblem, algorithm::TestRegion, state::AIE.State)
     new_iterate = (; algorithm.region, algorithm.kwargs.foo, algorithm.kwargs.bar)
     state.iterate = [state.iterate; [new_iterate]]
     return state
@@ -28,8 +28,8 @@ end
 
         problem = TestProblem()
         iterate = []
-        state = AI.solve(problem, algorithm; iterate)
-        @test state.iterate == [(; region = "region", foo = 1, bar = 2)]
+        iterate = AI.solve(problem, algorithm; iterate)
+        @test iterate == [(; region = "region", foo = 1, bar = 2)]
     end
     @testset "Sweep" begin
         algorithm = AIE.nested_algorithm(3) do i
@@ -37,8 +37,8 @@ end
         end
         problem = TestProblem()
         iterate = []
-        state = AI.solve(problem, algorithm; iterate)
-        @test state.iterate == [
+        iterate = AI.solve(problem, algorithm; iterate)
+        @test iterate == [
             (; region = "region1", foo = 1, bar = 2),
             (; region = "region2", foo = 2, bar = 4),
             (; region = "region3", foo = 3, bar = 6),
@@ -52,8 +52,8 @@ end
         end
         problem = TestProblem()
         iterate = []
-        state = AI.solve(problem, algorithm; iterate)
-        @test state.iterate == [
+        iterate = AI.solve(problem, algorithm; iterate)
+        @test iterate == [
             (; region = "sweep1, region1", foo = (1, 1), bar = (2, 2)),
             (; region = "sweep1, region2", foo = (1, 2), bar = (2, 4)),
             (; region = "sweep1, region3", foo = (1, 3), bar = (2, 6)),
