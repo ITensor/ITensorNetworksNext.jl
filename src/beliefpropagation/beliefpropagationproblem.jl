@@ -153,8 +153,7 @@ end
 function AI.solve!(
         problem::BeliefPropagationProblem,
         algorithm::SimpleMessageUpdate,
-        cache::MessageCache;
-        logging_context_prefix = AIE.default_logging_context_prefix(problem, algorithm)
+        cache::MessageCache
     )
     edge = algorithm.edge
 
@@ -217,7 +216,5 @@ function beliefpropagation(
 
     ##
 
-    state = AI.solve(problem, algorithm; iterate = cache)
-
-    return state.iterate # -> typeof(cache)
+    return AI.solve(problem, algorithm; iterate = cache) # -> typeof(cache)
 end
