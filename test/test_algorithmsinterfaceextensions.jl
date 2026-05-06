@@ -16,16 +16,14 @@ end
 end
 
 function AI.step!(
-        problem::TestProblem, algorithm::TestAlgorithm, state::AIE.DefaultState;
-        logging_context_prefix = Symbol()
+        problem::TestProblem, algorithm::TestAlgorithm, state::AIE.DefaultState
     )
     state.iterate .+= 1  # Simple increment step
     return state
 end
 
 function AI.step!(
-        problem::TestProblem, algorithm::TestAlgorithmStep, state::AIE.DefaultState;
-        kwargs...
+        problem::TestProblem, algorithm::TestAlgorithmStep, state::AIE.DefaultState
     )
     state.iterate .+= 2  # Different increment step
     return state
@@ -101,22 +99,22 @@ end
 
         # Solve with custom initial iterate
         initial_iterate = [5.0, 10.0]
-        final_state = AI.solve!(
+        final_iterate = AI.solve!(
             problem, algorithm, state; iterate = copy(initial_iterate)
         )
 
-        @test final_state.iteration == 3
+        @test state.iteration == 3
+        @test final_iterate == state.iterate
         # Each step increments by 1, so after 3 steps: [5, 10] + 3 = [8, 13]
-        @test final_state.iterate ≈ [8.0, 13.0]
+        @test state.iterate ≈ [8.0, 13.0]
 
         # Test solve without exclamation
         problem2 = TestProblem([1.0, 2.0])
         algorithm2 = TestAlgorithm(; stopping_criterion = AI.StopAfterIteration(2))
         initial_iterate2 = [5.0, 10.0]
 
-        final_state2 = AI.solve(problem2, algorithm2; iterate = copy(initial_iterate2))
-        @test final_state2.iteration == 2
-        @test final_state2.iterate ≈ [7.0, 12.0]
+        final_iterate2 = AI.solve(problem2, algorithm2; iterate = copy(initial_iterate2))
+        @test final_iterate2 ≈ [7.0, 12.0]
     end
 
     @testset "DefaultAlgorithmIterator" begin
@@ -144,31 +142,6 @@ end
         @test state_out.iteration == 2
 
         @test AI.is_finished!(iterator)
-    end
-
-    @testset "with_algorithmlogger" begin
-        # Test with_algorithmlogger with functions
-        results = []
-        function callback1(problem, algorithm, state)
-            push!(results, :callback1)
-            return nothing
-        end
-        function callback2(problem, algorithm, state)
-            push!(results, :callback2)
-            return nothing
-        end
-
-        problem = TestProblem([1.0])
-        algorithm = TestAlgorithm(; stopping_criterion = AI.StopAfterIteration(1))
-
-        # Test with CallbackAction (wrapped functions)
-        state = AIE.with_algorithmlogger(
-            :TestProblem_TestAlgorithm_PreStep => callback1,
-            :TestProblem_TestAlgorithm_PostStep => callback2
-        ) do
-            return AI.solve(problem, algorithm; iterate = [0.0])
-        end
-        @test results == [:callback1, :callback2]
     end
 
     @testset "DefaultNestedAlgorithm" begin
@@ -268,21 +241,6 @@ end
         )
         AIE.set_substate!(problem, nested_alg, state, new_substate)
         @test state.iterate ≈ [100.0, 200.0]
-    end
-
-    @testset "basetypenameof and default_logging_context_prefix" begin
-        # Test basetypenameof utility
-        problem = TestProblem([1.0])
-        algorithm = TestAlgorithm()
-
-        prefix_problem = AIE.default_logging_context_prefix(problem)
-        prefix_algorithm = AIE.default_logging_context_prefix(algorithm)
-        prefix_combined = AIE.default_logging_context_prefix(problem, algorithm)
-
-        @test prefix_problem isa Symbol
-        @test prefix_algorithm isa Symbol
-        @test prefix_combined isa Symbol
-        @test contains(String(prefix_combined), String(prefix_problem))
     end
 
     @testset "DefaultFlattenedAlgorithm" begin
