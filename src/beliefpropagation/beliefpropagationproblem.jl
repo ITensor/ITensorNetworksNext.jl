@@ -175,48 +175,10 @@ function AI.solve!(
     return cache
 end
 
-function beliefpropagation(factors, messages; kwargs...)
-    problem = BeliefPropagationProblem(factors)
-
-    cache = initialize_cache(beliefpropagation, factors, messages)
-
-    algorithm = select_algorithm(beliefpropagation, factors, cache; kwargs...)
-
-    state = AI.solve(problem, algorithm; iterate = cache)
-
-    return state.iterate # -> typeof(cache)
-end
-
-# Use a `MessageCache` by default. Note if `messages` is already a `MessageCache` this
-# will make a copy of the the existing cache, thus protecting the original from mutation.
-initialize_cache(::typeof(beliefpropagation), _factors, messages) = MessageCache(messages)
-
-function default_stopping_criterion(
-        ::typeof(beliefpropagation);
-        maxiter,
-        tol,
-        stopping_criterion
-    )
-    base_stopping_criterion = AI.StopAfterIteration(maxiter)
-
-    if !isnothing(stopping_criterion)
-        base_stopping_criterion |= stopping_criterion
-    end
-
-    if !isnothing(tol)
-        base_stopping_criterion |= StopWhenConverged(tol)
-    end
-
-    return base_stopping_criterion
-end
-
-function select_algorithm(
-        ::typeof(beliefpropagation),
-        network::AbstractGraph,
-        cache::MessageCache;
-        edges = forest_cover_edge_sequence(cache),
-        maxiter = is_tree(network) ? 1 : nothing,
-        tol = nothing,
+function beliefpropagation(
+        factors, messages;
+        edges = nothing,
+        maxiter = is_tree(factors) ? 1 : nothing,
         stopping_criterion = nothing,
         kwargs...
     )
@@ -229,19 +191,33 @@ function select_algorithm(
         )
     end
 
-    stopping_criterion = default_stopping_criterion(
-        beliefpropagation;
-        maxiter,
-        tol,
-        stopping_criterion
-    )
+    cache = MessageCache(messages)
+    problem = BeliefPropagationProblem(factors)
+
+    ## Algorithm construction:
+
+    edges = isnothing(edges) ? forest_cover_edge_sequence(cache) : edges
+
+    base_stopping_criterion = AI.StopAfterIteration(maxiter)
+
+    if !isnothing(stopping_criterion)
+        base_stopping_criterion |= stopping_criterion
+    end
+
+    stopping_criterion = base_stopping_criterion
 
     extended_kwargs = extend_columns((; kwargs...), maxiter)
     edge_kwargs = rows(extended_kwargs, maxiter)
 
-    return BeliefPropagation(maxiter; stopping_criterion) do repnum
+    algorithm = BeliefPropagation(maxiter; stopping_criterion) do repnum
         return BeliefPropagationSweep(edges) do edge
             return SimpleMessageUpdate(edge; edge_kwargs[repnum]...)
         end
     end
+
+    ##
+
+    state = AI.solve(problem, algorithm; iterate = cache)
+
+    return state.iterate # -> typeof(cache)
 end
