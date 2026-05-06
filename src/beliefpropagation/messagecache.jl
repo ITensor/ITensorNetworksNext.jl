@@ -160,13 +160,14 @@ function incoming_messages(cache::AbstractGraph, edge::AbstractEdge)
     return getindices(cache, filter(e -> e != reverse(edge), inds))
 end
 
-function environment_messages(cache::AbstractGraph, vertices)
+# TODO: maybe this should be defined in `DataGraphs`.
+function incoming_edge_data(cache::AbstractGraph, vertices)
     inds = Indices(boundary_edges(cache, vertices; dir = :in))
     return getindices(cache, inds)
 end
 
 function vertex_scalar(factors, messages, vertex; kwargs...)
-    in_messages = environment_messages(messages, [vertex])
+    in_messages = incoming_edge_data(messages, [vertex])
     tensors = vcat([factors[vertex]], collect(in_messages))
     return contract_network(tensors; kwargs...)[]
 end
