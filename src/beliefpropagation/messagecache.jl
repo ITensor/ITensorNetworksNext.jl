@@ -53,6 +53,7 @@ function MessageCache{T, V}(messages) where {T, V}
 end
 
 messagecache(pairs) = MessageCache(Dict(pairs))
+messagecache(f, edges) = messagecache(edge => f(edge) for edge in edges)
 
 # ================================ NamedGraphs interface ================================= #
 function NamedGraphs.add_edge!(c::MessageCache, edge)
@@ -160,13 +161,14 @@ function incoming_messages(cache::AbstractGraph, edge::AbstractEdge)
     return getindices(cache, filter(e -> e != reverse(edge), inds))
 end
 
-function environment_messages(cache::AbstractGraph, vertices)
+# TODO: maybe this should be defined in `DataGraphs`.
+function incoming_edge_data(cache::AbstractGraph, vertices)
     inds = Indices(boundary_edges(cache, vertices; dir = :in))
     return getindices(cache, inds)
 end
 
 function vertex_scalar(factors, messages, vertex; kwargs...)
-    in_messages = environment_messages(messages, [vertex])
+    in_messages = incoming_edge_data(messages, [vertex])
     tensors = vcat([factors[vertex]], collect(in_messages))
     return contract_network(tensors; kwargs...)[]
 end
@@ -211,7 +213,7 @@ function region_scalar(factors, messages, region)
 end
 
 # We need a graph structure here, so assume `factors` is a graph.
-function logscalar(factors, messages)
+function bethe_free_energy(factors, messages)
     numerator_terms = vertex_scalars(factors, messages)
     denominator_terms = edge_scalars(messages)
 
@@ -228,8 +230,6 @@ function logscalar(factors, messages)
 
     return sum(log.(numerator_terms)) - sum(log.(denominator_terms))
 end
-
-scalar(factors, messages) = exp(logscalar(factors, messages))
 
 # TODO: This needs to go in NamedGraphs.GraphsExtensions
 function forest_cover_edge_sequence(gi::AbstractGraph; root_vertex = default_root_vertex)

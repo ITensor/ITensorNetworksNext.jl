@@ -5,8 +5,8 @@ using Dictionaries: Dictionary, dictionary, set!
 using Graphs: AbstractGraph, dst, edges, has_edge, src, vertices
 using ITensorBase: ITensor, Index, noprime, prime
 using ITensorNetworksNext: ITensorNetworksNext, MessageCache, StopWhenConverged,
-    TensorNetwork, edge_scalar, incoming_messages, linkinds, messagecache, region_scalar,
-    scalar, subgraph, vertex_scalar, vertex_scalars
+    TensorNetwork, bethe_free_energy, edge_scalar, incoming_messages, linkinds,
+    messagecache, region_scalar, subgraph, vertex_scalar, vertex_scalars
 using LinearAlgebra: LinearAlgebra
 using NamedDimsArrays: inds, name
 using NamedGraphs.GraphsExtensions: all_edges, arranged_edges, incident_edges, vertextype
@@ -51,9 +51,7 @@ end
                 return randn(Tuple(is))
             end
 
-            bpc = messagecache(
-                edge => "$(src(edge)) => $(dst(edge))" for edge in all_edges(g)
-            )
+            bpc = messagecache(edge -> "$(src(edge)) => $(dst(edge))", all_edges(g))
 
             @test valtype(bpc) <: String
             @test edge_data_type(bpc) <: String
@@ -77,7 +75,7 @@ end
             @test new_bpc[(1, 2) => (2, 2)] == "m1"
             @test new_bpc[(2, 2) => (2, 3)] == "m2"
 
-            bpc_dst = messagecache(edge => "" for edge in all_edges(g))
+            bpc_dst = messagecache(edge -> "", all_edges(g))
 
             copyto!(bpc_dst, bpc, [(1, 2) => (2, 2), (2, 2) => (2, 3)])
             @test bpc_dst[(1, 1) => (1, 2)] == ""
@@ -93,10 +91,9 @@ end
                 return randn(ComplexF32, Tuple(is))
             end
 
-            bpc = messagecache(
-                edge => ones(Float64, Tuple(linkinds(tn, edge))) for
-                    edge in all_edges(g)
-            )
+            bpc = messagecache(all_edges(g)) do edge
+                return ones(Float64, Tuple(linkinds(tn, edge)))
+            end
 
             # Vertex/edge/region scalars.
             @test vertex_scalar(tn, bpc, 2) isa ComplexF64
@@ -126,9 +123,7 @@ end
                 is = map(e -> l[e], incident_edges(g, v))
                 return randn(Tuple(is))
             end
-            bpc = messagecache(
-                edge => ones(Tuple(linkinds(tn, edge))) for edge in all_edges(g)
-            )
+            bpc = messagecache(edge -> ones(Tuple(linkinds(tn, edge))), all_edges(g))
 
             sub_vs = [(1,), (2,)]
             subbpc = subgraph(bpc, sub_vs)
@@ -145,9 +140,7 @@ end
                 return randn(Tuple(is))
             end
 
-            bpc1 = messagecache(
-                edge => ones(Tuple(linkinds(tn, edge))) for edge in all_edges(g)
-            )
+            bpc1 = messagecache(edge -> ones(Tuple(linkinds(tn, edge))), all_edges(g))
 
             bpc2 = copy(bpc1)
 
@@ -175,7 +168,7 @@ end
             messages = Dict(edge => onet(tn, edge) for edge in all_edges(g))
 
             cache = ITensorNetworksNext.beliefpropagation(tn, messages; maxiter = 1)
-            z_bp = scalar(tn, cache)
+            z_bp = exp(bethe_free_energy(tn, cache))
             z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
             @test z_bp ≈ z_exact
 
@@ -192,7 +185,7 @@ end
             messages = Dict(edge => onet(tn, edge) for edge in all_edges(g))
 
             cache = ITensorNetworksNext.beliefpropagation(tn, messages; maxiter = 1)
-            z_bp = scalar(tn, cache)
+            z_bp = exp(bethe_free_energy(tn, cache))
             z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
             @test z_bp ≈ z_exact
 
@@ -214,7 +207,7 @@ end
                         stopping_criterion
                     )
 
-                    z_bp = scalar(tn, cache)
+                    z_bp = exp(bethe_free_energy(tn, cache))
 
                     @test z_bp ≈ 1.5^(n^2)
                 end
