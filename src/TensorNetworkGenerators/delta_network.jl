@@ -1,6 +1,6 @@
-using ..ITensorNetworksNext: TensorNetwork
+using ..ITensorNetworksNext: tensornetwork
 using DiagonalArrays: δ
-using Graphs: AbstractGraph
+using Graphs: AbstractGraph, vertices
 using NamedGraphs.GraphsExtensions: incident_edges
 
 """
@@ -11,10 +11,11 @@ on each vertex. Link dimensions are defined using the function `f(e)` that shoul
 edge `e` as an input and should output the link index on that edge.
 """
 function delta_network(f, elt::Type, g::AbstractGraph)
-    return tn = TensorNetwork(g) do v
+    tn = tensornetwork(vertices(g)) do v
         is = Tuple(f.(incident_edges(g, v)))
         return δ(elt, is)
     end
+    return tn
 end
 function delta_network(f, g::AbstractGraph)
     return delta_network(f, Float64, g)

@@ -1,3 +1,4 @@
+using DataGraphs: DataGraph
 using DiagonalArrays: δ
 using Graphs: edges, ne, nv, vertices
 using ITensorBase: Index
@@ -31,8 +32,13 @@ using Test: @test, @testset
             dims = (4,)
             β = 0.4
             g = named_grid(dims; periodic)
-            ldict = Dict(e => Index(2) for e in edges(g))
-            l(e) = get(() -> ldict[reverse(e)], ldict, e)
+            # ldict = Dict(e => Index(2) for e in edges(g))
+            # l(e) = get(() -> ldict[reverse(e)], ldict, e)
+            ldict = DataGraph(g)
+            for e in edges(g)
+                ldict[e] = Index(2)
+            end
+            l = e -> ldict[e]
             tn = ising_network(l, β, g)
             @test nv(tn) == 4
             @test ne(tn) == ne(g)

@@ -107,49 +107,6 @@ function NamedGraphs.induced_subgraph_from_vertices(cache::MessageCache, subvert
     return MessageCache(messages), vlist
 end
 
-# see: copyto!(dest, src) for analogous behaviour to 2 argument method
-# see: copyto!(dest, Rdest::CartesianIndices, src, Rsrc::CartesianIndices)
-# for analogous behaviour to 3 argument method.
-# TODO: these can be made generic for `AbtractDataGraph` in `DataGraphs.jl`
-function copyto!_messagecache(
-        cache_dst::MessageCache,
-        cache_src,
-        inds = nothing
-    )
-    inds = isnothing(inds) ? Indices(keys(cache_src)) : Indices(inds)
-    view(edge_data(cache_dst), inds) .= view(cache_src, inds)
-    return cache_dst
-end
-
-function Base.copyto!(
-        cache_dst::MessageCache,
-        cache_src::AbstractDataGraph,
-        inds = nothing
-    )
-    copyto!_messagecache(cache_dst, edge_data(cache_src), inds)
-    return cache_dst
-end
-
-function Base.copyto!(
-        cache_dst::MessageCache,
-        dictionary_src::Dictionary,
-        inds = nothing
-    )
-    copyto!_messagecache(cache_dst, dictionary_src, inds)
-    return cache_dst
-end
-
-function Base.copyto!(
-        cache_dst::MessageCache,
-        dict_src::Dict,
-        inds = keys(dict_src)
-    )
-    for key in inds
-        cache_dst[key] = dict_src[key]
-    end
-    return cache_dst
-end
-
 # ===================================== contraction ====================================== #
 
 function incoming_messages(cache::AbstractGraph, pair::Pair)
@@ -157,14 +114,14 @@ function incoming_messages(cache::AbstractGraph, pair::Pair)
     return incoming_messages(cache, edge)
 end
 function incoming_messages(cache::AbstractGraph, edge::AbstractEdge)
-    inds = Indices(in_incident_edges(cache, src(edge)))
-    return getindices(cache, filter(e -> e != reverse(edge), inds))
+    dimnames = Indices(in_incident_edges(cache, src(edge)))
+    return getindices(cache, filter(e -> e != reverse(edge), dimnames))
 end
 
 # TODO: maybe this should be defined in `DataGraphs`.
 function incoming_edge_data(cache::AbstractGraph, vertices)
-    inds = Indices(boundary_edges(cache, vertices; dir = :in))
-    return getindices(cache, inds)
+    dimnames = Indices(boundary_edges(cache, vertices; dir = :in))
+    return getindices(cache, dimnames)
 end
 
 function vertex_scalar(factors, messages, vertex; kwargs...)
@@ -247,23 +204,3 @@ function forest_cover_edge_sequence(gi::AbstractGraph; root_vertex = default_roo
     end
     return rv
 end
-
-# ======================================= printing ======================================= #
-
-# TODO: This is the definition for the proposed `DataGraphs.AbstractEdgeDataGraph`.
-function Base.show(io::IO, mime::MIME"text/plain", graph::MessageCache)
-    println(io, "$(typeof(graph)) with $(nv(graph)) vertices:")
-    show(io, mime, vertices(graph))
-    println(io, "\n")
-    println(io, "and $(ne(graph)) edge(s):")
-    for e in edges(graph)
-        show(io, mime, e)
-        println(io)
-    end
-    println(io)
-    println(io, "with edge data:")
-    show(io, mime, edge_data(graph))
-    return nothing
-end
-
-Base.show(io::IO, graph::MessageCache) = show(io, MIME"text/plain"(), graph)

@@ -1,7 +1,7 @@
 using BackendSelection: @Algorithm_str, Algorithm
-using Graphs: edges
+using Graphs: edges, vertices
 using ITensorBase: Index
-using ITensorNetworksNext: TensorNetwork, contract_network, linkinds, siteinds
+using ITensorNetworksNext: contract_network, linkinds, siteinds, tensornetwork
 using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges
 using NamedGraphs.NamedGraphGenerators: named_grid
 using TensorOperations: TensorOperations
@@ -28,7 +28,7 @@ using Test: @test, @testset
         g = named_grid(dims)
         l = Dict(e => Index(2) for e in edges(g))
         l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
-        tn = TensorNetwork(g) do v
+        tn = tensornetwork(vertices(g)) do v
             is = map(e -> l[e], incident_edges(g, v))
             return randn(Tuple(is))
         end
@@ -39,5 +39,8 @@ using Test: @test, @testset
 
         @test abs(z1 - z2) / abs(z1) <= 1.0e3 * eps(Float64)
         @test abs(z1 - z3) / abs(z1) <= 1.0e3 * eps(Float64)
+
+        @test z1 ≈ z2
+        @test z1 ≈ z3
     end
 end
