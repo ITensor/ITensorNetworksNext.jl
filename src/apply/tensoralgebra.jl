@@ -3,18 +3,9 @@ using MatrixAlgebraKit: MatrixAlgebraKit
 using NamedDimsArrays: AbstractNamedDimsArray, dimnames, name, nameddims, randname
 using TensorAlgebra: TensorAlgebra
 
-struct TikhonovPinv{T <: Real}
-    tol::T
-end
-TikhonovPinv(; tol::Real = 0.0) = TikhonovPinv(float(tol))
-
-function regularized_inv(alg::TikhonovPinv, x::Real)
-    iszero(alg.tol) && return inv(x)
-    return x / (x^2 + alg.tol^2)
-end
-
 function balanced_eigh_and_inv(
-        A::AbstractMatrix; trunc = nothing, pinv_alg = TikhonovPinv(), ishermitian = true
+        A::AbstractMatrix;
+        trunc = nothing, pinv_kwargs::NamedTuple = (; tol = 0), ishermitian = true
     )
     F = ishermitian ? eigen(Hermitian(Matrix(A))) : eigen(Matrix(A))
     λ, U = F.values, F.vectors
@@ -25,7 +16,7 @@ function balanced_eigh_and_inv(
     end
     R = real(eltype(λ))
     sqrtλ = sqrt.(max.(real.(λ), zero(R)))
-    invsqrtλ = map(s -> regularized_inv(pinv_alg, s), sqrtλ)
+    invsqrtλ = MatrixAlgebraKit.inv_regularized.(sqrtλ, pinv_kwargs.tol)
     Uᴴ = adjoint(U)
     Y = sqrtλ .* Uᴴ
     Yinv = U .* transpose(invsqrtλ)
