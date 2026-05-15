@@ -1,5 +1,6 @@
 import AlgorithmsInterface as AI
 import NamedDimsArrays as NDA
+using Base: @kwdef
 using DataGraphs: AbstractDataGraph
 using Graphs: vertices
 using LinearAlgebra: norm
@@ -8,26 +9,30 @@ using NamedGraphs.GraphsExtensions: boundary_edges
 using TensorAlgebra: TensorAlgebra
 
 function apply_operators(ops, init; op_alg = BPApplyOperator())
-    problem = ApplyOperatorsProblem(ops, init)
-    algorithm = ApplyOperators(op_alg)
+    problem = ApplyOperatorsProblem(; operators = ops, init)
+    algorithm = ApplyOperators(;
+        operator_algorithm = op_alg,
+        stopping_criterion = AI.StopAfterIteration(length(ops))
+    )
     return AI.solve(problem, algorithm; iterate = copy(init))
 end
 
-struct ApplyOperatorsProblem{Ops, Init} <: AI.Problem
+@kwdef struct ApplyOperatorsProblem{Ops, Init} <: AI.Problem
     operators::Ops
     init::Init
 end
 
-struct ApplyOperators{OpAlg} <: AI.Algorithm
+@kwdef struct ApplyOperators{OpAlg} <: AI.Algorithm
     operator_algorithm::OpAlg
+    stopping_criterion::AI.StopAfterIteration
 end
 
-mutable struct ApplyOperatorsState{
+@kwdef mutable struct ApplyOperatorsState{
         Iterate, Cache, SCState <: AI.StoppingCriterionState,
     } <: AI.State
     iterate::Iterate
     cache::Cache
-    iteration::Int
+    iteration::Int = 0
     stopping_criterion_state::SCState
 end
 
@@ -42,70 +47,67 @@ function AI.step!(
     return state
 end
 
-function initialize_cache end
+"""
+    initialize_cache(algorithm, iterate)
+
+Construct the cache stored on [`ApplyOperatorsState`](@ref) for the per-operator
+`algorithm` (e.g. [`BPApplyOperator`](@ref)) given the initial `iterate`.
+Throws a `MethodError` by default; per-algorithm methods opt in.
+"""
+function initialize_cache(algorithm, iterate)
+    return throw(MethodError(initialize_cache, (algorithm, iterate)))
+end
 
 function AI.initialize_state(
         problem::ApplyOperatorsProblem, algorithm::ApplyOperators;
         iterate, iteration::Int = 0
     )
-    cache = initialize_cache(iterate, algorithm.operator_algorithm)
-    sc = AI.StopAfterIteration(length(problem.operators))
-    sc_state = AI.initialize_state(problem, algorithm, sc; iterate)
-    return ApplyOperatorsState(iterate, cache, iteration, sc_state)
+    cache = initialize_cache(algorithm.operator_algorithm, iterate)
+    stopping_criterion_state = AI.initialize_state(
+        problem, algorithm, algorithm.stopping_criterion; iterate
+    )
+    return ApplyOperatorsState(;
+        iterate, cache, iteration, stopping_criterion_state
+    )
 end
 
 function AI.initialize_state!(
         problem::ApplyOperatorsProblem, algorithm::ApplyOperators,
-        state::ApplyOperatorsState; iteration::Int = 0, kwargs...
+        state::ApplyOperatorsState; iteration::Int = 0
     )
     state.iteration = iteration
-    sc = AI.StopAfterIteration(length(problem.operators))
-    AI.initialize_state!(problem, algorithm, sc, state.stopping_criterion_state)
+    AI.initialize_state!(
+        problem, algorithm, algorithm.stopping_criterion,
+        state.stopping_criterion_state
+    )
     return state
 end
 
-function AI.is_finished!(
-        problem::ApplyOperatorsProblem, algorithm::ApplyOperators,
-        state::ApplyOperatorsState
-    )
-    sc = AI.StopAfterIteration(length(problem.operators))
-    return AI.is_finished!(
-        problem, algorithm, sc, state.stopping_criterion_state, state
-    )
+@kwdef struct BPApplyOperator{Trunc, PinvKwargs <: NamedTuple}
+    trunc::Trunc = nothing
+    pinv_kwargs::PinvKwargs = (; tol = 0)
+    normalize::Bool = false
 end
 
-struct BPApplyOperator{Trunc, PinvAlg}
-    trunc::Trunc
-    pinv_alg::PinvAlg
-    normalize::Bool
-end
-
-function BPApplyOperator(;
-        trunc = nothing, pinv_alg = TikhonovPinv(), normalize::Bool = false
+function apply_operator(
+        op,
+        init;
+        alg = BPApplyOperator(),
+        cache = initialize_cache(alg, init)
     )
-    return BPApplyOperator(trunc, pinv_alg, normalize)
-end
-
-# TODO: build a fresh `MessageCache` from `iterate` with a sensible default
-# initial-message convention (identity / uniform). For now this is a stub that
-# returns `nothing`, which makes `apply_operator_bp` fall back to env-free
-# simple update.
-initialize_cache(iterate, ::BPApplyOperator) = nothing
-
-function apply_operator(op, init; alg = BPApplyOperator(), cache = nothing)
     return apply_operator(alg, op, init, cache)
 end
 
 function apply_operator(alg::BPApplyOperator, op, init, cache)
     return apply_operator_bp(
         op, init, cache;
-        trunc = alg.trunc, pinv_alg = alg.pinv_alg, normalize = alg.normalize
+        trunc = alg.trunc, pinv_kwargs = alg.pinv_kwargs, normalize = alg.normalize
     )
 end
 
 function apply_operator_bp(
         op, init, cache;
-        trunc = nothing, pinv_alg = TikhonovPinv(), normalize::Bool = false
+        trunc = nothing, pinv_kwargs::NamedTuple = (; tol = 0), normalize::Bool = false
     )
     state = copy(init)
     vs = neighbor_vertices(state, op)
@@ -121,7 +123,7 @@ function apply_operator_bp(
     r_dimnames = Vector{Any}(undef, n)
     for (i, v) in enumerate(vs)
         ψv = state[v]
-        ψv, env_invs[i] = _absorb_envs(ψv, resolved_envs, pinv_alg)
+        ψv, env_invs[i] = _absorb_envs(ψv, resolved_envs, pinv_kwargs)
         site_v = sitenames(state, v)
         internal_bonds = mapreduce(union, vs; init = eltype(dimnames(ψv))[]) do w
             return if w == v
@@ -175,7 +177,7 @@ end
 
 _absorb_envs(ψ, ::Nothing, _) = (ψ, ())
 
-function _absorb_envs(ψ, envs, pinv_alg)
+function _absorb_envs(ψ, envs, pinv_kwargs)
     inv_factors = []
     for env in envs
         shared = intersect(dimnames(env), dimnames(ψ))
@@ -185,7 +187,7 @@ function _absorb_envs(ψ, envs, pinv_alg)
         )
         domain = Tuple(shared)
         codomain = Tuple(setdiff(dimnames(env), shared))
-        Y, Yinv = balanced_eigh_and_inv(env, codomain, domain; pinv_alg)
+        Y, Yinv = balanced_eigh_and_inv(env, codomain, domain; pinv_kwargs)
         ψ = ψ * Y
         push!(inv_factors, Yinv)
     end
