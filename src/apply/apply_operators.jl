@@ -1,7 +1,6 @@
 import AlgorithmsInterface as AI
 import NamedDimsArrays as NDA
 using Base: @kwdef
-using DataGraphs: AbstractDataGraph
 using Graphs: vertices
 using LinearAlgebra: norm
 using NamedDimsArrays: AbstractNamedDimsArray, dimnames, domainnames
@@ -146,7 +145,8 @@ function apply_operator!(alg::BPApplyOperator, init, op, iterate; cache!)
 end
 
 function apply_operator_bp!(init, op, iterate; kwargs...)
-    vs = neighbor_vertices(init, op)
+    op_in = domainnames(op)
+    vs = [v for v in vertices(init) if !isempty(intersect(op_in, sitenames(init, v)))]
     isempty(vs) && throw(
         ArgumentError("operator shares no indices with the tensor network")
     )
@@ -164,10 +164,18 @@ function apply_operator_bp_nsite!(
     v = only(vs)
     ψv = NDA.apply(op, init[v])
     if normalize
-        envs = boundary_envs(cache!, vs)
-        ψ_gauge, env_invs = _absorb_envs(ψv, envs, pinv_kwargs)
-        ψ_gauge = ψ_gauge / norm(ψ_gauge)
-        ψv = _absorb_factors(ψ_gauge, env_invs)
+        envs = [cache![e] for e in boundary_edges(cache!, vs; dir = :in)]
+        envs_v = filter(e -> !isempty(intersect(dimnames(e), dimnames(init[v]))), envs)
+        sqrt_envs_and_invs = map(envs_v) do env
+            shared = intersect(dimnames(env), dimnames(init[v]))
+            return balanced_eigh_and_inv(
+                env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared);
+                pinv_kwargs...
+            )
+        end
+        sqrt_envs, inv_sqrt_envs = first.(sqrt_envs_and_invs), last.(sqrt_envs_and_invs)
+        ψ_gauge = prod([ψv; sqrt_envs])
+        ψv = prod([ψ_gauge / norm(ψ_gauge); inv_sqrt_envs])
     end
     init[v] = ψv
     return init
@@ -178,64 +186,53 @@ function apply_operator_bp_nsite!(
         cache!, trunc, pinv_kwargs, normalize
     )
     v1, v2 = vs
-    envs = boundary_envs(cache!, vs)
-    ψ1, env_invs_1 = _absorb_envs(init[v1], envs, pinv_kwargs)
-    ψ2, env_invs_2 = _absorb_envs(init[v2], envs, pinv_kwargs)
-    bond = Tuple(intersect(dimnames(ψ1), dimnames(ψ2)))
-    Q1, R1 = _gate_split(ψ1, sitenames(init, v1), bond)
-    Q2, R2 = _gate_split(ψ2, sitenames(init, v2), bond)
-    blob = NDA.apply(op, R1 * R2)
-    codomain = Tuple(intersect(dimnames(blob), dimnames(R1)))
-    domain = Tuple(intersect(dimnames(blob), dimnames(R2)))
-    R1_new, R2_new = balanced_svd(blob, codomain, domain; trunc)
-    new_ψ1 = Q1 * R1_new
-    new_ψ2 = Q2 * R2_new
-    new_ψ1 = _absorb_factors(new_ψ1, env_invs_1)
-    new_ψ2 = _absorb_factors(new_ψ2, env_invs_2)
-    if normalize
-        new_ψ1 = new_ψ1 / norm(new_ψ1)
-        new_ψ2 = new_ψ2 / norm(new_ψ2)
-    end
-    init[v1] = new_ψ1
-    init[v2] = new_ψ2
-    return init
-end
-
-function _gate_split(ψ, site, bond)
-    domain = Tuple(union(bond, site))
-    codomain = Tuple(setdiff(dimnames(ψ), domain))
-    return TensorAlgebra.qr(ψ, codomain, domain)
-end
-
-function neighbor_vertices(tn, op::AbstractNamedDimsArray)
-    op_in = domainnames(op)
-    return [v for v in vertices(tn) if !isempty(intersect(op_in, sitenames(tn, v)))]
-end
-
-function boundary_envs(cache::AbstractDataGraph, vs)
-    return [cache[e] for e in boundary_edges(cache, vs; dir = :in)]
-end
-
-function _absorb_envs(ψ, envs, pinv_kwargs)
-    inv_factors = []
-    for env in envs
-        shared = intersect(dimnames(env), dimnames(ψ))
-        isempty(shared) && continue
-        length(shared) == 1 || error(
-            "env must share exactly one dimname with endpoint, got $(length(shared))"
+    envs = [cache![e] for e in boundary_edges(cache!, vs; dir = :in)]
+    envs_v1 = filter(e -> !isempty(intersect(dimnames(e), dimnames(init[v1]))), envs)
+    envs_v2 = filter(e -> !isempty(intersect(dimnames(e), dimnames(init[v2]))), envs)
+    sqrt_envs_and_invs_v1 = map(envs_v1) do env
+        shared = intersect(dimnames(env), dimnames(init[v1]))
+        return balanced_eigh_and_inv(
+            env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared); pinv_kwargs...
         )
-        domain = Tuple(shared)
-        codomain = Tuple(setdiff(dimnames(env), shared))
-        Y, Yinv = balanced_eigh_and_inv(env, codomain, domain; pinv_kwargs...)
-        ψ = ψ * Y
-        push!(inv_factors, Yinv)
     end
-    return ψ, Tuple(inv_factors)
-end
+    sqrt_envs_and_invs_v2 = map(envs_v2) do env
+        shared = intersect(dimnames(env), dimnames(init[v2]))
+        return balanced_eigh_and_inv(
+            env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared); pinv_kwargs...
+        )
+    end
+    sqrt_envs_v1, inv_sqrt_envs_v1 =
+        first.(sqrt_envs_and_invs_v1), last.(sqrt_envs_and_invs_v1)
+    sqrt_envs_v2, inv_sqrt_envs_v2 =
+        first.(sqrt_envs_and_invs_v2), last.(sqrt_envs_and_invs_v2)
 
-function _absorb_factors(ψ, factors)
-    for f in factors
-        ψ = ψ * f
+    ψ_v1 = prod([init[v1]; sqrt_envs_v1])
+    ψ_v2 = prod([init[v2]; sqrt_envs_v2])
+
+    s_v1 = sitenames(init, v1)
+    s_v2 = sitenames(init, v2)
+    bond = Tuple(intersect(dimnames(ψ_v1), dimnames(ψ_v2)))
+    Q_v1, R_v1 = TensorAlgebra.qr(
+        ψ_v1, Tuple(setdiff(dimnames(ψ_v1), bond, s_v1)), (bond..., s_v1...)
+    )
+    Q_v2, R_v2 = TensorAlgebra.qr(
+        ψ_v2, Tuple(setdiff(dimnames(ψ_v2), bond, s_v2)), (bond..., s_v2...)
+    )
+    blob = NDA.apply(op, R_v1 * R_v2)
+    R_v1, R_v2 = balanced_svd(
+        blob,
+        Tuple(intersect(dimnames(blob), dimnames(R_v1))),
+        Tuple(intersect(dimnames(blob), dimnames(R_v2)));
+        trunc
+    )
+
+    ψ_v1 = prod([Q_v1 * R_v1; inv_sqrt_envs_v1])
+    ψ_v2 = prod([Q_v2 * R_v2; inv_sqrt_envs_v2])
+    if normalize
+        ψ_v1 = ψ_v1 / norm(ψ_v1)
+        ψ_v2 = ψ_v2 / norm(ψ_v2)
     end
-    return ψ
+    init[v1] = ψ_v1
+    init[v2] = ψ_v2
+    return init
 end
