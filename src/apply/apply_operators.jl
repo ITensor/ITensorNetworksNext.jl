@@ -8,13 +8,16 @@ using NamedDimsArrays: AbstractNamedDimsArray, dimnames, domainnames
 using NamedGraphs.GraphsExtensions: boundary_edges
 using TensorAlgebra: TensorAlgebra
 
-function apply_operators(ops, init; op_alg = BPApplyOperator())
-    problem = ApplyOperatorsProblem(; operators = ops, init)
+function apply_operators(
+        ops, iterate;
+        op_alg = BPApplyOperator(), cache! = initialize_cache(op_alg, iterate)
+    )
+    problem = ApplyOperatorsProblem(; operators = ops, init = iterate)
     algorithm = ApplyOperators(;
         operator_algorithm = op_alg,
         stopping_criterion = AI.StopAfterIteration(length(ops))
     )
-    return AI.solve(problem, algorithm; iterate = copy(init))
+    return AI.solve(problem, algorithm; iterate, cache!)
 end
 
 @kwdef struct ApplyOperatorsProblem{Ops, Init} <: AI.Problem
@@ -61,14 +64,14 @@ end
 
 function AI.initialize_state(
         problem::ApplyOperatorsProblem, algorithm::ApplyOperators;
-        iterate, iteration::Int = 0
+        iterate, cache! = initialize_cache(algorithm.operator_algorithm, iterate),
+        iteration::Int = 0
     )
-    cache = initialize_cache(algorithm.operator_algorithm, iterate)
     stopping_criterion_state = AI.initialize_state(
         problem, algorithm, algorithm.stopping_criterion; iterate
     )
     return ApplyOperatorsState(;
-        iterate, cache, iteration, stopping_criterion_state
+        iterate, cache = cache!, iteration, stopping_criterion_state
     )
 end
 
@@ -224,7 +227,7 @@ function _absorb_envs(ψ, envs, pinv_kwargs)
         )
         domain = Tuple(shared)
         codomain = Tuple(setdiff(dimnames(env), shared))
-        Y, Yinv = balanced_eigh_and_inv(env, codomain, domain; pinv_kwargs)
+        Y, Yinv = balanced_eigh_and_inv(env, codomain, domain; pinv_kwargs...)
         ψ = ψ * Y
         push!(inv_factors, Yinv)
     end
