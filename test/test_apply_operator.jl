@@ -6,6 +6,7 @@ using LinearAlgebra: I, norm
 using NamedDimsArrays: AbstractNamedDimsArray, dimnames, name, nameddims, operator, randname
 using NamedGraphs.GraphsExtensions: incident_edges
 using NamedGraphs.NamedGraphGenerators: named_grid
+using Random: Random
 using Test: @test, @test_throws, @testset
 
 function _random_state(g, sdict, ldict)
@@ -35,6 +36,9 @@ end
 end
 
 @testset "apply_operator on (2, 2) grid" begin
+    # Test reseeds the RNG per @testset, which causes randname collisions with
+    # already-created indices. Break the deterministic seeding.
+    Random.seed!()
     g = named_grid((2, 2))
     sdict = Dict(v => Index(2) for v in Graphs.vertices(g))
     ldict = Dict{Graphs.edgetype(g), Index{Int, Base.OneTo{Int}}}()
@@ -44,6 +48,7 @@ end
     ψ = _random_state(g, sdict, ldict)
 
     @testset "1-site identity gate preserves dimnames and norm of each tensor" begin
+        Random.seed!()
         v = (1, 1)
         s_v = sdict[v]
         n_v = name(s_v)
@@ -55,6 +60,7 @@ end
     end
 
     @testset "2-site identity gate preserves site dimnames" begin
+        Random.seed!()
         v1, v2 = (1, 1), (2, 1)
         n_v1, n_v2 = name(sdict[v1]), name(sdict[v2])
         co_n1, co_n2 = randname(n_v1), randname(n_v2)
@@ -73,6 +79,7 @@ end
     end
 
     @testset "2-site Hermitian unitary gate is norm-preserving locally" begin
+        Random.seed!()
         v1, v2 = (1, 1), (2, 1)
         n_v1, n_v2 = name(sdict[v1]), name(sdict[v2])
         co_n1, co_n2 = randname(n_v1), randname(n_v2)
@@ -85,13 +92,12 @@ end
         ψ_g = apply_operator(gate, ψ)
         # The bond between v1 and v2 is fresh and small (≤ 2*2 = 4, since
         # there's no extra factor from the gate beyond the site dims).
-        new_bond_dim = length(
-            only(intersect(dimnames(ψ_g[v1]), dimnames(ψ_g[v2])))
-        )
+        new_bond_dim = Int(length(only(intersect(axes(ψ_g[v1]), axes(ψ_g[v2])))))
         @test new_bond_dim ≤ 4
     end
 
     @testset "apply_operators applies a sequence of gates" begin
+        Random.seed!()
         v1, v2 = (1, 1), (2, 1)
         n_v1, n_v2 = name(sdict[v1]), name(sdict[v2])
         co_n1, co_n2 = randname(n_v1), randname(n_v2)
@@ -101,16 +107,15 @@ end
         )
         ψ_single = apply_operator(id4, ψ)
         ψ_seq = apply_operators([id4, id4], ψ)
-        # Two identity gates is the same as one (up to bond renaming).
-        @test issetequal(
-            Graphs.edges(ψ_single).underlying, Graphs.edges(ψ_seq).underlying
-        ) || true  # accept either edge ordering
-        @test all(
-            v -> issetequal(
-                filter(d -> d in dimnames(ψ[v]), dimnames(ψ_seq[v])),
-                filter(d -> d in dimnames(ψ[v]), dimnames(ψ_single[v]))
-            ),
-            Graphs.vertices(g)
-        )
+        # Two identity gates is the same as one (up to bond renaming): site
+        # names of `ψ` are preserved at each vertex.
+        @test all(Graphs.vertices(g)) do v
+            site_names =
+                setdiff(dimnames(ψ[v]), (dimnames(ψ[u]) for u in Graphs.neighbors(g, v))...)
+            return issetequal(
+                intersect(dimnames(ψ_seq[v]), site_names),
+                intersect(dimnames(ψ_single[v]), site_names)
+            )
+        end
     end
 end
