@@ -42,7 +42,8 @@ function AI.step!(
     )
     op_i = problem.operators[state.iteration]
     state.iterate = apply_operator(
-        algorithm.operator_algorithm, op_i, state.iterate, state.cache
+        algorithm.operator_algorithm, op_i, state.iterate;
+        (cache!) = state.cache
     )
     return state
 end
@@ -89,32 +90,68 @@ end
     normalize::Bool = false
 end
 
+"""
+    initialize_output(::typeof(apply_operator), algorithm, op, iterate)
+
+Allocate the output buffer that [`apply_operator!`](@ref) writes into. The
+default uses `copy(iterate)` as the starting guess; per-algorithm methods
+may override.
+"""
+initialize_output(::typeof(apply_operator), algorithm, op, iterate) = copy(iterate)
+
+"""
+    apply_operator(op, iterate; alg, cache!)
+    apply_operator(algorithm, op, iterate; cache!)
+
+Apply the operator `op` to the input tensor network `iterate` under
+`algorithm`, returning the new tensor network. The cache `cache!` is mutated
+in place (the `!` suffix marks it as a mutated kwarg).
+"""
 function apply_operator(
-        op,
-        init;
-        alg = BPApplyOperator(),
-        cache = initialize_cache(alg, init)
+        op, iterate;
+        alg = BPApplyOperator(), cache! = initialize_cache(alg, iterate)
     )
-    return apply_operator(alg, op, init, cache)
+    return apply_operator(alg, op, iterate; cache!)
 end
 
-function apply_operator(alg::BPApplyOperator, op, init, cache)
-    return apply_operator_bp(
-        op, init, cache;
-        trunc = alg.trunc, pinv_kwargs = alg.pinv_kwargs, normalize = alg.normalize
+function apply_operator(
+        algorithm, op, iterate;
+        cache! = initialize_cache(algorithm, iterate)
+    )
+    init = initialize_output(apply_operator, algorithm, op, iterate)
+    apply_operator!(algorithm, init, op, iterate; cache!)
+    return init
+end
+
+"""
+    apply_operator!(algorithm, init, op, iterate; cache!)
+
+In-place form of [`apply_operator`](@ref): writes the result into `init` and
+mutates `cache!`. Returns `init`. Throws a `MethodError` by default;
+per-algorithm methods opt in.
+"""
+function apply_operator!(algorithm, init, op, iterate; cache!)
+    return throw(MethodError(apply_operator!, (algorithm, init, op, iterate)))
+end
+
+function apply_operator!(alg::BPApplyOperator, init, op, iterate; cache!)
+    return apply_operator_bp!(
+        init, op, iterate;
+        cache!, trunc = alg.trunc, pinv_kwargs = alg.pinv_kwargs,
+        normalize = alg.normalize
     )
 end
 
-function apply_operator_bp(
-        op, init, cache;
-        trunc = nothing, pinv_kwargs::NamedTuple = (; tol = 0), normalize::Bool = false
+function apply_operator_bp!(
+        init, op, iterate;
+        cache!, trunc = nothing, pinv_kwargs::NamedTuple = (; tol = 0),
+        normalize::Bool = false
     )
-    state = copy(init)
-    vs = neighbor_vertices(state, op)
+    vs = neighbor_vertices(init, op)
     isempty(vs) && throw(
         ArgumentError("operator shares no indices with the tensor network")
     )
-    resolved_envs = isnothing(cache) ? nothing : boundary_envs(cache, vs)
+    resolved_envs = isnothing(cache!) ? nothing : boundary_envs(cache!, vs)
 
     n = length(vs)
     qs = Vector{Any}(undef, n)
@@ -122,14 +159,14 @@ function apply_operator_bp(
     env_invs = Vector{Any}(undef, n)
     r_dimnames = Vector{Any}(undef, n)
     for (i, v) in enumerate(vs)
-        ψv = state[v]
+        ψv = init[v]
         ψv, env_invs[i] = _absorb_envs(ψv, resolved_envs, pinv_kwargs)
-        site_v = sitenames(state, v)
+        site_v = sitenames(init, v)
         internal_bonds = mapreduce(union, vs; init = eltype(dimnames(ψv))[]) do w
             return if w == v
                 eltype(dimnames(ψv))[]
             else
-                intersect(dimnames(ψv), dimnames(state[w]))
+                intersect(dimnames(ψv), dimnames(init[w]))
             end
         end
         domain = Tuple(union(internal_bonds, site_v))
@@ -161,9 +198,9 @@ function apply_operator_bp(
         if normalize
             new_ψv = new_ψv / norm(new_ψv)
         end
-        state[v] = new_ψv
+        init[v] = new_ψv
     end
-    return state
+    return init
 end
 
 function neighbor_vertices(tn, op::AbstractNamedDimsArray)
