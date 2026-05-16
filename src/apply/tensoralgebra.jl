@@ -5,7 +5,7 @@ using TensorAlgebra: TensorAlgebra
 
 function balanced_eigh_and_inv(
         A::AbstractMatrix;
-        trunc = nothing, pinv_kwargs::NamedTuple = (; tol = 0), ishermitian = true
+        trunc = nothing, tol = 0, ishermitian = true
     )
     F = ishermitian ? eigen(Hermitian(Matrix(A))) : eigen(Matrix(A))
     λ, U = F.values, F.vectors
@@ -16,7 +16,7 @@ function balanced_eigh_and_inv(
     end
     R = real(eltype(λ))
     sqrtλ = sqrt.(max.(real.(λ), zero(R)))
-    invsqrtλ = MatrixAlgebraKit.inv_regularized.(sqrtλ, pinv_kwargs.tol)
+    invsqrtλ = MatrixAlgebraKit.inv_regularized.(sqrtλ, tol)
     Uᴴ = adjoint(U)
     Y = sqrtλ .* Uᴴ
     Yinv = U .* transpose(invsqrtλ)
