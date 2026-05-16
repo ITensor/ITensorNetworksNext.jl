@@ -1,10 +1,10 @@
 import AlgorithmsInterface as AI
 import NamedDimsArrays as NDA
 using Base: @kwdef
-using Graphs: vertices
-using LinearAlgebra: norm
-using NamedDimsArrays: AbstractNamedDimsArray, dimnames, domainnames
-using NamedGraphs.GraphsExtensions: boundary_edges
+using Graphs: dst, src, vertices
+using LinearAlgebra: I, norm
+using NamedDimsArrays: AbstractNamedDimsArray, dimnames, domainnames, nameddims, randname
+using NamedGraphs.GraphsExtensions: all_edges, boundary_edges
 using TensorAlgebra: TensorAlgebra
 
 # === NestedAlgorithm framework ===
@@ -166,6 +166,21 @@ function AI.initialize_state!(
     return state
 end
 
+# Identity-message cache: trivial Vidal-gauge initialization where each bond
+# carries the identity 2-leg matrix. With this cache, the BP simple update
+# degrades to a no-op gauge + raw QR/SVD-based gate apply.
+function initialize_cache(
+        problem::ApplyOperatorProblem, ::BPApplyOperator, iterate::AbstractTensorNetwork
+    )
+    T = eltype(iterate[first(vertices(iterate))])
+    return messagecache(all_edges(iterate)) do edge
+        bond_name = only(linknames(iterate, edge))
+        n = Int(length(only(linkaxes(iterate, edge))))
+        fresh_name = randname(bond_name)
+        return nameddims(Matrix{T}(I, n, n), (fresh_name, bond_name))
+    end
+end
+
 # Non-iterative algorithm: bypass the step!/stopping-criterion loop.
 function AI.solve_loop!(
         problem::ApplyOperatorProblem, algorithm::BPApplyOperator,
@@ -219,8 +234,8 @@ function apply_operator_bp_nsite!(
             )
         end
         sqrt_envs, inv_sqrt_envs = first.(sqrt_envs_and_invs), last.(sqrt_envs_and_invs)
-        ψ_gauge = prod([ψv; sqrt_envs])
-        ψv = prod([ψ_gauge / norm(ψ_gauge); inv_sqrt_envs])
+        ψ_gauge = prod([[ψv]; sqrt_envs])
+        ψv = prod([[ψ_gauge / norm(ψ_gauge)]; inv_sqrt_envs])
     end
     dest[v] = ψv
     return dest
@@ -252,8 +267,8 @@ function apply_operator_bp_nsite!(
     sqrt_envs_v2, inv_sqrt_envs_v2 =
         first.(sqrt_envs_and_invs_v2), last.(sqrt_envs_and_invs_v2)
 
-    ψ_v1 = prod([state[v1]; sqrt_envs_v1])
-    ψ_v2 = prod([state[v2]; sqrt_envs_v2])
+    ψ_v1 = prod([[state[v1]]; sqrt_envs_v1])
+    ψ_v2 = prod([[state[v2]]; sqrt_envs_v2])
 
     s_v1 = sitenames(state, v1)
     s_v2 = sitenames(state, v2)
@@ -272,8 +287,8 @@ function apply_operator_bp_nsite!(
         trunc
     )
 
-    ψ_v1 = prod([Q_v1 * R_v1; inv_sqrt_envs_v1])
-    ψ_v2 = prod([Q_v2 * R_v2; inv_sqrt_envs_v2])
+    ψ_v1 = prod([[Q_v1 * R_v1]; inv_sqrt_envs_v1])
+    ψ_v2 = prod([[Q_v2 * R_v2]; inv_sqrt_envs_v2])
     if normalize
         ψ_v1 = ψ_v1 / norm(ψ_v1)
         ψ_v2 = ψ_v2 / norm(ψ_v2)
