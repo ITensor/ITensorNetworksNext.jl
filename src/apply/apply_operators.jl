@@ -34,16 +34,13 @@ end
 
 # === apply_operators (plural, iterative over a list of operators) ===
 
-function apply_operators(
-        ops, state;
-        op_alg = BPApplyOperator(), cache! = initialize_cache(op_alg, state)
-    )
+function apply_operators(ops, state; op_alg = BPApplyOperator(), kwargs...)
     problem = ApplyOperatorsProblem(; operators = ops, init = state)
     algorithm = ApplyOperators(;
         operator_algorithm = op_alg,
         stopping_criterion = AI.StopAfterIteration(length(ops))
     )
-    return AI.solve(problem, algorithm; iterate = copy(state), cache!)
+    return AI.solve(problem, algorithm; iterate = copy(state), kwargs...)
 end
 
 @kwdef struct ApplyOperatorsProblem{Ops, Init} <: AI.Problem
@@ -67,7 +64,8 @@ end
 
 function AI.initialize_state(
         problem::ApplyOperatorsProblem, algorithm::ApplyOperators;
-        iterate, cache! = initialize_cache(algorithm.operator_algorithm, iterate),
+        iterate,
+        cache! = initialize_cache(problem, algorithm, iterate),
         iteration::Int = 0
     )
     stopping_criterion_state = AI.initialize_state(
@@ -111,14 +109,16 @@ function finalize_substate!(
     return state
 end
 
-"""
-    initialize_cache(algorithm, iterate)
+function initialize_cache(problem::AI.Problem, algorithm::AI.Algorithm, iterate)
+    return throw(MethodError(initialize_cache, (problem, algorithm, iterate)))
+end
 
-Construct the cache for the per-operator `algorithm` given the initial `iterate`.
-Throws a `MethodError` by default; per-algorithm methods opt in.
-"""
-function initialize_cache(algorithm, iterate)
-    return throw(MethodError(initialize_cache, (algorithm, iterate)))
+function initialize_cache(
+        problem::ApplyOperatorsProblem, algorithm::ApplyOperators, iterate
+    )
+    subproblem = ApplyOperatorProblem(; op = first(problem.operators), init = iterate)
+    subalgorithm = algorithm.operator_algorithm
+    return initialize_cache(subproblem, subalgorithm, iterate)
 end
 
 # === apply_operator (singular, one gate application) ===
@@ -128,35 +128,14 @@ end
     init::Init
 end
 
-"""
-    apply_operator(op, iterate; alg, cache!)
-
-Apply the operator `op` to the input tensor network `iterate` under `alg`,
-returning the new tensor network. The cache `cache!` is mutated in place.
-"""
-function apply_operator(
-        op, state;
-        alg = BPApplyOperator(), cache! = initialize_cache(alg, state)
-    )
+function apply_operator(op, state; alg = BPApplyOperator(), kwargs...)
     problem = ApplyOperatorProblem(; op, init = state)
-    return AI.solve(problem, alg; iterate = copy(state), cache!)
+    return AI.solve(problem, alg; iterate = copy(state), kwargs...)
 end
 
-"""
-    apply_operator!(dest, op, state; alg, cache!)
-
-In-place form of [`apply_operator`](@ref) capturing the `X * Y ≈ Z` pattern:
-`op` is `X`, `state` is `Y`, `dest` is `Z` — the output buffer that algorithms
-write into. For variational algorithms `dest` doubles as a starting guess for
-`Z`; for non-variational ones (e.g. `BPApplyOperator`) it's simply overwritten.
-Returns `dest`. The cache `cache!` is also mutated in place.
-"""
-function apply_operator!(
-        dest, op, state;
-        alg = BPApplyOperator(), cache! = initialize_cache(alg, state)
-    )
+function apply_operator!(dest, op, state; alg = BPApplyOperator(), kwargs...)
     problem = ApplyOperatorProblem(; op, init = state)
-    alg_state = AI.initialize_state(problem, alg; iterate = dest, cache!)
+    alg_state = AI.initialize_state(problem, alg; iterate = dest, kwargs...)
     return AI.solve!(problem, alg, alg_state)
 end
 
@@ -174,8 +153,8 @@ end
 end
 
 function AI.initialize_state(
-        ::ApplyOperatorProblem, ::BPApplyOperator;
-        iterate, cache!
+        problem::ApplyOperatorProblem, algorithm::BPApplyOperator;
+        iterate, cache! = initialize_cache(problem, algorithm, iterate)
     )
     return BPApplyOperatorState(; iterate, cache = cache!)
 end
@@ -203,7 +182,10 @@ end
 
 # === BP simple-update implementation ===
 
-function apply_operator_bp!(dest, op, state; kwargs...)
+function apply_operator_bp!(
+        dest::AbstractTensorNetwork, op::AbstractNamedDimsArray,
+        state::AbstractTensorNetwork; kwargs...
+    )
     op_in = domainnames(op)
     vs = [v for v in vertices(state) if !isempty(intersect(op_in, sitenames(state, v)))]
     isempty(vs) && throw(
@@ -212,12 +194,16 @@ function apply_operator_bp!(dest, op, state; kwargs...)
     return apply_operator_bp_nsite!(Val(length(vs)), dest, op, state, vs; kwargs...)
 end
 
-function apply_operator_bp_nsite!(::Val{N}, dest, op, state, vs; kwargs...) where {N}
+function apply_operator_bp_nsite!(
+        ::Val{N}, dest::AbstractTensorNetwork, op::AbstractNamedDimsArray,
+        state::AbstractTensorNetwork, vs; kwargs...
+    ) where {N}
     throw(ArgumentError("$N-site gate decomposition not implemented"))
 end
 
 function apply_operator_bp_nsite!(
-        ::Val{1}, dest, op, state, vs;
+        ::Val{1}, dest::AbstractTensorNetwork, op::AbstractNamedDimsArray,
+        state::AbstractTensorNetwork, vs;
         cache!, pinv_kwargs, normalize, kwargs...
     )
     v = only(vs)
@@ -241,7 +227,8 @@ function apply_operator_bp_nsite!(
 end
 
 function apply_operator_bp_nsite!(
-        ::Val{2}, dest, op, state, vs;
+        ::Val{2}, dest::AbstractTensorNetwork, op::AbstractNamedDimsArray,
+        state::AbstractTensorNetwork, vs;
         cache!, trunc, pinv_kwargs, normalize
     )
     v1, v2 = vs
