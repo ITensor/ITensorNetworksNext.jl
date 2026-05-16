@@ -7,16 +7,43 @@ using NamedDimsArrays: AbstractNamedDimsArray, dimnames, domainnames
 using NamedGraphs.GraphsExtensions: boundary_edges
 using TensorAlgebra: TensorAlgebra
 
-function apply_operators(
-        ops, iterate;
-        op_alg = BPApplyOperator(), cache! = initialize_cache(op_alg, iterate)
+# === NestedAlgorithm framework ===
+
+abstract type NestedAlgorithm <: AI.Algorithm end
+
+function initialize_subproblem(
+        problem::AI.Problem, algorithm::AI.Algorithm, state::AI.State
     )
-    problem = ApplyOperatorsProblem(; operators = ops, init = iterate)
+    return throw(MethodError(initialize_subproblem, (problem, algorithm, state)))
+end
+
+function finalize_substate!(
+        problem::AI.Problem, algorithm::AI.Algorithm, state::AI.State, substate::AI.State
+    )
+    return throw(
+        MethodError(finalize_substate!, (problem, algorithm, state, substate))
+    )
+end
+
+function AI.step!(problem::AI.Problem, algorithm::NestedAlgorithm, state::AI.State)
+    subproblem, subalgorithm, substate = initialize_subproblem(problem, algorithm, state)
+    AI.solve!(subproblem, subalgorithm, substate)
+    finalize_substate!(problem, algorithm, state, substate)
+    return state
+end
+
+# === apply_operators (plural, iterative over a list of operators) ===
+
+function apply_operators(
+        ops, state;
+        op_alg = BPApplyOperator(), cache! = initialize_cache(op_alg, state)
+    )
+    problem = ApplyOperatorsProblem(; operators = ops, init = state)
     algorithm = ApplyOperators(;
         operator_algorithm = op_alg,
         stopping_criterion = AI.StopAfterIteration(length(ops))
     )
-    return AI.solve(problem, algorithm; iterate, cache!)
+    return AI.solve(problem, algorithm; iterate = copy(state), cache!)
 end
 
 @kwdef struct ApplyOperatorsProblem{Ops, Init} <: AI.Problem
@@ -24,7 +51,7 @@ end
     init::Init
 end
 
-@kwdef struct ApplyOperators{OpAlg} <: AI.Algorithm
+@kwdef struct ApplyOperators{OpAlg} <: NestedAlgorithm
     operator_algorithm::OpAlg
     stopping_criterion::AI.StopAfterIteration
 end
@@ -36,29 +63,6 @@ end
     cache::Cache
     iteration::Int = 0
     stopping_criterion_state::SCState
-end
-
-function AI.step!(
-        problem::ApplyOperatorsProblem, algorithm::ApplyOperators,
-        state::ApplyOperatorsState
-    )
-    op_i = problem.operators[state.iteration]
-    state.iterate = apply_operator(
-        algorithm.operator_algorithm, op_i, state.iterate;
-        (cache!) = state.cache
-    )
-    return state
-end
-
-"""
-    initialize_cache(algorithm, iterate)
-
-Construct the cache stored on [`ApplyOperatorsState`](@ref) for the per-operator
-`algorithm` (e.g. [`BPApplyOperator`](@ref)) given the initial `iterate`.
-Throws a `MethodError` by default; per-algorithm methods opt in.
-"""
-function initialize_cache(algorithm, iterate)
-    return throw(MethodError(initialize_cache, (algorithm, iterate)))
 end
 
 function AI.initialize_state(
@@ -86,88 +90,143 @@ function AI.initialize_state!(
     return state
 end
 
-@kwdef struct BPApplyOperator{Trunc, PinvKwargs <: NamedTuple}
+function initialize_subproblem(
+        problem::ApplyOperatorsProblem, algorithm::ApplyOperators,
+        state::ApplyOperatorsState
+    )
+    op_i = problem.operators[state.iteration]
+    subproblem = ApplyOperatorProblem(; op = op_i, init = state.iterate)
+    subalgorithm = algorithm.operator_algorithm
+    substate = AI.initialize_state(
+        subproblem, subalgorithm; iterate = state.iterate, cache! = state.cache
+    )
+    return subproblem, subalgorithm, substate
+end
+
+function finalize_substate!(
+        problem::ApplyOperatorsProblem, algorithm::ApplyOperators,
+        state::ApplyOperatorsState, substate::AI.State
+    )
+    state.iterate = substate.iterate
+    return state
+end
+
+"""
+    initialize_cache(algorithm, iterate)
+
+Construct the cache for the per-operator `algorithm` given the initial `iterate`.
+Throws a `MethodError` by default; per-algorithm methods opt in.
+"""
+function initialize_cache(algorithm, iterate)
+    return throw(MethodError(initialize_cache, (algorithm, iterate)))
+end
+
+# === apply_operator (singular, one gate application) ===
+
+@kwdef struct ApplyOperatorProblem{Op, Init} <: AI.Problem
+    op::Op
+    init::Init
+end
+
+"""
+    apply_operator(op, iterate; alg, cache!)
+
+Apply the operator `op` to the input tensor network `iterate` under `alg`,
+returning the new tensor network. The cache `cache!` is mutated in place.
+"""
+function apply_operator(
+        op, state;
+        alg = BPApplyOperator(), cache! = initialize_cache(alg, state)
+    )
+    problem = ApplyOperatorProblem(; op, init = state)
+    return AI.solve(problem, alg; iterate = copy(state), cache!)
+end
+
+"""
+    apply_operator!(dest, op, state; alg, cache!)
+
+In-place form of [`apply_operator`](@ref) capturing the `X * Y ≈ Z` pattern:
+`op` is `X`, `state` is `Y`, `dest` is `Z` — the output buffer that algorithms
+write into. For variational algorithms `dest` doubles as a starting guess for
+`Z`; for non-variational ones (e.g. `BPApplyOperator`) it's simply overwritten.
+Returns `dest`. The cache `cache!` is also mutated in place.
+"""
+function apply_operator!(
+        dest, op, state;
+        alg = BPApplyOperator(), cache! = initialize_cache(alg, state)
+    )
+    problem = ApplyOperatorProblem(; op, init = state)
+    alg_state = AI.initialize_state(problem, alg; iterate = dest, cache!)
+    return AI.solve!(problem, alg, alg_state)
+end
+
+# === BPApplyOperator (non-iterative; overloads solve_loop! directly) ===
+
+@kwdef struct BPApplyOperator{Trunc, PinvKwargs <: NamedTuple} <: AI.Algorithm
     trunc::Trunc = nothing
     pinv_kwargs::PinvKwargs = (; tol = 0)
     normalize::Bool = false
 end
 
-"""
-    initialize_output(::typeof(apply_operator), algorithm, op, iterate)
+@kwdef mutable struct BPApplyOperatorState{Iterate, Cache} <: AI.State
+    iterate::Iterate
+    cache::Cache
+end
 
-Allocate the output buffer that [`apply_operator!`](@ref) writes into. The
-default uses `copy(iterate)` as the starting guess; per-algorithm methods
-may override.
-"""
-initialize_output(::typeof(apply_operator), algorithm, op, iterate) = copy(iterate)
-
-"""
-    apply_operator(op, iterate; alg, cache!)
-    apply_operator(algorithm, op, iterate; cache!)
-
-Apply the operator `op` to the input tensor network `iterate` under
-`algorithm`, returning the new tensor network. The cache `cache!` is mutated
-in place (the `!` suffix marks it as a mutated kwarg).
-"""
-function apply_operator(
-        op, iterate;
-        alg = BPApplyOperator(), cache! = initialize_cache(alg, iterate)
+function AI.initialize_state(
+        ::ApplyOperatorProblem, ::BPApplyOperator;
+        iterate, cache!
     )
-    return apply_operator(alg, op, iterate; cache!)
+    return BPApplyOperatorState(; iterate, cache = cache!)
 end
 
-function apply_operator(
-        algorithm, op, iterate;
-        cache! = initialize_cache(algorithm, iterate)
+# Non-iterative algorithm: no per-call state to reset.
+function AI.initialize_state!(
+        ::ApplyOperatorProblem, ::BPApplyOperator, state::BPApplyOperatorState
     )
-    init = initialize_output(apply_operator, algorithm, op, iterate)
-    apply_operator!(algorithm, init, op, iterate; cache!)
-    return init
+    return state
 end
 
-"""
-    apply_operator!(algorithm, init, op, iterate; cache!)
-
-In-place form of [`apply_operator`](@ref): writes the result into `init` and
-mutates `cache!`. Returns `init`. Throws a `MethodError` by default;
-per-algorithm methods opt in.
-"""
-function apply_operator!(algorithm, init, op, iterate; cache!)
-    return throw(MethodError(apply_operator!, (algorithm, init, op, iterate)))
-end
-
-function apply_operator!(alg::BPApplyOperator, init, op, iterate; cache!)
-    return apply_operator_bp!(
-        init, op, iterate;
-        cache!, trunc = alg.trunc, pinv_kwargs = alg.pinv_kwargs,
-        normalize = alg.normalize
+# Non-iterative algorithm: bypass the step!/stopping-criterion loop.
+function AI.solve_loop!(
+        problem::ApplyOperatorProblem, algorithm::BPApplyOperator,
+        state::BPApplyOperatorState
     )
+    apply_operator_bp!(
+        state.iterate, problem.op, problem.init;
+        cache! = state.cache,
+        trunc = algorithm.trunc, pinv_kwargs = algorithm.pinv_kwargs,
+        normalize = algorithm.normalize
+    )
+    return state
 end
 
-function apply_operator_bp!(init, op, iterate; kwargs...)
+# === BP simple-update implementation ===
+
+function apply_operator_bp!(dest, op, state; kwargs...)
     op_in = domainnames(op)
-    vs = [v for v in vertices(init) if !isempty(intersect(op_in, sitenames(init, v)))]
+    vs = [v for v in vertices(state) if !isempty(intersect(op_in, sitenames(state, v)))]
     isempty(vs) && throw(
         ArgumentError("operator shares no indices with the tensor network")
     )
-    return apply_operator_bp_nsite!(Val(length(vs)), init, op, vs; kwargs...)
+    return apply_operator_bp_nsite!(Val(length(vs)), dest, op, state, vs; kwargs...)
 end
 
-function apply_operator_bp_nsite!(::Val{N}, init, op, vs; kwargs...) where {N}
+function apply_operator_bp_nsite!(::Val{N}, dest, op, state, vs; kwargs...) where {N}
     throw(ArgumentError("$N-site gate decomposition not implemented"))
 end
 
 function apply_operator_bp_nsite!(
-        ::Val{1}, init, op, vs;
+        ::Val{1}, dest, op, state, vs;
         cache!, pinv_kwargs, normalize, kwargs...
     )
     v = only(vs)
-    ψv = NDA.apply(op, init[v])
+    ψv = NDA.apply(op, state[v])
     if normalize
         envs = [cache![e] for e in boundary_edges(cache!, vs; dir = :in)]
-        envs_v = filter(e -> !isempty(intersect(dimnames(e), dimnames(init[v]))), envs)
+        envs_v = filter(e -> !isempty(intersect(dimnames(e), dimnames(state[v]))), envs)
         sqrt_envs_and_invs = map(envs_v) do env
-            shared = intersect(dimnames(env), dimnames(init[v]))
+            shared = intersect(dimnames(env), dimnames(state[v]))
             return balanced_eigh_and_inv(
                 env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared);
                 pinv_kwargs...
@@ -177,26 +236,26 @@ function apply_operator_bp_nsite!(
         ψ_gauge = prod([ψv; sqrt_envs])
         ψv = prod([ψ_gauge / norm(ψ_gauge); inv_sqrt_envs])
     end
-    init[v] = ψv
-    return init
+    dest[v] = ψv
+    return dest
 end
 
 function apply_operator_bp_nsite!(
-        ::Val{2}, init, op, vs;
+        ::Val{2}, dest, op, state, vs;
         cache!, trunc, pinv_kwargs, normalize
     )
     v1, v2 = vs
     envs = [cache![e] for e in boundary_edges(cache!, vs; dir = :in)]
-    envs_v1 = filter(e -> !isempty(intersect(dimnames(e), dimnames(init[v1]))), envs)
-    envs_v2 = filter(e -> !isempty(intersect(dimnames(e), dimnames(init[v2]))), envs)
+    envs_v1 = filter(e -> !isempty(intersect(dimnames(e), dimnames(state[v1]))), envs)
+    envs_v2 = filter(e -> !isempty(intersect(dimnames(e), dimnames(state[v2]))), envs)
     sqrt_envs_and_invs_v1 = map(envs_v1) do env
-        shared = intersect(dimnames(env), dimnames(init[v1]))
+        shared = intersect(dimnames(env), dimnames(state[v1]))
         return balanced_eigh_and_inv(
             env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared); pinv_kwargs...
         )
     end
     sqrt_envs_and_invs_v2 = map(envs_v2) do env
-        shared = intersect(dimnames(env), dimnames(init[v2]))
+        shared = intersect(dimnames(env), dimnames(state[v2]))
         return balanced_eigh_and_inv(
             env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared); pinv_kwargs...
         )
@@ -206,11 +265,11 @@ function apply_operator_bp_nsite!(
     sqrt_envs_v2, inv_sqrt_envs_v2 =
         first.(sqrt_envs_and_invs_v2), last.(sqrt_envs_and_invs_v2)
 
-    ψ_v1 = prod([init[v1]; sqrt_envs_v1])
-    ψ_v2 = prod([init[v2]; sqrt_envs_v2])
+    ψ_v1 = prod([state[v1]; sqrt_envs_v1])
+    ψ_v2 = prod([state[v2]; sqrt_envs_v2])
 
-    s_v1 = sitenames(init, v1)
-    s_v2 = sitenames(init, v2)
+    s_v1 = sitenames(state, v1)
+    s_v2 = sitenames(state, v2)
     bond = Tuple(intersect(dimnames(ψ_v1), dimnames(ψ_v2)))
     Q_v1, R_v1 = TensorAlgebra.qr(
         ψ_v1, Tuple(setdiff(dimnames(ψ_v1), bond, s_v1)), (bond..., s_v1...)
@@ -232,7 +291,7 @@ function apply_operator_bp_nsite!(
         ψ_v1 = ψ_v1 / norm(ψ_v1)
         ψ_v2 = ψ_v2 / norm(ψ_v2)
     end
-    init[v1] = ψ_v1
-    init[v2] = ψ_v2
-    return init
+    dest[v1] = ψ_v1
+    dest[v2] = ψ_v2
+    return dest
 end
