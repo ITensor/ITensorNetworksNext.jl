@@ -145,65 +145,66 @@ function apply_operator!(alg::BPApplyOperator, init, op, iterate; cache!)
     )
 end
 
-function apply_operator_bp!(
-        init, op, iterate;
-        cache!, trunc = nothing, pinv_kwargs::NamedTuple = (; tol = 0),
-        normalize::Bool = false
-    )
+function apply_operator_bp!(init, op, iterate; kwargs...)
     vs = neighbor_vertices(init, op)
     isempty(vs) && throw(
         ArgumentError("operator shares no indices with the tensor network")
     )
-    resolved_envs = isnothing(cache!) ? nothing : boundary_envs(cache!, vs)
+    return apply_operator_bp_nsite!(Val(length(vs)), init, op, vs; kwargs...)
+end
 
-    n = length(vs)
-    qs = Vector{Any}(undef, n)
-    rs = Vector{Any}(undef, n)
-    env_invs = Vector{Any}(undef, n)
-    r_dimnames = Vector{Any}(undef, n)
-    for (i, v) in enumerate(vs)
-        ψv = init[v]
-        ψv, env_invs[i] = _absorb_envs(ψv, resolved_envs, pinv_kwargs)
-        site_v = sitenames(init, v)
-        internal_bonds = mapreduce(union, vs; init = eltype(dimnames(ψv))[]) do w
-            return if w == v
-                eltype(dimnames(ψv))[]
-            else
-                intersect(dimnames(ψv), dimnames(init[w]))
-            end
-        end
-        domain = Tuple(union(internal_bonds, site_v))
-        codomain = Tuple(setdiff(dimnames(ψv), domain))
-        if isempty(codomain)
-            qs[i] = nothing
-            rs[i] = ψv
-        else
-            qs[i], rs[i] = TensorAlgebra.qr(ψv, codomain, domain)
-        end
-        r_dimnames[i] = Set(dimnames(rs[i]))
+function apply_operator_bp_nsite!(::Val{N}, init, op, vs; kwargs...) where {N}
+    throw(ArgumentError("$N-site gate decomposition not implemented"))
+end
+
+function apply_operator_bp_nsite!(
+        ::Val{1}, init, op, vs;
+        cache!, pinv_kwargs, normalize, kwargs...
+    )
+    v = only(vs)
+    ψv = NDA.apply(op, init[v])
+    if normalize
+        envs = boundary_envs(cache!, vs)
+        ψ_gauge, env_invs = _absorb_envs(ψv, envs, pinv_kwargs)
+        ψ_gauge = ψ_gauge / norm(ψ_gauge)
+        ψv = _absorb_factors(ψ_gauge, env_invs)
     end
-
-    blob = NDA.apply(op, reduce(*, rs))
-
-    new_rs = if n == 1
-        [blob]
-    elseif n == 2
-        codomain = Tuple(intersect(dimnames(blob), r_dimnames[1]))
-        domain = Tuple(intersect(dimnames(blob), r_dimnames[2]))
-        collect(balanced_svd(blob, codomain, domain; trunc))
-    else
-        throw(ArgumentError("$(n)-site gate decomposition not implemented"))
-    end
-
-    for (i, v) in enumerate(vs)
-        new_ψv = isnothing(qs[i]) ? new_rs[i] : qs[i] * new_rs[i]
-        new_ψv = _absorb_factors(new_ψv, env_invs[i])
-        if normalize
-            new_ψv = new_ψv / norm(new_ψv)
-        end
-        init[v] = new_ψv
-    end
+    init[v] = ψv
     return init
+end
+
+function apply_operator_bp_nsite!(
+        ::Val{2}, init, op, vs;
+        cache!, trunc, pinv_kwargs, normalize
+    )
+    v1, v2 = vs
+    envs = boundary_envs(cache!, vs)
+    ψ1, env_invs_1 = _absorb_envs(init[v1], envs, pinv_kwargs)
+    ψ2, env_invs_2 = _absorb_envs(init[v2], envs, pinv_kwargs)
+    bond = Tuple(intersect(dimnames(ψ1), dimnames(ψ2)))
+    Q1, R1 = _gate_split(ψ1, sitenames(init, v1), bond)
+    Q2, R2 = _gate_split(ψ2, sitenames(init, v2), bond)
+    blob = NDA.apply(op, R1 * R2)
+    codomain = Tuple(intersect(dimnames(blob), dimnames(R1)))
+    domain = Tuple(intersect(dimnames(blob), dimnames(R2)))
+    R1_new, R2_new = balanced_svd(blob, codomain, domain; trunc)
+    new_ψ1 = Q1 * R1_new
+    new_ψ2 = Q2 * R2_new
+    new_ψ1 = _absorb_factors(new_ψ1, env_invs_1)
+    new_ψ2 = _absorb_factors(new_ψ2, env_invs_2)
+    if normalize
+        new_ψ1 = new_ψ1 / norm(new_ψ1)
+        new_ψ2 = new_ψ2 / norm(new_ψ2)
+    end
+    init[v1] = new_ψ1
+    init[v2] = new_ψ2
+    return init
+end
+
+function _gate_split(ψ, site, bond)
+    domain = Tuple(union(bond, site))
+    codomain = Tuple(setdiff(dimnames(ψ), domain))
+    return TensorAlgebra.qr(ψ, codomain, domain)
 end
 
 function neighbor_vertices(tn, op::AbstractNamedDimsArray)
@@ -214,8 +215,6 @@ end
 function boundary_envs(cache::AbstractDataGraph, vs)
     return [cache[e] for e in boundary_edges(cache, vs; dir = :in)]
 end
-
-_absorb_envs(ψ, ::Nothing, _) = (ψ, ())
 
 function _absorb_envs(ψ, envs, pinv_kwargs)
     inv_factors = []
