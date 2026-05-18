@@ -3,9 +3,7 @@ import NamedDimsArrays as NDA
 using Base: @kwdef
 using Graphs: dst, src, vertices
 using LinearAlgebra: I, diag, diagm, norm
-using MatrixAlgebraKit: MatrixAlgebraKit
-using NamedDimsArrays:
-    AbstractNamedDimsArray, dimnames, domainnames, name, nameddims, randname
+using NamedDimsArrays: AbstractNamedDimsArray, dimnames, domainnames, nameddims, randname
 using NamedGraphs.GraphsExtensions: all_edges, boundary_edges
 using TensorAlgebra: TensorAlgebra
 
@@ -22,9 +20,8 @@ end
 function finalize_substate!(
         problem::AI.Problem, algorithm::AI.Algorithm, state::AI.State, substate::AI.State
     )
-    return throw(
-        MethodError(finalize_substate!, (problem, algorithm, state, substate))
-    )
+    state.iterate = substate.iterate
+    return state
 end
 
 function AI.step!(problem::AI.Problem, algorithm::NestedAlgorithm, state::AI.State)
@@ -101,14 +98,6 @@ function initialize_subproblem(
         subproblem, subalgorithm; iterate = state.iterate, cache! = state.cache
     )
     return subproblem, subalgorithm, substate
-end
-
-function finalize_substate!(
-        problem::ApplyOperatorsProblem, algorithm::ApplyOperators,
-        state::ApplyOperatorsState, substate::AI.State
-    )
-    state.iterate = substate.iterate
-    return state
 end
 
 function initialize_cache(problem::AI.Problem, algorithm::AI.Algorithm, iterate)
@@ -207,23 +196,6 @@ end
 # directed edge are sqrt-form (√M), so they are used as gauge-in factors
 # directly and only the (regularized) inverse is needed for gauge-out.
 
-# Inverse of a 2-leg diagonal `env` with names `(codomain..., domain...)`,
-# returned as a 2-leg named array with names `(domain..., codomain...)`
-# (flipped, so it can be contracted to undo a gauge-in). Regularized via
-# `MatrixAlgebraKit.inv_regularized`. Assumes `env` is diagonal — appropriate
-# for the sqrt-message Vidal-gauge cache used here.
-function invert_diagonal_message(env::AbstractNamedDimsArray, codomain, domain; tol = 0)
-    codomain_names = name.(codomain)
-    domain_names = name.(domain)
-    biperm = TensorAlgebra.blockedperm_indexin(
-        Tuple.((dimnames(env), codomain_names, domain_names))...
-    )
-    perm_co, perm_dom = TensorAlgebra.blocks(biperm)
-    env_perm = TensorAlgebra.bipermutedims(env.denamed, perm_co, perm_dom)
-    inv_σ = MatrixAlgebraKit.inv_regularized.(diag(env_perm), tol)
-    return nameddims(diagm(inv_σ), (domain_names..., codomain_names...))
-end
-
 function apply_gate_bp!(
         dest::AbstractTensorNetwork, op::AbstractNamedDimsArray,
         state::AbstractTensorNetwork; kwargs...
@@ -255,7 +227,7 @@ function apply_gate_bp_nsite!(
         sqrt_envs = filter(e -> !isempty(intersect(dimnames(e), dimnames(state[v]))), envs)
         inv_sqrt_envs = map(sqrt_envs) do env
             shared = intersect(dimnames(env), dimnames(state[v]))
-            return invert_diagonal_message(
+            return inv_regularized(
                 env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared);
                 pinv_kwargs...
             )
@@ -278,13 +250,13 @@ function apply_gate_bp_nsite!(
     sqrt_envs_v2 = filter(e -> !isempty(intersect(dimnames(e), dimnames(state[v2]))), envs)
     inv_sqrt_envs_v1 = map(sqrt_envs_v1) do env
         shared = intersect(dimnames(env), dimnames(state[v1]))
-        return invert_diagonal_message(
+        return inv_regularized(
             env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared); pinv_kwargs...
         )
     end
     inv_sqrt_envs_v2 = map(sqrt_envs_v2) do env
         shared = intersect(dimnames(env), dimnames(state[v2]))
-        return invert_diagonal_message(
+        return inv_regularized(
             env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared); pinv_kwargs...
         )
     end
