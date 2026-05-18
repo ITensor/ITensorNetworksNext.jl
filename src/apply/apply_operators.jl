@@ -35,7 +35,7 @@ end
 
 # === apply_operators (plural, iterative over a list of operators) ===
 
-function apply_operators(ops, state; op_alg = BPApplyOperator(), kwargs...)
+function apply_operators(ops, state; op_alg = BPApplyGate(), kwargs...)
     problem = ApplyOperatorsProblem(; operators = ops, init = state)
     algorithm = ApplyOperators(;
         operator_algorithm = op_alg,
@@ -129,40 +129,40 @@ end
     init::Init
 end
 
-function apply_operator(op, state; alg = BPApplyOperator(), kwargs...)
+function apply_operator(op, state; alg = BPApplyGate(), kwargs...)
     problem = ApplyOperatorProblem(; op, init = state)
     return AI.solve(problem, alg; iterate = copy(state), kwargs...)
 end
 
-function apply_operator!(dest, op, state; alg = BPApplyOperator(), kwargs...)
+function apply_operator!(dest, op, state; alg = BPApplyGate(), kwargs...)
     problem = ApplyOperatorProblem(; op, init = state)
     alg_state = AI.initialize_state(problem, alg; iterate = dest, kwargs...)
     return AI.solve!(problem, alg, alg_state)
 end
 
-# === BPApplyOperator (non-iterative; overloads solve_loop! directly) ===
+# === BPApplyGate (non-iterative; overloads solve_loop! directly) ===
 
-@kwdef struct BPApplyOperator{Trunc, PinvKwargs <: NamedTuple} <: AI.Algorithm
+@kwdef struct BPApplyGate{Trunc, PinvKwargs <: NamedTuple} <: AI.Algorithm
     trunc::Trunc = nothing
     pinv_kwargs::PinvKwargs = (; tol = 0)
     normalize::Bool = false
 end
 
-@kwdef mutable struct BPApplyOperatorState{Iterate, Cache} <: AI.State
+@kwdef mutable struct BPApplyGateState{Iterate, Cache} <: AI.State
     iterate::Iterate
     cache::Cache
 end
 
 function AI.initialize_state(
-        problem::ApplyOperatorProblem, algorithm::BPApplyOperator;
+        problem::ApplyOperatorProblem, algorithm::BPApplyGate;
         iterate, cache! = initialize_cache(problem, algorithm, iterate)
     )
-    return BPApplyOperatorState(; iterate, cache = cache!)
+    return BPApplyGateState(; iterate, cache = cache!)
 end
 
 # Non-iterative algorithm: no per-call state to reset.
 function AI.initialize_state!(
-        ::ApplyOperatorProblem, ::BPApplyOperator, state::BPApplyOperatorState
+        ::ApplyOperatorProblem, ::BPApplyGate, state::BPApplyGateState
     )
     return state
 end
@@ -172,23 +172,26 @@ end
 # in a `SqrtMessageCache` so the BP simple update knows to use the messages
 # as gauge-in factors directly and skip the √ step.
 function initialize_cache(
-        problem::ApplyOperatorProblem, ::BPApplyOperator, iterate::AbstractTensorNetwork
+        problem::ApplyOperatorProblem, ::BPApplyGate, iterate::AbstractTensorNetwork
     )
     T = eltype(iterate[first(vertices(iterate))])
-    return sqrt_messagecache(all_edges(iterate)) do edge
+    return sqrtmessagecache(all_edges(iterate)) do edge
         bond_name = only(linknames(iterate, edge))
         n = Int(length(only(linkaxes(iterate, edge))))
         fresh_name = randname(bond_name)
+        # TODO: Make this work for symmetric tensors (GradedArrays): construct
+        # an identity that respects the sector structure of the bond axis,
+        # rather than a plain `Matrix{T}(I, n, n)` keyed only by length.
         return nameddims(Matrix{T}(I, n, n), (fresh_name, bond_name))
     end
 end
 
 # Non-iterative algorithm: bypass the step!/stopping-criterion loop.
 function AI.solve_loop!(
-        problem::ApplyOperatorProblem, algorithm::BPApplyOperator,
-        state::BPApplyOperatorState
+        problem::ApplyOperatorProblem, algorithm::BPApplyGate,
+        state::BPApplyGateState
     )
-    apply_operator_bp!(
+    apply_gate_bp!(
         state.iterate, problem.op, problem.init;
         cache! = state.cache,
         trunc = algorithm.trunc, pinv_kwargs = algorithm.pinv_kwargs,
@@ -198,23 +201,12 @@ function AI.solve_loop!(
 end
 
 # === BP simple-update implementation ===
+#
+# The `cache!` here is assumed to be a `SqrtMessageCache`: messages on each
+# directed edge are sqrt-form (√M), so they are used as gauge-in factors
+# directly and only the (regularized) inverse is needed for gauge-out.
 
-# `gauge_factors(cache, env, codomain, domain; pinv_kwargs...)` returns the
-# pair `(Y, Yinv)` of "gauge-in" and "gauge-out" factors built from `env`:
-# `Y` is contracted into the state tensor to absorb the env, `Yinv` is
-# contracted into the result to undo it. For a full-message `MessageCache`
-# the env is `M` and `Y = √M` (computed via eigh). For a sqrt-message
-# `SqrtMessageCache` the env is already `√M`, so `Y = env` and `Yinv` is
-# its (regularized) pseudo-inverse with the names flipped.
-function gauge_factors(::MessageCache, env, codomain, domain; pinv_kwargs...)
-    return balanced_eigh_and_inv(env, codomain, domain; pinv_kwargs...)
-end
-
-function gauge_factors(::SqrtMessageCache, env, codomain, domain; pinv_kwargs...)
-    return env, invert_diagonal_message(env, codomain, domain; pinv_kwargs...)
-end
-
-function apply_operator_bp!(
+function apply_gate_bp!(
         dest::AbstractTensorNetwork, op::AbstractNamedDimsArray,
         state::AbstractTensorNetwork; kwargs...
     )
@@ -223,17 +215,17 @@ function apply_operator_bp!(
     isempty(vs) && throw(
         ArgumentError("operator shares no indices with the tensor network")
     )
-    return apply_operator_bp_nsite!(Val(length(vs)), dest, op, state, vs; kwargs...)
+    return apply_gate_bp_nsite!(Val(length(vs)), dest, op, state, vs; kwargs...)
 end
 
-function apply_operator_bp_nsite!(
+function apply_gate_bp_nsite!(
         ::Val{N}, dest::AbstractTensorNetwork, op::AbstractNamedDimsArray,
         state::AbstractTensorNetwork, vs; kwargs...
     ) where {N}
-    throw(ArgumentError("$N-site gate decomposition not implemented"))
+    return throw(ArgumentError("$N-site gate decomposition not implemented"))
 end
 
-function apply_operator_bp_nsite!(
+function apply_gate_bp_nsite!(
         ::Val{1}, dest::AbstractTensorNetwork, op::AbstractNamedDimsArray,
         state::AbstractTensorNetwork, vs;
         cache!, pinv_kwargs, normalize, kwargs...
@@ -242,15 +234,14 @@ function apply_operator_bp_nsite!(
     ψv = NDA.apply(op, state[v])
     if normalize
         envs = [cache![e] for e in boundary_edges(cache!, vs; dir = :in)]
-        envs_v = filter(e -> !isempty(intersect(dimnames(e), dimnames(state[v]))), envs)
-        sqrt_envs_and_invs = map(envs_v) do env
+        sqrt_envs = filter(e -> !isempty(intersect(dimnames(e), dimnames(state[v]))), envs)
+        inv_sqrt_envs = map(sqrt_envs) do env
             shared = intersect(dimnames(env), dimnames(state[v]))
-            return gauge_factors(
-                cache!, env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared);
+            return invert_diagonal_message(
+                env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared);
                 pinv_kwargs...
             )
         end
-        sqrt_envs, inv_sqrt_envs = first.(sqrt_envs_and_invs), last.(sqrt_envs_and_invs)
         ψ_gauge = prod([[ψv]; sqrt_envs])
         ψv = prod([[ψ_gauge / norm(ψ_gauge)]; inv_sqrt_envs])
     end
@@ -258,33 +249,27 @@ function apply_operator_bp_nsite!(
     return dest
 end
 
-function apply_operator_bp_nsite!(
+function apply_gate_bp_nsite!(
         ::Val{2}, dest::AbstractTensorNetwork, op::AbstractNamedDimsArray,
         state::AbstractTensorNetwork, vs;
         cache!, trunc, pinv_kwargs, normalize
     )
     v1, v2 = vs
     envs = [cache![e] for e in boundary_edges(cache!, vs; dir = :in)]
-    envs_v1 = filter(e -> !isempty(intersect(dimnames(e), dimnames(state[v1]))), envs)
-    envs_v2 = filter(e -> !isempty(intersect(dimnames(e), dimnames(state[v2]))), envs)
-    sqrt_envs_and_invs_v1 = map(envs_v1) do env
+    sqrt_envs_v1 = filter(e -> !isempty(intersect(dimnames(e), dimnames(state[v1]))), envs)
+    sqrt_envs_v2 = filter(e -> !isempty(intersect(dimnames(e), dimnames(state[v2]))), envs)
+    inv_sqrt_envs_v1 = map(sqrt_envs_v1) do env
         shared = intersect(dimnames(env), dimnames(state[v1]))
-        return gauge_factors(
-            cache!, env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared);
-            pinv_kwargs...
+        return invert_diagonal_message(
+            env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared); pinv_kwargs...
         )
     end
-    sqrt_envs_and_invs_v2 = map(envs_v2) do env
+    inv_sqrt_envs_v2 = map(sqrt_envs_v2) do env
         shared = intersect(dimnames(env), dimnames(state[v2]))
-        return gauge_factors(
-            cache!, env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared);
-            pinv_kwargs...
+        return invert_diagonal_message(
+            env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared); pinv_kwargs...
         )
     end
-    sqrt_envs_v1, inv_sqrt_envs_v1 =
-        first.(sqrt_envs_and_invs_v1), last.(sqrt_envs_and_invs_v1)
-    sqrt_envs_v2, inv_sqrt_envs_v2 =
-        first.(sqrt_envs_and_invs_v2), last.(sqrt_envs_and_invs_v2)
 
     ψ_v1 = prod([[state[v1]]; sqrt_envs_v1])
     ψ_v2 = prod([[state[v2]]; sqrt_envs_v2])
@@ -327,17 +312,8 @@ function apply_operator_bp_nsite!(
 
     # Write fresh sqrt-messages on the (v1, v2) edge of the cache, so that the
     # cache stays consistent with the new bond name and weights in `dest`.
-    update_sqrt_message_cache!(cache!, v1, v2, sqrtσ, new_bond)
-    return dest
-end
-
-update_sqrt_message_cache!(::MessageCache, args...) = nothing
-
-function update_sqrt_message_cache!(
-        cache!::SqrtMessageCache, v1, v2, sqrtσ, bond_name
-    )
     W = diagm(sqrtσ)
-    cache![v1 => v2] = nameddims(W, (randname(bond_name), bond_name))
-    cache![v2 => v1] = nameddims(W, (randname(bond_name), bond_name))
-    return cache!
+    cache![v1 => v2] = nameddims(W, (randname(new_bond), new_bond))
+    cache![v2 => v1] = nameddims(W, (randname(new_bond), new_bond))
+    return dest
 end

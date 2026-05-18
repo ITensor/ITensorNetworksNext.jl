@@ -10,7 +10,9 @@ using NamedGraphs.PartitionedGraphs: QuotientEdge, QuotientView, quotient_graph
 using NamedGraphs: NamedDiGraph, Vertices, convert_vertextype, ordered_vertices,
     parent_graph_indices, position_graph, to_graph_index, vertex_positions
 
-struct MessageCache{T, V} <: AbstractDataGraph{V, Nothing, T}
+abstract type AbstractMessageCache{T, V} <: AbstractDataGraph{V, Nothing, T} end
+
+struct MessageCache{T, V} <: AbstractMessageCache{T, V}
     messages::Dictionary{NamedEdge{V}, T}
     underlying_graph::NamedDiGraph{V}
     function MessageCache{T, V}(::UndefInitializer, vertices) where {T, V}
@@ -20,81 +22,75 @@ struct MessageCache{T, V} <: AbstractDataGraph{V, Nothing, T}
     end
 end
 
-# single type parameter version of the inner constructor
-function MessageCache{T}(::UndefInitializer, vertices) where {T}
-    return MessageCache{T, eltype(vertices)}(undef, vertices)
+# A cache that stores sqrt-form messages (in the Vidal-gauge / simple-update
+# sense): the entry on each directed edge is the operator that gets contracted
+# directly into the state for the balanced gauge — i.e. `√M` rather than the
+# "full" message `M`. Structurally identical to `MessageCache`; the apply-
+# operator BP path dispatches on the type to use the messages as gauge
+# factors directly and skip the sqrt-via-eigh step.
+struct SqrtMessageCache{T, V} <: AbstractMessageCache{T, V}
+    messages::Dictionary{NamedEdge{V}, T}
+    underlying_graph::NamedDiGraph{V}
+    function SqrtMessageCache{T, V}(::UndefInitializer, vertices) where {T, V}
+        messages = Dictionary{NamedEdge{V}, T}()
+        underlying_graph = NamedDiGraph{V}(vertices)
+        return new{T, V}(messages, underlying_graph)
+    end
 end
 
-# compatibility with generic key-val iterables
-Base.keytype(c::MessageCache) = keytype(typeof(c))
-Base.keytype(::Type{<:MessageCache{T, V}}) where {T, V} = NamedEdge{V}
+# Constructors and convenience factories shared between `MessageCache` and
+# `SqrtMessageCache`: the storage and graph structure are identical, only the
+# semantic interpretation of the message values differs.
+for Cache in (:MessageCache, :SqrtMessageCache)
+    @eval begin
+        function $Cache{T}(::UndefInitializer, vertices) where {T}
+            return $Cache{T, eltype(vertices)}(undef, vertices)
+        end
 
-Base.valtype(c::MessageCache) = valtype(typeof(c))
-Base.valtype(::Type{<:MessageCache{T}}) where {T} = T
+        $Cache(messages) = $Cache{valtype(messages)}(messages)
 
-Base.keys(cache::MessageCache) = edges(cache)
+        function $Cache{T}(messages) where {T}
+            V = vertextype(keytype(messages))
+            return $Cache{T, V}(messages)
+        end
 
-MessageCache(messages) = MessageCache{valtype(messages)}(messages)
+        # `messages` is any iterable data structure, where `keys(messages)`
+        # are edges and the values are the messages on those edges.
+        function $Cache{T, V}(messages) where {T, V}
+            edges = keys(messages)
+            vertices = union(src.(edges), dst.(edges))
+            cache = $Cache{T, V}(undef, vertices)
+            add_edges!(cache.underlying_graph, edges)
+            copyto!(cache, messages)
+            return cache
+        end
 
-function MessageCache{T}(messages) where {T}
-    V = vertextype(keytype(messages))
-    return MessageCache{T, V}(messages)
-end
-
-# `messages` is any iterable data structure, where `keys(messages)` are edges
-# and the values are the messages on those edges.
-function MessageCache{T, V}(messages) where {T, V}
-    edges = keys(messages)
-    vertices = union(src.(edges), dst.(edges))
-    cache = MessageCache{T, V}(undef, vertices)
-    add_edges!(cache.underlying_graph, edges)
-    copyto!(cache, messages)
-    return cache
+        Base.copy(cache::$Cache) = $Cache(copy(cache.messages))
+    end
 end
 
 messagecache(pairs) = MessageCache(Dict(pairs))
 messagecache(f, edges) = messagecache(edge => f(edge) for edge in edges)
 
-# A cache that stores sqrt-form messages (in the Vidal-gauge / simple-update
-# sense): the entry on each directed edge is the operator that gets contracted
-# directly into the state for the balanced gauge — i.e. `√M` rather than the
-# "full" message `M`. Wraps a `MessageCache` so the graph and message-storage
-# interface are forwarded unchanged; the apply-operator BP path dispatches on
-# this type to skip the sqrt-via-eigh step.
-struct SqrtMessageCache{T, V} <: AbstractDataGraph{V, Nothing, T}
-    cache::MessageCache{T, V}
-end
+sqrtmessagecache(pairs) = SqrtMessageCache(Dict(pairs))
+sqrtmessagecache(f, edges) = sqrtmessagecache(edge => f(edge) for edge in edges)
 
-SqrtMessageCache(messages) = SqrtMessageCache(MessageCache(messages))
+# compatibility with generic key-val iterables
+Base.keytype(c::AbstractMessageCache) = keytype(typeof(c))
+Base.keytype(::Type{<:AbstractMessageCache{T, V}}) where {T, V} = NamedEdge{V}
 
-function sqrt_messagecache(f, edges)
-    return SqrtMessageCache(messagecache(f, edges))
-end
+Base.valtype(c::AbstractMessageCache) = valtype(typeof(c))
+Base.valtype(::Type{<:AbstractMessageCache{T}}) where {T} = T
 
-DataGraphs.underlying_graph(c::SqrtMessageCache) = DataGraphs.underlying_graph(c.cache)
-DataGraphs.is_vertex_assigned(::SqrtMessageCache, _) = false
-function DataGraphs.is_edge_assigned(c::SqrtMessageCache, edge)
-    return DataGraphs.is_edge_assigned(c.cache, edge)
-end
-function DataGraphs.get_edge_data(c::SqrtMessageCache, edge::AbstractEdge)
-    return DataGraphs.get_edge_data(c.cache, edge)
-end
-function DataGraphs.set_edge_data!(c::SqrtMessageCache, val, edge)
-    return DataGraphs.set_edge_data!(c.cache, val, edge)
-end
-
-Base.keytype(c::SqrtMessageCache) = keytype(c.cache)
-Base.valtype(c::SqrtMessageCache) = valtype(c.cache)
-Base.keys(c::SqrtMessageCache) = keys(c.cache)
-Base.copy(c::SqrtMessageCache) = SqrtMessageCache(copy(c.cache))
+Base.keys(cache::AbstractMessageCache) = edges(cache)
 
 # ================================ NamedGraphs interface ================================= #
-function NamedGraphs.add_edge!(c::MessageCache, edge)
+function NamedGraphs.add_edge!(c::AbstractMessageCache, edge)
     add_edge!(c.underlying_graph, edge)
     return c
 end
 
-function NamedGraphs.rem_edge!(c::MessageCache, edge)
+function NamedGraphs.rem_edge!(c::AbstractMessageCache, edge)
     delete!(c.messages, to_graph_index(c, edge))
     rem_edge!(c.underlying_graph, edge)
     return c
@@ -102,21 +98,19 @@ end
 
 # ================================= DataGraphs interface ================================= #
 
-DataGraphs.underlying_graph(cache::MessageCache) = cache.underlying_graph
+DataGraphs.underlying_graph(cache::AbstractMessageCache) = cache.underlying_graph
 
-DataGraphs.is_vertex_assigned(::MessageCache, _) = false
-DataGraphs.is_edge_assigned(c::MessageCache, edge) = haskey(c.messages, edge)
+DataGraphs.is_vertex_assigned(::AbstractMessageCache, _) = false
+DataGraphs.is_edge_assigned(c::AbstractMessageCache, edge) = haskey(c.messages, edge)
 
-function DataGraphs.get_edge_data(c::MessageCache, edge::AbstractEdge)
+function DataGraphs.get_edge_data(c::AbstractMessageCache, edge::AbstractEdge)
     return c.messages[edge]
 end
-function DataGraphs.set_edge_data!(c::MessageCache, val, edge)
+function DataGraphs.set_edge_data!(c::AbstractMessageCache, val, edge)
     return set!(c.messages, edge, val)
 end
 
-Base.copy(cache::MessageCache) = MessageCache(copy(cache.messages))
-
-function Base.:(==)(cache1::MessageCache, cache2::MessageCache)
+function Base.:(==)(cache1::C, cache2::C) where {C <: AbstractMessageCache}
     ug1 = cache1.underlying_graph
     ug2 = cache2.underlying_graph
 
@@ -145,7 +139,7 @@ end
 # for analogous behaviour to 3 argument method.
 # TODO: these can be made generic for `AbtractDataGraph` in `DataGraphs.jl`
 function copyto!_messagecache(
-        cache_dst::MessageCache,
+        cache_dst::AbstractMessageCache,
         cache_src,
         inds = nothing
     )
@@ -155,7 +149,7 @@ function copyto!_messagecache(
 end
 
 function Base.copyto!(
-        cache_dst::MessageCache,
+        cache_dst::AbstractMessageCache,
         cache_src::AbstractDataGraph,
         inds = nothing
     )
@@ -164,7 +158,7 @@ function Base.copyto!(
 end
 
 function Base.copyto!(
-        cache_dst::MessageCache,
+        cache_dst::AbstractMessageCache,
         dictionary_src::Dictionary,
         inds = nothing
     )
@@ -173,7 +167,7 @@ function Base.copyto!(
 end
 
 function Base.copyto!(
-        cache_dst::MessageCache,
+        cache_dst::AbstractMessageCache,
         dict_src::Dict,
         inds = keys(dict_src)
     )
@@ -284,7 +278,7 @@ end
 # ======================================= printing ======================================= #
 
 # TODO: This is the definition for the proposed `DataGraphs.AbstractEdgeDataGraph`.
-function Base.show(io::IO, mime::MIME"text/plain", graph::MessageCache)
+function Base.show(io::IO, mime::MIME"text/plain", graph::AbstractMessageCache)
     println(io, "$(typeof(graph)) with $(nv(graph)) vertices:")
     show(io, mime, vertices(graph))
     println(io, "\n")
@@ -299,4 +293,4 @@ function Base.show(io::IO, mime::MIME"text/plain", graph::MessageCache)
     return nothing
 end
 
-Base.show(io::IO, graph::MessageCache) = show(io, MIME"text/plain"(), graph)
+Base.show(io::IO, graph::AbstractMessageCache) = show(io, MIME"text/plain"(), graph)
