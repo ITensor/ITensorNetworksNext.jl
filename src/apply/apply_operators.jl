@@ -268,6 +268,9 @@ function apply_gate_bp_nsite!(
     # bond; the same `√σ` becomes the sqrt-message written back to
     # `cache!` below.
     U, S, V = TA.svd(op_R_v1v2, setdiff(dimnames(R_v1), dimnames(R_v2)); trunc)
+    if normalize
+        S = S / norm(S)
+    end
     name_u, name_v = dimnames(S)
     sqrtσ = sqrt.(diag(S.denamed))
     new_bond = randname(name_u)
@@ -276,17 +279,6 @@ function apply_gate_bp_nsite!(
     R_v1 = U * sqrt_S_left
     R_v2 = sqrt_S_right * V
 
-    # Normalize so each new vertex tensor has unit BP norm in the fully
-    # gauged basis (every incident edge gauged in, including the new (v1, v2)
-    # message `sqrt(σ)`). The fully-gauged tensor at v_i is
-    # `Q_v_i · R_v_i · sqrt(σ)` = `Q_v_i · (U or V) · σ`, with Frobenius
-    # norm `sqrt(Σσᵢ²) = ||S||_F` (Q, U, V are isometric). Dividing R_v_i
-    # by `norm(S)` makes that BP norm 1 for each vertex.
-    if normalize
-        n = norm(S)
-        R_v1 = R_v1 / n
-        R_v2 = R_v2 / n
-    end
     dest[v1] = prod([[Q_v1 * R_v1]; inv_sqrt_envs_v1])
     dest[v2] = prod([[Q_v2 * R_v2]; inv_sqrt_envs_v2])
 
