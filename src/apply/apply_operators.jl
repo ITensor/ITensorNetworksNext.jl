@@ -219,22 +219,14 @@ end
 function apply_gate_bp_nsite!(
         ::Val{1}, dest::AbstractTensorNetwork, op::AbstractNamedDimsArray,
         state::AbstractTensorNetwork, vs;
-        cache!, pinv_kwargs, normalize, kwargs...
+        cache!, normalize, kwargs...
     )
     v = only(vs)
     ψv = NDA.apply(op, state[v])
     if normalize
         envs = [cache![e] for e in boundary_edges(cache!, vs; dir = :in)]
         sqrt_envs = filter(e -> !isempty(intersect(dimnames(e), dimnames(state[v]))), envs)
-        inv_sqrt_envs = map(sqrt_envs) do env
-            shared = intersect(dimnames(env), dimnames(state[v]))
-            return MatrixAlgebraKit.inv_regularized(
-                env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared);
-                pinv_kwargs...
-            )
-        end
-        ψ_gauge = prod([[ψv]; sqrt_envs])
-        ψv = prod([[ψ_gauge / norm(ψ_gauge)]; inv_sqrt_envs])
+        ψv /= norm(prod([[ψv]; sqrt_envs]))
     end
     dest[v] = ψv
     return dest
