@@ -254,13 +254,12 @@ function apply_gate_bp_nsite!(
     ψ_v1 = prod([[state[v1]]; sqrt_envs_v1])
     ψ_v2 = prod([[state[v2]]; sqrt_envs_v2])
 
-    # Site legs of `op` at v1 / v2 — `intersect` rather than
-    # `sitenames(state, v_i)` so we only put the *actually-acted-on* site
-    # legs into the qr domain (the gate may touch a strict subset).
-    s_v1 = intersect(dimnames(ψ_v1), dimnames(op))
-    s_v2 = intersect(dimnames(ψ_v2), dimnames(op))
-    Q_v1, R_v1 = TA.qr(ψ_v1, setdiff(dimnames(ψ_v1), dimnames(ψ_v2), s_v1))
-    Q_v2, R_v2 = TA.qr(ψ_v2, setdiff(dimnames(ψ_v2), dimnames(ψ_v1), s_v2))
+    # qr codomain at v_i: legs of ψ_v_i not shared with ψ_v_j (the v1v2 bond)
+    # and not touched by `op` (those need to stay in `R` so the gate can act
+    # on them). `setdiff(_, dimnames(op))` is safe even though `op` carries
+    # legs not in ψ_v_i — extra elements in the subtracted set are no-ops.
+    Q_v1, R_v1 = TA.qr(ψ_v1, setdiff(dimnames(ψ_v1), dimnames(ψ_v2), dimnames(op)))
+    Q_v2, R_v2 = TA.qr(ψ_v2, setdiff(dimnames(ψ_v2), dimnames(ψ_v1), dimnames(op)))
     op_R_v1v2 = NDA.apply(op, R_v1 * R_v2)
     # `op_R_v1v2 ≈ U · S · V`, with `S` a 2-leg diagonal NamedDimsArray
     # on `(name_u, name_v)`. Absorb `√S` symmetrically into the new
@@ -268,12 +267,7 @@ function apply_gate_bp_nsite!(
     # into a single fresh `new_bond` so the gauged tensors share one
     # bond; the same `√σ` becomes the sqrt-message written back to
     # `cache!` below.
-    U, S, V = TA.svd(
-        op_R_v1v2,
-        intersect(dimnames(op_R_v1v2), dimnames(R_v1)),
-        intersect(dimnames(op_R_v1v2), dimnames(R_v2));
-        trunc
-    )
+    U, S, V = TA.svd(op_R_v1v2, setdiff(dimnames(R_v1), dimnames(R_v2)); trunc)
     name_u, name_v = dimnames(S)
     sqrtσ = sqrt.(diag(S.denamed))
     new_bond = randname(name_u)
@@ -282,14 +276,19 @@ function apply_gate_bp_nsite!(
     R_v1 = U * sqrt_S_left
     R_v2 = sqrt_S_right * V
 
-    ψ_v1 = prod([[Q_v1 * R_v1]; inv_sqrt_envs_v1])
-    ψ_v2 = prod([[Q_v2 * R_v2]; inv_sqrt_envs_v2])
+    # Normalize so each new vertex tensor has unit BP norm in the fully
+    # gauged basis (every incident edge gauged in, including the new (v1, v2)
+    # message `sqrt(σ)`). The fully-gauged tensor at v_i is
+    # `Q_v_i · R_v_i · sqrt(σ)` = `Q_v_i · (U or V) · σ`, with Frobenius
+    # norm `sqrt(Σσᵢ²) = ||S||_F` (Q, U, V are isometric). Dividing R_v_i
+    # by `norm(S)` makes that BP norm 1 for each vertex.
     if normalize
-        ψ_v1 = ψ_v1 / norm(ψ_v1)
-        ψ_v2 = ψ_v2 / norm(ψ_v2)
+        n = norm(S)
+        R_v1 = R_v1 / n
+        R_v2 = R_v2 / n
     end
-    dest[v1] = ψ_v1
-    dest[v2] = ψ_v2
+    dest[v1] = prod([[Q_v1 * R_v1]; inv_sqrt_envs_v1])
+    dest[v2] = prod([[Q_v2 * R_v2]; inv_sqrt_envs_v2])
 
     # Write fresh sqrt-messages on the (v1, v2) edge of the cache, so that the
     # cache stays consistent with the new bond name and weights in `dest`.
