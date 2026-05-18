@@ -2,7 +2,8 @@ import AlgorithmsInterface as AI
 import NamedDimsArrays as NDA
 using Base: @kwdef
 using Graphs: dst, src, vertices
-using LinearAlgebra: I, norm
+using LinearAlgebra: I, diag, diagm, norm
+using MatrixAlgebraKit: MatrixAlgebraKit
 using NamedDimsArrays: AbstractNamedDimsArray, dimnames, domainnames, nameddims, randname
 using NamedGraphs.GraphsExtensions: all_edges, boundary_edges
 using TensorAlgebra: TensorAlgebra
@@ -167,13 +168,14 @@ function AI.initialize_state!(
 end
 
 # Identity-message cache: trivial Vidal-gauge initialization where each bond
-# carries the identity 2-leg matrix. With this cache, the BP simple update
-# degrades to a no-op gauge + raw QR/SVD-based gate apply.
+# carries the identity 2-leg matrix (= √I = I, in sqrt-message form). Stored
+# in a `SqrtMessageCache` so the BP simple update knows to use the messages
+# as gauge-in factors directly and skip the √ step.
 function initialize_cache(
         problem::ApplyOperatorProblem, ::BPApplyOperator, iterate::AbstractTensorNetwork
     )
     T = eltype(iterate[first(vertices(iterate))])
-    return messagecache(all_edges(iterate)) do edge
+    return sqrt_messagecache(all_edges(iterate)) do edge
         bond_name = only(linknames(iterate, edge))
         n = Int(length(only(linkaxes(iterate, edge))))
         fresh_name = randname(bond_name)
@@ -196,6 +198,21 @@ function AI.solve_loop!(
 end
 
 # === BP simple-update implementation ===
+
+# `gauge_factors(cache, env, codomain, domain; pinv_kwargs...)` returns the
+# pair `(Y, Yinv)` of "gauge-in" and "gauge-out" factors built from `env`:
+# `Y` is contracted into the state tensor to absorb the env, `Yinv` is
+# contracted into the result to undo it. For a full-message `MessageCache`
+# the env is `M` and `Y = √M` (computed via eigh). For a sqrt-message
+# `SqrtMessageCache` the env is already `√M`, so `Y = env` and `Yinv` is
+# its (regularized) pseudo-inverse with the names flipped.
+function gauge_factors(::MessageCache, env, codomain, domain; pinv_kwargs...)
+    return balanced_eigh_and_inv(env, codomain, domain; pinv_kwargs...)
+end
+
+function gauge_factors(::SqrtMessageCache, env, codomain, domain; pinv_kwargs...)
+    return env, invert_diagonal_message(env, codomain, domain; pinv_kwargs...)
+end
 
 function apply_operator_bp!(
         dest::AbstractTensorNetwork, op::AbstractNamedDimsArray,
@@ -228,8 +245,8 @@ function apply_operator_bp_nsite!(
         envs_v = filter(e -> !isempty(intersect(dimnames(e), dimnames(state[v]))), envs)
         sqrt_envs_and_invs = map(envs_v) do env
             shared = intersect(dimnames(env), dimnames(state[v]))
-            return balanced_eigh_and_inv(
-                env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared);
+            return gauge_factors(
+                cache!, env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared);
                 pinv_kwargs...
             )
         end
@@ -252,14 +269,16 @@ function apply_operator_bp_nsite!(
     envs_v2 = filter(e -> !isempty(intersect(dimnames(e), dimnames(state[v2]))), envs)
     sqrt_envs_and_invs_v1 = map(envs_v1) do env
         shared = intersect(dimnames(env), dimnames(state[v1]))
-        return balanced_eigh_and_inv(
-            env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared); pinv_kwargs...
+        return gauge_factors(
+            cache!, env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared);
+            pinv_kwargs...
         )
     end
     sqrt_envs_and_invs_v2 = map(envs_v2) do env
         shared = intersect(dimnames(env), dimnames(state[v2]))
-        return balanced_eigh_and_inv(
-            env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared); pinv_kwargs...
+        return gauge_factors(
+            cache!, env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared);
+            pinv_kwargs...
         )
     end
     sqrt_envs_v1, inv_sqrt_envs_v1 =
@@ -280,12 +299,22 @@ function apply_operator_bp_nsite!(
         ψ_v2, Tuple(setdiff(dimnames(ψ_v2), bond, s_v2)), (bond..., s_v2...)
     )
     blob = NDA.apply(op, R_v1 * R_v2)
-    R_v1, R_v2 = balanced_svd(
+    # Raw SVD `blob ≈ U · diag(σ) · V`, with `U` and `V` sharing a single bond
+    # name. Absorb `√σ` symmetrically into the new `R_v1`, `R_v2` ("balanced
+    # gauge"); the same `√σ` becomes the sqrt-message we write back to
+    # `cache!` on the (v1, v2) edge below.
+    U, σ, V = svd_compact_named(
         blob,
         Tuple(intersect(dimnames(blob), dimnames(R_v1))),
         Tuple(intersect(dimnames(blob), dimnames(R_v2)));
         trunc
     )
+    sqrtσ = sqrt.(σ)
+    bond_name = only(intersect(dimnames(U), dimnames(V)))
+    new_bond = randname(bond_name)
+    sqrt_S = nameddims(diagm(sqrtσ), (bond_name, new_bond))
+    R_v1 = U * sqrt_S
+    R_v2 = sqrt_S * V
 
     ψ_v1 = prod([[Q_v1 * R_v1]; inv_sqrt_envs_v1])
     ψ_v2 = prod([[Q_v2 * R_v2]; inv_sqrt_envs_v2])
@@ -295,5 +324,20 @@ function apply_operator_bp_nsite!(
     end
     dest[v1] = ψ_v1
     dest[v2] = ψ_v2
+
+    # Write fresh sqrt-messages on the (v1, v2) edge of the cache, so that the
+    # cache stays consistent with the new bond name and weights in `dest`.
+    update_sqrt_message_cache!(cache!, v1, v2, sqrtσ, new_bond)
     return dest
+end
+
+update_sqrt_message_cache!(::MessageCache, args...) = nothing
+
+function update_sqrt_message_cache!(
+        cache!::SqrtMessageCache, v1, v2, sqrtσ, bond_name
+    )
+    W = diagm(sqrtσ)
+    cache![v1 => v2] = nameddims(W, (randname(bond_name), bond_name))
+    cache![v2 => v1] = nameddims(W, (randname(bond_name), bond_name))
+    return cache!
 end
