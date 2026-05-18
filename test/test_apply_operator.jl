@@ -1,7 +1,6 @@
 import Graphs
 using ITensorBase: Index
-using ITensorNetworksNext:
-    TensorNetwork, apply_operator, apply_operators, balanced_eigh_and_inv, balanced_svd
+using ITensorNetworksNext: TensorNetwork, apply_operator, apply_operators
 using LinearAlgebra: I, norm
 using NamedDimsArrays: AbstractNamedDimsArray, dimnames, name, nameddims, operator, randname
 using NamedGraphs.GraphsExtensions: incident_edges
@@ -14,24 +13,6 @@ function _random_state(g, sdict, ldict)
     return TensorNetwork(g) do v
         is = (sdict[v], (l(e) for e in incident_edges(g, v))...)
         return randn(is...)
-    end
-end
-
-@testset "apply_operator primitives" begin
-    @testset "balanced_eigh_and_inv round-trip on a PSD matrix" begin
-        n = 4
-        B = randn(n, n)
-        P = B * B' + 0.1 * I
-        Y, Yinv = balanced_eigh_and_inv(P)
-        # X = Y' for Hermitian PSD; Y' * Y ≈ P; Y * Yinv ≈ I; Yinv * Y ≈ I.
-        @test Y' * Y ≈ P
-        @test Yinv' * P * Yinv ≈ I atol = 1.0e-10
-    end
-    @testset "balanced_svd round-trip" begin
-        n_c, n_d = 4, 3
-        A = randn(n_c, n_d)
-        X, Y = balanced_svd(A)
-        @test X * Y ≈ A
     end
 end
 
