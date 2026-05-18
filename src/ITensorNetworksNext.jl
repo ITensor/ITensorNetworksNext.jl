@@ -16,6 +16,7 @@ include("contract_network.jl")
 include("beliefpropagation/messagecache.jl")
 include("beliefpropagation/beliefpropagation.jl")
 
+include("apply/tensoralgebra.jl")
 include("apply/apply_operators.jl")
 
 end
