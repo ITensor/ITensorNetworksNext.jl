@@ -65,6 +65,6 @@ function MAK.inv_regularized(
         a::AbstractNamedDimsArray, dimnames_codomain; kwargs...
     )
     codomain_names = name.(dimnames_codomain)
-    domain_names = Tuple(setdiff(dimnames(a), codomain_names))
+    domain_names = setdiff(dimnames(a), codomain_names)
     return MAK.inv_regularized(a, codomain_names, domain_names; kwargs...)
 end
