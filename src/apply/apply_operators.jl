@@ -4,7 +4,8 @@ using Base: @kwdef
 using Graphs: dst, src, vertices
 using LinearAlgebra: I, diag, diagm, norm
 using MatrixAlgebraKit: MatrixAlgebraKit
-using NamedDimsArrays: AbstractNamedDimsArray, dimnames, domainnames, nameddims, randname
+using NamedDimsArrays:
+    AbstractNamedDimsArray, dimnames, domainnames, name, nameddims, randname
 using NamedGraphs.GraphsExtensions: all_edges, boundary_edges
 using TensorAlgebra: TensorAlgebra
 
@@ -206,6 +207,23 @@ end
 # directed edge are sqrt-form (√M), so they are used as gauge-in factors
 # directly and only the (regularized) inverse is needed for gauge-out.
 
+# Inverse of a 2-leg diagonal `env` with names `(codomain..., domain...)`,
+# returned as a 2-leg named array with names `(domain..., codomain...)`
+# (flipped, so it can be contracted to undo a gauge-in). Regularized via
+# `MatrixAlgebraKit.inv_regularized`. Assumes `env` is diagonal — appropriate
+# for the sqrt-message Vidal-gauge cache used here.
+function invert_diagonal_message(env::AbstractNamedDimsArray, codomain, domain; tol = 0)
+    codomain_names = name.(codomain)
+    domain_names = name.(domain)
+    biperm = TensorAlgebra.blockedperm_indexin(
+        Tuple.((dimnames(env), codomain_names, domain_names))...
+    )
+    perm_co, perm_dom = TensorAlgebra.blocks(biperm)
+    env_perm = TensorAlgebra.bipermutedims(env.denamed, perm_co, perm_dom)
+    inv_σ = MatrixAlgebraKit.inv_regularized.(diag(env_perm), tol)
+    return nameddims(diagm(inv_σ), (domain_names..., codomain_names...))
+end
+
 function apply_gate_bp!(
         dest::AbstractTensorNetwork, op::AbstractNamedDimsArray,
         state::AbstractTensorNetwork; kwargs...
@@ -284,22 +302,24 @@ function apply_gate_bp_nsite!(
         ψ_v2, Tuple(setdiff(dimnames(ψ_v2), bond, s_v2)), (bond..., s_v2...)
     )
     blob = NDA.apply(op, R_v1 * R_v2)
-    # Raw SVD `blob ≈ U · diag(σ) · V`, with `U` and `V` sharing a single bond
-    # name. Absorb `√σ` symmetrically into the new `R_v1`, `R_v2` ("balanced
-    # gauge"); the same `√σ` becomes the sqrt-message we write back to
-    # `cache!` on the (v1, v2) edge below.
-    U, σ, V = svd_compact_named(
+    # `blob ≈ U · S · V`, with `S` a 2-leg diagonal NamedDimsArray on
+    # `(name_u, name_v)`. Absorb `√S` symmetrically into the new `R_v1`,
+    # `R_v2` ("balanced gauge") and unify the two SVD bond names into a
+    # single fresh `new_bond` so the gauged tensors share one bond; the
+    # same `√σ` becomes the sqrt-message written back to `cache!` below.
+    U, S, V = TensorAlgebra.svd(
         blob,
         Tuple(intersect(dimnames(blob), dimnames(R_v1))),
         Tuple(intersect(dimnames(blob), dimnames(R_v2)));
         trunc
     )
-    sqrtσ = sqrt.(σ)
-    bond_name = only(intersect(dimnames(U), dimnames(V)))
-    new_bond = randname(bond_name)
-    sqrt_S = nameddims(diagm(sqrtσ), (bond_name, new_bond))
-    R_v1 = U * sqrt_S
-    R_v2 = sqrt_S * V
+    name_u, name_v = dimnames(S)
+    sqrtσ = sqrt.(diag(S.denamed))
+    new_bond = randname(name_u)
+    sqrt_S_left = nameddims(diagm(sqrtσ), (name_u, new_bond))
+    sqrt_S_right = nameddims(diagm(sqrtσ), (new_bond, name_v))
+    R_v1 = U * sqrt_S_left
+    R_v2 = sqrt_S_right * V
 
     ψ_v1 = prod([[Q_v1 * R_v1]; inv_sqrt_envs_v1])
     ψ_v2 = prod([[Q_v2 * R_v2]; inv_sqrt_envs_v2])
