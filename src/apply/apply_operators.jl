@@ -257,10 +257,10 @@ function apply_gate_bp_nsite!(
     # Site legs of `op` at v1 / v2 — `intersect` rather than
     # `sitenames(state, v_i)` so we only put the *actually-acted-on* site
     # legs into the qr domain (the gate may touch a strict subset).
-    s_v1 = intersect(dimnames.((ψ_v1, op))...)
-    s_v2 = intersect(dimnames.((ψ_v2, op))...)
-    Q_v1, R_v1 = TA.qr(ψ_v1, setdiff(dimnames.((ψ_v1, ψ_v2))..., s_v1))
-    Q_v2, R_v2 = TA.qr(ψ_v2, setdiff(dimnames.((ψ_v2, ψ_v1))..., s_v2))
+    s_v1 = intersect(dimnames(ψ_v1), dimnames(op))
+    s_v2 = intersect(dimnames(ψ_v2), dimnames(op))
+    Q_v1, R_v1 = TA.qr(ψ_v1, setdiff(dimnames(ψ_v1), dimnames(ψ_v2), s_v1))
+    Q_v2, R_v2 = TA.qr(ψ_v2, setdiff(dimnames(ψ_v2), dimnames(ψ_v1), s_v2))
     op_R_v1v2 = NDA.apply(op, R_v1 * R_v2)
     # `op_R_v1v2 ≈ U · S · V`, with `S` a 2-leg diagonal NamedDimsArray
     # on `(name_u, name_v)`. Absorb `√S` symmetrically into the new
