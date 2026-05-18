@@ -3,6 +3,7 @@ import NamedDimsArrays as NDA
 using Base: @kwdef
 using Graphs: dst, src, vertices
 using LinearAlgebra: I, diag, diagm, norm
+using MatrixAlgebraKit: MatrixAlgebraKit
 using NamedDimsArrays: AbstractNamedDimsArray, dimnames, domainnames, nameddims, randname
 using NamedGraphs.GraphsExtensions: all_edges, boundary_edges
 using TensorAlgebra: TensorAlgebra
@@ -227,7 +228,7 @@ function apply_gate_bp_nsite!(
         sqrt_envs = filter(e -> !isempty(intersect(dimnames(e), dimnames(state[v]))), envs)
         inv_sqrt_envs = map(sqrt_envs) do env
             shared = intersect(dimnames(env), dimnames(state[v]))
-            return inv_regularized(
+            return MatrixAlgebraKit.inv_regularized(
                 env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared);
                 pinv_kwargs...
             )
@@ -250,13 +251,13 @@ function apply_gate_bp_nsite!(
     sqrt_envs_v2 = filter(e -> !isempty(intersect(dimnames(e), dimnames(state[v2]))), envs)
     inv_sqrt_envs_v1 = map(sqrt_envs_v1) do env
         shared = intersect(dimnames(env), dimnames(state[v1]))
-        return inv_regularized(
+        return MatrixAlgebraKit.inv_regularized(
             env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared); pinv_kwargs...
         )
     end
     inv_sqrt_envs_v2 = map(sqrt_envs_v2) do env
         shared = intersect(dimnames(env), dimnames(state[v2]))
-        return inv_regularized(
+        return MatrixAlgebraKit.inv_regularized(
             env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared); pinv_kwargs...
         )
     end
