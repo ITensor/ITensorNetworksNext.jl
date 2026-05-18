@@ -1,7 +1,28 @@
-using LinearAlgebra: Hermitian, adjoint, diag, eigen
+using LinearAlgebra: Hermitian, adjoint, diag, diagm, eigen
 using MatrixAlgebraKit: MatrixAlgebraKit
 using NamedDimsArrays: AbstractNamedDimsArray, dimnames, name, nameddims, randname
 using TensorAlgebra: TensorAlgebra
+
+"""
+    invert_diagonal_message(env::AbstractNamedDimsArray, codomain, domain; tol=0)
+
+Inverse of a 2-leg diagonal `env` with names `(codomain..., domain...)`, returned
+as a 2-leg named array with names `(domain..., codomain...)` (flipped, so it can
+be contracted to undo a gauge-in). Regularized via `MatrixAlgebraKit.inv_regularized`.
+Assumes `env` is diagonal — appropriate for sqrt-message Vidal-gauge caches.
+"""
+function invert_diagonal_message(env::AbstractNamedDimsArray, codomain, domain; tol = 0)
+    codomain_names = name.(codomain)
+    domain_names = name.(domain)
+    biperm = TensorAlgebra.blockedperm_indexin(
+        Tuple.((dimnames(env), codomain_names, domain_names))...
+    )
+    perm_co, perm_dom = TensorAlgebra.blocks(biperm)
+    env_perm = TensorAlgebra.bipermutedims(env.denamed, perm_co, perm_dom)
+    σ = diag(env_perm)
+    inv_σ = MatrixAlgebraKit.inv_regularized.(σ, tol)
+    return nameddims(diagm(inv_σ), (domain_names..., codomain_names...))
+end
 
 function balanced_eigh_and_inv(
         A::AbstractMatrix;
@@ -58,6 +79,65 @@ function balanced_eigh_and_inv(P::AbstractNamedDimsArray, codomain, domain; kwar
     Y = nameddims(Y_d, (bond_name, domain_names...))
     Yinv = nameddims(Yinv_d, (domain_names..., bond_name))
     return Y, Yinv
+end
+
+"""
+    svd_compact_named(A; trunc=nothing)
+    svd_compact_named(A, ndims_codomain::Val; trunc=nothing)
+    svd_compact_named(A, perm_codomain, perm_domain; trunc=nothing)
+    svd_compact_named(A, codomain, domain; trunc=nothing)
+
+Like `MatrixAlgebraKit.svd_compact` / `svd_trunc`, but for `(Abstract)NamedDimsArray`
+inputs returns `(U, σ, V)` where `U` has names `(codomain..., bond_name)`,
+`V` has names `(bond_name, domain...)`, and `σ` is the singular-value
+`Vector`. A single `bond_name` is shared by `U` and `V` (unlike
+`TensorAlgebra.svd`, which inserts a 2-leg singular-value matrix with two
+distinct bond names).
+"""
+function svd_compact_named(A::AbstractMatrix; trunc = nothing)
+    U, S, Vᴴ = if isnothing(trunc)
+        MatrixAlgebraKit.svd_compact(Matrix(A))
+    else
+        MatrixAlgebraKit.svd_trunc(Matrix(A); trunc)
+    end
+    return U, diag(S), Vᴴ
+end
+
+function svd_compact_named(A::AbstractArray, ndims_codomain::Val; kwargs...)
+    style = TensorAlgebra.FusionStyle(A)
+    A_mat = TensorAlgebra.matricize(style, A, ndims_codomain)
+    U_mat, σ, V_mat = svd_compact_named(A_mat; kwargs...)
+    biperm = TensorAlgebra.trivialbiperm(ndims_codomain, Val(ndims(A)))
+    axes_co, axes_dom = TensorAlgebra.blocks(axes(A)[biperm])
+    ax_bond = (axes(U_mat, 2),)
+    axes_U = TensorAlgebra.tuplemortar((axes_co, ax_bond))
+    axes_V = TensorAlgebra.tuplemortar((ax_bond, axes_dom))
+    U = TensorAlgebra.unmatricize(style, U_mat, axes_U)
+    V = TensorAlgebra.unmatricize(style, V_mat, axes_V)
+    return U, σ, V
+end
+
+function svd_compact_named(
+        A::AbstractArray,
+        perm_codomain::Tuple{Vararg{Int}}, perm_domain::Tuple{Vararg{Int}};
+        kwargs...
+    )
+    A_perm = TensorAlgebra.bipermutedims(A, perm_codomain, perm_domain)
+    return svd_compact_named(A_perm, Val(length(perm_codomain)); kwargs...)
+end
+
+function svd_compact_named(A::AbstractNamedDimsArray, codomain, domain; kwargs...)
+    codomain_names = name.(codomain)
+    domain_names = name.(domain)
+    biperm = TensorAlgebra.blockedperm_indexin(
+        Tuple.((dimnames(A), codomain_names, domain_names))...
+    )
+    perm_co, perm_dom = TensorAlgebra.blocks(biperm)
+    U_d, σ, V_d = svd_compact_named(A.denamed, perm_co, perm_dom; kwargs...)
+    bond_name = randname(first(codomain_names))
+    U = nameddims(U_d, (codomain_names..., bond_name))
+    V = nameddims(V_d, (bond_name, domain_names...))
+    return U, σ, V
 end
 
 function balanced_svd(A::AbstractMatrix; trunc = nothing)
