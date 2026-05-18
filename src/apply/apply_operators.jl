@@ -1,12 +1,12 @@
 import AlgorithmsInterface as AI
+import MatrixAlgebraKit as MAK
 import NamedDimsArrays as NDA
+import TensorAlgebra as TA
 using Base: @kwdef
 using Graphs: dst, src, vertices
 using LinearAlgebra: I, diag, diagm, norm
-using MatrixAlgebraKit: MatrixAlgebraKit
 using NamedDimsArrays: AbstractNamedDimsArray, dimnames, domainnames, nameddims, randname
 using NamedGraphs.GraphsExtensions: all_edges, boundary_edges
-using TensorAlgebra: TensorAlgebra
 
 # === NestedAlgorithm framework ===
 
@@ -96,7 +96,7 @@ function initialize_subproblem(
     subproblem = ApplyOperatorProblem(; op = op_i, init = state.iterate)
     subalgorithm = algorithm.operator_algorithm
     substate = AI.initialize_state(
-        subproblem, subalgorithm; iterate = state.iterate, cache! = state.cache
+        subproblem, subalgorithm; state.iterate, cache! = state.cache
     )
     return subproblem, subalgorithm, substate
 end
@@ -224,8 +224,7 @@ function apply_gate_bp_nsite!(
     v = only(vs)
     ψv = NDA.apply(op, state[v])
     if normalize
-        envs = [cache![e] for e in boundary_edges(cache!, vs; dir = :in)]
-        sqrt_envs = filter(e -> !isempty(intersect(dimnames(e), dimnames(state[v]))), envs)
+        sqrt_envs = [cache![e] for e in boundary_edges(cache!, vs; dir = :in)]
         ψv /= norm(prod([[ψv]; sqrt_envs]))
     end
     dest[v] = ψv
@@ -238,44 +237,41 @@ function apply_gate_bp_nsite!(
         cache!, trunc, pinv_kwargs, normalize
     )
     v1, v2 = vs
-    envs = [cache![e] for e in boundary_edges(cache!, vs; dir = :in)]
-    sqrt_envs_v1 = filter(e -> !isempty(intersect(dimnames(e), dimnames(state[v1]))), envs)
-    sqrt_envs_v2 = filter(e -> !isempty(intersect(dimnames(e), dimnames(state[v2]))), envs)
+    edges_in = boundary_edges(cache!, vs; dir = :in)
+    sqrt_envs_v1 = [cache![e] for e in edges_in if dst(e) == v1]
+    sqrt_envs_v2 = [cache![e] for e in edges_in if dst(e) == v2]
     inv_sqrt_envs_v1 = map(sqrt_envs_v1) do env
-        shared = intersect(dimnames(env), dimnames(state[v1]))
-        return MatrixAlgebraKit.inv_regularized(
-            env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared); pinv_kwargs...
+        return MAK.inv_regularized(
+            env, setdiff(dimnames(env), dimnames(state[v1])); pinv_kwargs...
         )
     end
     inv_sqrt_envs_v2 = map(sqrt_envs_v2) do env
-        shared = intersect(dimnames(env), dimnames(state[v2]))
-        return MatrixAlgebraKit.inv_regularized(
-            env, Tuple(setdiff(dimnames(env), shared)), Tuple(shared); pinv_kwargs...
+        return MAK.inv_regularized(
+            env, setdiff(dimnames(env), dimnames(state[v2])); pinv_kwargs...
         )
     end
 
     ψ_v1 = prod([[state[v1]]; sqrt_envs_v1])
     ψ_v2 = prod([[state[v2]]; sqrt_envs_v2])
 
-    s_v1 = sitenames(state, v1)
-    s_v2 = sitenames(state, v2)
-    bond = Tuple(intersect(dimnames(ψ_v1), dimnames(ψ_v2)))
-    Q_v1, R_v1 = TensorAlgebra.qr(
-        ψ_v1, Tuple(setdiff(dimnames(ψ_v1), bond, s_v1)), (bond..., s_v1...)
-    )
-    Q_v2, R_v2 = TensorAlgebra.qr(
-        ψ_v2, Tuple(setdiff(dimnames(ψ_v2), bond, s_v2)), (bond..., s_v2...)
-    )
-    blob = NDA.apply(op, R_v1 * R_v2)
-    # `blob ≈ U · S · V`, with `S` a 2-leg diagonal NamedDimsArray on
-    # `(name_u, name_v)`. Absorb `√S` symmetrically into the new `R_v1`,
-    # `R_v2` ("balanced gauge") and unify the two SVD bond names into a
-    # single fresh `new_bond` so the gauged tensors share one bond; the
-    # same `√σ` becomes the sqrt-message written back to `cache!` below.
-    U, S, V = TensorAlgebra.svd(
-        blob,
-        Tuple(intersect(dimnames(blob), dimnames(R_v1))),
-        Tuple(intersect(dimnames(blob), dimnames(R_v2)));
+    # Site legs of `op` at v1 / v2 — `intersect` rather than
+    # `sitenames(state, v_i)` so we only put the *actually-acted-on* site
+    # legs into the qr domain (the gate may touch a strict subset).
+    s_v1 = intersect(dimnames.((ψ_v1, op))...)
+    s_v2 = intersect(dimnames.((ψ_v2, op))...)
+    Q_v1, R_v1 = TA.qr(ψ_v1, setdiff(dimnames.((ψ_v1, ψ_v2))..., s_v1))
+    Q_v2, R_v2 = TA.qr(ψ_v2, setdiff(dimnames.((ψ_v2, ψ_v1))..., s_v2))
+    op_R_v1v2 = NDA.apply(op, R_v1 * R_v2)
+    # `op_R_v1v2 ≈ U · S · V`, with `S` a 2-leg diagonal NamedDimsArray
+    # on `(name_u, name_v)`. Absorb `√S` symmetrically into the new
+    # `R_v1`, `R_v2` ("balanced gauge") and unify the two SVD bond names
+    # into a single fresh `new_bond` so the gauged tensors share one
+    # bond; the same `√σ` becomes the sqrt-message written back to
+    # `cache!` below.
+    U, S, V = TA.svd(
+        op_R_v1v2,
+        intersect(dimnames(op_R_v1v2), dimnames(R_v1)),
+        intersect(dimnames(op_R_v1v2), dimnames(R_v2));
         trunc
     )
     name_u, name_v = dimnames(S)

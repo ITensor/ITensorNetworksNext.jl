@@ -1,7 +1,7 @@
 # Local stand-ins for a general regularized pseudo-inverse, split across
 # the two upstream namespaces it's intended to live in:
 #
-#   * `MatrixAlgebraKit.inv_regularized(A::AbstractMatrix, tol; kwargs...)`
+#   * `MAK.inv_regularized(A::AbstractMatrix, tol; kwargs...)`
 #     already exists upstream as the matrix-layer pseudo-inverse.
 #
 #   * `inv_regularized(A::AbstractArray, ::Val; kwargs...)` (N-d unnamed) is
@@ -9,7 +9,7 @@
 #     `TensorAlgebra.jl` as `TensorAlgebra.inv_regularized`, alongside its
 #     existing `TA.svd` / `TA.qr` overload set.
 #
-#   * `MatrixAlgebraKit.inv_regularized(a::AbstractNamedDimsArray, ...)` is
+#   * `MAK.inv_regularized(a::AbstractNamedDimsArray, ...)` is
 #     added here, extending MAK's function directly for named arrays.
 #     Intended to move into `NamedDimsArrays.jl` (mirroring how NDA already
 #     extends `TA.svd` for named arrays).
@@ -19,7 +19,7 @@
 # layers in distinct function namespaces (avoiding cross-layer dispatch
 # ambiguity) and matches the planned upstream landing.
 
-using MatrixAlgebraKit: MatrixAlgebraKit
+import MatrixAlgebraKit as MAK
 using NamedDimsArrays: AbstractNamedDimsArray, denamed, dimnames, name, nameddims
 using TensorAlgebra: TensorAlgebra
 
@@ -30,8 +30,8 @@ function inv_regularized(
         tol = nothing, kwargs...
     )
     A_mat = TensorAlgebra.matricize(style, A, ndims_codomain)
-    tol_value = isnothing(tol) ? MatrixAlgebraKit.defaulttol(A_mat) : tol
-    Ainv_mat = MatrixAlgebraKit.inv_regularized(A_mat, tol_value; kwargs...)
+    tol_value = isnothing(tol) ? MAK.defaulttol(A_mat) : tol
+    Ainv_mat = MAK.inv_regularized(A_mat, tol_value; kwargs...)
     biperm = TensorAlgebra.trivialbiperm(ndims_codomain, Val(ndims(A)))
     axes_codomain, axes_domain = TensorAlgebra.blocks(axes(A)[biperm])
     axes_Ainv = TensorAlgebra.tuplemortar((axes_domain, axes_codomain))
@@ -41,9 +41,9 @@ function inv_regularized(A::AbstractArray, ndims_codomain::Val; kwargs...)
     return inv_regularized(TensorAlgebra.FusionStyle(A), A, ndims_codomain; kwargs...)
 end
 
-# === NamedDimsArrays layer (extends `MatrixAlgebraKit.inv_regularized`) ===
+# === NamedDimsArrays layer (extends `MAK.inv_regularized`) ===
 
-function MatrixAlgebraKit.inv_regularized(
+function MAK.inv_regularized(
         a::AbstractNamedDimsArray, dimnames_codomain, dimnames_domain; kwargs...
     )
     codomain_names = name.(dimnames_codomain)
@@ -55,4 +55,16 @@ function MatrixAlgebraKit.inv_regularized(
     A_perm = TensorAlgebra.bipermutedims(denamed(a), perm_codomain, perm_domain)
     Ainv_denamed = inv_regularized(A_perm, Val(length(perm_codomain)); kwargs...)
     return nameddims(Ainv_denamed, (domain_names..., codomain_names...))
+end
+
+# Short form: supply the codomain dimnames; the domain is inferred as the
+# complement. Matches the 2-arg convention used by `TA.qr` / `TA.lq` /
+# `TA.factorize` / `TA.orth` / `TA.polar` for named arrays
+# (see `NamedDimsArrays/src/tensoralgebra.jl`).
+function MAK.inv_regularized(
+        a::AbstractNamedDimsArray, dimnames_codomain; kwargs...
+    )
+    codomain_names = name.(dimnames_codomain)
+    domain_names = Tuple(setdiff(dimnames(a), codomain_names))
+    return MAK.inv_regularized(a, codomain_names, domain_names; kwargs...)
 end
