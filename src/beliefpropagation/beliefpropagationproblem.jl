@@ -1,5 +1,6 @@
 import .AlgorithmsInterfaceExtensions as AIE
 import AlgorithmsInterface as AI
+using .AlgorithmsInterfaceExtensions: StopWhenConverged, iterate_diff
 using BackendSelection: @Algorithm_str, Algorithm
 using DataGraphs: edge_data
 using Graphs: AbstractEdge, edges, has_edge, vertices
@@ -240,67 +241,9 @@ function AI.solve_loop!(
     return state
 end
 
-# === `StopWhenConverged` stopping criterion ===
+# === `iterate_diff` for `MessageCache` (used by `AIE.StopWhenConverged`) ===
 
-@kwdef struct StopWhenConverged <: AI.StoppingCriterion
-    tol::Float64
-end
-
-@kwdef mutable struct StopWhenConvergedState{Iterate} <: AI.StoppingCriterionState
-    delta::Float64 = Inf
-    at_iteration::Int = -1
-    previous_iterate::Iterate
-end
-
-function AI.initialize_state(::AI.Problem, ::AI.Algorithm, ::StopWhenConverged; iterate)
-    return StopWhenConvergedState(; previous_iterate = copy(iterate))
-end
-
-function AI.initialize_state!(
-        ::AI.Problem, ::AI.Algorithm, ::StopWhenConverged, st::StopWhenConvergedState
-    )
-    st.delta = Inf
-    return st
-end
-
-function AI.is_finished!(
-        problem::AI.Problem,
-        algorithm::AI.Algorithm,
-        state::AI.State,
-        c::StopWhenConverged,
-        st::StopWhenConvergedState
-    )
-    iterate = state.iterate
-    previous_iterate = st.previous_iterate
-
-    delta = iterate_diff(iterate, previous_iterate)
-
-    st.previous_iterate = copy(iterate)
-
-    # delta = 0 initially, so skip this the first time.
-    state.iteration == 0 && return false
-
-    st.delta = delta
-
-    if AI.is_finished(problem, algorithm, state, c, st)
-        st.at_iteration = state.iteration
-        return true
-    end
-
-    return false
-end
-
-function AI.is_finished(
-        ::AI.Problem,
-        ::AI.Algorithm,
-        ::AI.State,
-        c::StopWhenConverged,
-        st::StopWhenConvergedState
-    )
-    return st.delta < c.tol
-end
-
-function iterate_diff(cache1::MessageCache, cache2::MessageCache)
+function AIE.iterate_diff(cache1::MessageCache, cache2::MessageCache)
     return maximum(edges(cache1)) do edge
         m1 = cache1[edge]
         m2 = cache2[edge]

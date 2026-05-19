@@ -31,4 +31,70 @@ function AI.step!(problem::AI.Problem, algorithm::NestedAlgorithm, state::AI.Sta
     return state
 end
 
+# ============================ StopWhenConverged ===========================================
+
+# Stopping criterion that fires once `iterate_diff(iterate, previous_iterate) < tol`.
+# Concrete iterate types must supply an `iterate_diff` method.
+function iterate_diff(a, b)
+    return throw(MethodError(iterate_diff, (a, b)))
+end
+
+@kwdef struct StopWhenConverged <: AI.StoppingCriterion
+    tol::Float64
+end
+
+@kwdef mutable struct StopWhenConvergedState{Iterate} <: AI.StoppingCriterionState
+    delta::Float64 = Inf
+    at_iteration::Int = -1
+    previous_iterate::Iterate
+end
+
+function AI.initialize_state(::AI.Problem, ::AI.Algorithm, ::StopWhenConverged; iterate)
+    return StopWhenConvergedState(; previous_iterate = copy(iterate))
+end
+
+function AI.initialize_state!(
+        ::AI.Problem, ::AI.Algorithm, ::StopWhenConverged, st::StopWhenConvergedState
+    )
+    st.delta = Inf
+    return st
+end
+
+function AI.is_finished!(
+        problem::AI.Problem,
+        algorithm::AI.Algorithm,
+        state::AI.State,
+        c::StopWhenConverged,
+        st::StopWhenConvergedState
+    )
+    iterate = state.iterate
+    previous_iterate = st.previous_iterate
+
+    delta = iterate_diff(iterate, previous_iterate)
+
+    st.previous_iterate = copy(iterate)
+
+    # delta = 0 initially, so skip this the first time.
+    state.iteration == 0 && return false
+
+    st.delta = delta
+
+    if AI.is_finished(problem, algorithm, state, c, st)
+        st.at_iteration = state.iteration
+        return true
+    end
+
+    return false
+end
+
+function AI.is_finished(
+        ::AI.Problem,
+        ::AI.Algorithm,
+        ::AI.State,
+        c::StopWhenConverged,
+        st::StopWhenConvergedState
+    )
+    return st.delta < c.tol
+end
+
 end
