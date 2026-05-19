@@ -22,7 +22,8 @@
 import MatrixAlgebraKit as MAK
 import TensorAlgebra as TA
 using LinearAlgebra: I
-using NamedDimsArrays: AbstractNamedDimsArray, denamed, dimnames, name, nameddims, randname
+using NamedDimsArrays: AbstractNamedDimsArray, AbstractNamedDimsOperator, codomainnames,
+    denamed, dimnames, domainnames, name, nameddims, operator, randname, setname, state
 
 # === N-d / TensorAlgebra layer ===
 
@@ -69,37 +70,26 @@ function MAK.inv_regularized(
     return MAK.inv_regularized(a, codomain_names, domain_names; kwargs...)
 end
 
-# === identity_map ===
-#
-# 2k-leg identity *map* (pairwise δ per (co_i, dom_i)):
-# `I_{co_1, dom_1} ⊗ … ⊗ I_{co_k, dom_k}` reshaped to a 2k-leg tensor.
-#
-# Local stand-in: dense-only. Eventual home is `TensorAlgebra.jl` with
-# an `AbstractNamedDimsArray` overload and axis-type dispatch for the
-# graded / FusionTensor specializations (see
-# `gate_application/Overview.md` in `ITensorDevelopmentPlans`).
-
-function identity_map(::Type{T}, codomain_axes, domain_axes) where {T}
+function similar_operator(prototype::AbstractNamedDimsArray, codomain_axes)
     co_axes = Tuple(codomain_axes)
-    dom_axes = Tuple(domain_axes)
-    co_lens = length.(co_axes)
-    dom_lens = length.(dom_axes)
-    n_co = prod(co_lens; init = 1)
-    n_dom = prod(dom_lens; init = 1)
-    return reshape(Matrix{T}(I, n_co, n_dom), (co_lens..., dom_lens...))
+    dom_axes = setname.(co_axes, randname.(name.(co_axes)))
+    A = similar(denamed(prototype), (co_axes..., dom_axes...))
+    return operator(A, collect(name.(co_axes)), collect(name.(dom_axes)))
 end
 
-# Note: the BP simple-update `√S` split uses NDA's existing
-# `Base.sqrt(::AbstractNamedDimsArray, codomain_dimnames,
-# domain_dimnames)` (matrix sqrt as a single named array) directly,
-# combined with explicit `replacedimnames` at the call site to split
-# the result into two factors sharing a fresh bond. See the comment in
-# `apply_gate_bp_nsite!` (Val{2} method) for the call-site
-# choreography. A tuple-returning `factorize_sqrt` primitive — splitting
-# a Hermitian PSD `M` into `(X, Y)` with a fresh shared bond — was
-# previously staged here as a local stand-in but isn't needed for the
-# current `√S` use case (K=1 codomain). It can be reintroduced when a
-# multi-codomain (K>1) factorization use case lands, alongside the
-# rest of the `factorize_<backend>` family
-# (`factorize_balanced_eigh`, `factorize_cholesky`) discussed in
-# `gate_application/Overview.md` in `ITensorDevelopmentPlans`.
+function Base.one(a::AbstractNamedDimsOperator)
+    co = codomainnames(a)
+    dom = domainnames(a)
+    A = state(a)
+    A_denamed = denamed(A)
+    style = TA.FusionStyle(A_denamed)
+    ndims_co = Val(length(co))
+    A_mat = TA.matricize(style, A_denamed, ndims_co)
+    id_mat = similar(A_mat)
+    copyto!(id_mat, I)
+    biperm = TA.trivialbiperm(ndims_co, Val(ndims(A_denamed)))
+    co_axes, dom_axes = TA.blocks(axes(A_denamed)[biperm])
+    id_denamed = TA.unmatricize(style, id_mat, co_axes, dom_axes)
+    id_nda = nameddims(id_denamed, dimnames(A))
+    return operator(id_nda, co, dom)
+end

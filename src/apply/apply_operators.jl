@@ -5,8 +5,8 @@ import TensorAlgebra as TA
 using Base: @kwdef
 using Graphs: dst, src, vertices
 using LinearAlgebra: norm
-using NamedDimsArrays:
-    AbstractNamedDimsArray, dimnames, domainnames, nameddims, randname, replacedimnames
+using NamedDimsArrays: AbstractNamedDimsArray, dimnames, domainnames, nameddims, randname,
+    replacedimnames, state
 using NamedGraphs.GraphsExtensions: all_edges, boundary_edges
 
 # === NestedAlgorithm framework ===
@@ -159,20 +159,13 @@ function AI.initialize_state!(
     return state
 end
 
-# Identity-message cache: trivial Vidal-gauge initialization where each bond
-# carries the identity 2-leg map (= √I = I, in sqrt-message form). Stored
-# in a `SqrtMessageCache` so the BP simple update knows to use the messages
-# as gauge-in factors directly and skip the √ step.
+# Initialize the BP message cache to identity square-root messages.
 function initialize_cache(
-        problem::ApplyOperatorProblem, ::BPApplyGate, iterate::AbstractTensorNetwork
+        ::ApplyOperatorProblem, ::BPApplyGate, iterate::AbstractTensorNetwork
     )
-    T = eltype(iterate[first(vertices(iterate))])
     return sqrtmessagecache(all_edges(iterate)) do edge
-        bond_name = only(linknames(iterate, edge))
-        bond_axis = only(linkaxes(iterate, edge))
-        fresh_name = randname(bond_name)
-        A = identity_map(T, (bond_axis,), (bond_axis,))
-        return nameddims(A, (fresh_name, bond_name))
+        factor = iterate[dst(edge)]
+        return state(one(similar_operator(factor, linkaxes(iterate, edge))))
     end
 end
 
