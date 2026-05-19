@@ -6,7 +6,7 @@
 #
 #   * `inv_regularized(A::AbstractArray, ::Val; kwargs...)` (N-d unnamed) is
 #     defined here in this package's namespace. Intended to move into
-#     `TensorAlgebra.jl` as `TensorAlgebra.inv_regularized`, alongside its
+#     `TensorAlgebra.jl` as `TA.inv_regularized`, alongside its
 #     existing `TA.svd` / `TA.qr` overload set.
 #
 #   * `MAK.inv_regularized(a::AbstractNamedDimsArray, ...)` is
@@ -20,26 +20,25 @@
 # ambiguity) and matches the planned upstream landing.
 
 import MatrixAlgebraKit as MAK
+import TensorAlgebra as TA
 using LinearAlgebra: I
 using NamedDimsArrays: AbstractNamedDimsArray, denamed, dimnames, name, nameddims, randname
-using TensorAlgebra: TensorAlgebra
 
 # === N-d / TensorAlgebra layer ===
 
 function inv_regularized(
-        style::TensorAlgebra.FusionStyle, A::AbstractArray, ndims_codomain::Val;
+        style::TA.FusionStyle, A::AbstractArray, ndims_codomain::Val;
         tol = nothing, kwargs...
     )
-    A_mat = TensorAlgebra.matricize(style, A, ndims_codomain)
+    A_mat = TA.matricize(style, A, ndims_codomain)
     tol_value = isnothing(tol) ? MAK.defaulttol(A_mat) : tol
     Ainv_mat = MAK.inv_regularized(A_mat, tol_value; kwargs...)
-    biperm = TensorAlgebra.trivialbiperm(ndims_codomain, Val(ndims(A)))
-    axes_codomain, axes_domain = TensorAlgebra.blocks(axes(A)[biperm])
-    axes_Ainv = TensorAlgebra.tuplemortar((axes_domain, axes_codomain))
-    return TensorAlgebra.unmatricize(style, Ainv_mat, axes_Ainv)
+    biperm = TA.trivialbiperm(ndims_codomain, Val(ndims(A)))
+    axes_codomain, axes_domain = TA.blocks(axes(A)[biperm])
+    return TA.unmatricize(style, Ainv_mat, axes_domain, axes_codomain)
 end
 function inv_regularized(A::AbstractArray, ndims_codomain::Val; kwargs...)
-    return inv_regularized(TensorAlgebra.FusionStyle(A), A, ndims_codomain; kwargs...)
+    return inv_regularized(TA.FusionStyle(A), A, ndims_codomain; kwargs...)
 end
 
 # === NamedDimsArrays layer (extends `MAK.inv_regularized`) ===
@@ -47,15 +46,15 @@ end
 function MAK.inv_regularized(
         a::AbstractNamedDimsArray, dimnames_codomain, dimnames_domain; kwargs...
     )
-    codomain_names = name.(dimnames_codomain)
-    domain_names = name.(dimnames_domain)
-    biperm = TensorAlgebra.blockedperm_indexin(
+    codomain_names = collect(name.(dimnames_codomain))
+    domain_names = collect(name.(dimnames_domain))
+    biperm = TA.blockedperm_indexin(
         Tuple.((dimnames(a), codomain_names, domain_names))...
     )
-    perm_codomain, perm_domain = TensorAlgebra.blocks(biperm)
-    A_perm = TensorAlgebra.bipermutedims(denamed(a), perm_codomain, perm_domain)
+    perm_codomain, perm_domain = TA.blocks(biperm)
+    A_perm = TA.bipermutedims(denamed(a), perm_codomain, perm_domain)
     Ainv_denamed = inv_regularized(A_perm, Val(length(perm_codomain)); kwargs...)
-    return nameddims(Ainv_denamed, (domain_names..., codomain_names...))
+    return nameddims(Ainv_denamed, [domain_names; codomain_names])
 end
 
 # Short form: supply the codomain dimnames; the domain is inferred as the
@@ -90,55 +89,57 @@ function identity_map(::Type{T}, codomain_axes, domain_axes) where {T}
     return reshape(Matrix{T}(I, n_co, n_dom), (co_lens..., dom_lens...))
 end
 
-# === sqrt_factorization ===
+# === balanced_eigh_factorization ===
 #
-# Factor a PSD named array `a` as `(X, Y)` with `X * Y ≈ a` via named
-# contraction, where `X` and `Y` share a fresh-named bond. For
-# k-codomain input, `X` has names `(codomain..., new_bond)` and `Y`
-# has names `(new_bond, domain...)`.
+# Balanced eigh-based factorization of a Hermitian PSD named array `a`:
+# returns `(X, Y)` with `X * Y ≈ a` via named contraction, sharing a
+# fresh-named bond. For k-codomain input, `X` has names
+# `(codomain..., new_bond)` and `Y` has names `(new_bond, domain...)`.
+#
+# Conceptually: `a = U Λ U†` via eigh, then split Λ = √Λ · √Λ symmetrically
+# between the two halves so `X = U √Λ` and `Y = √Λ U†`. For
+# diagonal-Hermitian-PSD input (the BP simple-update SVD-`S` case),
+# eigh is trivial and this reduces to the per-element √ split.
 #
 # Layered through `TA.matricize` → matrix `sqrt` → `TA.unmatricize`,
 # matching the shape of `inv_regularized` above. The N-d / TA layer
-# is namespaced locally (intended TensorAlgebra.sqrt_factorization),
-# the named layer extends here.
+# is namespaced locally (intended `TA.balanced_eigh_factorization`),
+# the named layer extends here. See `gate_application/Overview.md` in
+# `ITensorDevelopmentPlans` for the operator-design synthesis this
+# slots into (`balanced_eigh_factor` single-factor companion,
+# `cholesky_factor`, `positive_factor` umbrella).
 
-function sqrt_factorization(
-        style::TensorAlgebra.FusionStyle, A::AbstractArray, ndims_codomain::Val
+function balanced_eigh_factorization(
+        style::TA.FusionStyle, A::AbstractArray, ndims_codomain::Val
     )
-    M = TensorAlgebra.matricize(style, A, ndims_codomain)
+    M = TA.matricize(style, A, ndims_codomain)
     sqrtM = sqrt(M)
-    biperm = TensorAlgebra.trivialbiperm(ndims_codomain, Val(ndims(A)))
-    axes_codomain, axes_domain = TensorAlgebra.blocks(axes(A)[biperm])
+    biperm = TA.trivialbiperm(ndims_codomain, Val(ndims(A)))
+    axes_codomain, axes_domain = TA.blocks(axes(A)[biperm])
     bond_axis = axes(sqrtM, 2)
-    axes_X = TensorAlgebra.tuplemortar((axes_codomain, (bond_axis,)))
-    axes_Y = TensorAlgebra.tuplemortar(((bond_axis,), axes_domain))
     return (
-        TensorAlgebra.unmatricize(style, sqrtM, axes_X),
-        TensorAlgebra.unmatricize(style, sqrtM, axes_Y),
+        TA.unmatricize(style, sqrtM, axes_codomain, (bond_axis,)),
+        TA.unmatricize(style, sqrtM, (bond_axis,), axes_domain),
     )
 end
+function balanced_eigh_factorization(A::AbstractArray, ndims_codomain::Val)
+    return balanced_eigh_factorization(TA.FusionStyle(A), A, ndims_codomain)
+end
 
-function sqrt_factorization(
+function balanced_eigh_factorization(
         a::AbstractNamedDimsArray, codomain_dimnames, domain_dimnames
     )
-    codomain_names = name.(codomain_dimnames)
-    domain_names = name.(domain_dimnames)
-    biperm = TensorAlgebra.blockedperm_indexin(
+    codomain_names = collect(name.(codomain_dimnames))
+    domain_names = collect(name.(domain_dimnames))
+    biperm = TA.blockedperm_indexin(
         Tuple.((dimnames(a), codomain_names, domain_names))...
     )
-    perm_codomain, perm_domain = TensorAlgebra.blocks(biperm)
-    A_perm = TensorAlgebra.bipermutedims(denamed(a), perm_codomain, perm_domain)
-    style = TensorAlgebra.FusionStyle(A_perm)
-    X_denamed, Y_denamed = sqrt_factorization(style, A_perm, Val(length(perm_codomain)))
+    perm_codomain, perm_domain = TA.blocks(biperm)
+    A_perm = TA.bipermutedims(denamed(a), perm_codomain, perm_domain)
+    X_denamed, Y_denamed = balanced_eigh_factorization(A_perm, Val(length(perm_codomain)))
     new_bond = randname(first(codomain_names))
     return (
-        nameddims(X_denamed, (codomain_names..., new_bond)),
-        nameddims(Y_denamed, (new_bond, domain_names...)),
+        nameddims(X_denamed, [codomain_names; [new_bond]]),
+        nameddims(Y_denamed, [[new_bond]; domain_names]),
     )
-end
-
-function sqrt_factorization(a::AbstractNamedDimsArray, codomain_dimnames)
-    codomain_names = name.(codomain_dimnames)
-    domain_names = setdiff(dimnames(a), codomain_names)
-    return sqrt_factorization(a, codomain_names, domain_names)
 end

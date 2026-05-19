@@ -268,7 +268,7 @@ function apply_gate_bp_nsite!(
         S = S / norm(S)
     end
     name_v1, name_v2 = dimnames(S)
-    sqrt_S_v1, sqrt_S_v2 = sqrt_factorization(S, (name_v1,))
+    sqrt_S_v1, sqrt_S_v2 = balanced_eigh_factorization(S, (name_v1,), (name_v2,))
     R_v1 = U_v1 * sqrt_S_v1
     R_v2 = sqrt_S_v2 * U_v2
 
