@@ -267,18 +267,23 @@ function apply_gate_bp_nsite!(
     if normalize
         S = S / norm(S)
     end
-    name_u, name_v = dimnames(S)
-    sqrt_S_left, sqrt_S_right = sqrt_factorization(S, (name_u,))
-    R_v1 = U * sqrt_S_left
-    R_v2 = sqrt_S_right * V
+    name_v1, name_v2 = dimnames(S)
+    sqrt_S_v1, sqrt_S_v2 = sqrt_factorization(S, (name_v1,))
+    R_v1 = U * sqrt_S_v1
+    R_v2 = sqrt_S_v2 * V
 
     dest[v1] = prod([[Q_v1 * R_v1]; inv_sqrt_envs_v1])
     dest[v2] = prod([[Q_v2 * R_v2]; inv_sqrt_envs_v2])
 
-    # Reuse `sqrt_S_left` as the new (v1, v2) sqrt-message: same data, just
-    # rebind `name_u` to a fresh outer name (a separate `randname` for each
-    # directed edge so the two messages don't accidentally share a leg name).
-    cache![v1 => v2] = replacedimnames(sqrt_S_left, name_u => randname(name_u))
-    cache![v2 => v1] = replacedimnames(sqrt_S_left, name_u => randname(name_u))
+    # Reuse the two `sqrt_S` factors as new sqrt-messages, rebinding the
+    # outer (SVD-codomain / SVD-domain) leg to a fresh name per directed
+    # edge so the two messages don't share a leg name. Each direction
+    # picks the factor whose shared-bond arrow contracts with the
+    # receiving tensor: `sqrt_S_v1`'s bond arrow contracts with `dest[v2]`
+    # (v1 => v2), `sqrt_S_v2`'s with `dest[v1]` (v2 => v1). For dense
+    # backings the two factors carry the same data and the choice is
+    # invisible; the distinction matters for graded / fermionic axes.
+    cache![v1 => v2] = replacedimnames(sqrt_S_v1, name_v1 => randname(name_v1))
+    cache![v2 => v1] = replacedimnames(sqrt_S_v2, name_v2 => randname(name_v2))
     return dest
 end
