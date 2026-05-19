@@ -10,9 +10,7 @@ using NamedGraphs.PartitionedGraphs: QuotientEdge, QuotientView, quotient_graph
 using NamedGraphs: NamedDiGraph, Vertices, convert_vertextype, ordered_vertices,
     parent_graph_indices, position_graph, to_graph_index, vertex_positions
 
-abstract type AbstractMessageCache{T, V} <: AbstractDataGraph{V, Nothing, T} end
-
-struct MessageCache{T, V} <: AbstractMessageCache{T, V}
+struct MessageCache{T, V} <: AbstractDataGraph{V, Nothing, T}
     messages::Dictionary{NamedEdge{V}, T}
     underlying_graph::NamedDiGraph{V}
     function MessageCache{T, V}(::UndefInitializer, vertices) where {T, V}
@@ -28,7 +26,7 @@ end
 # "full" message `M`. Structurally identical to `MessageCache`; the apply-
 # operator BP path dispatches on the type to use the messages as gauge
 # factors directly and skip the sqrt-via-eigh step.
-struct SqrtMessageCache{T, V} <: AbstractMessageCache{T, V}
+struct SqrtMessageCache{T, V} <: AbstractDataGraph{V, Nothing, T}
     messages::Dictionary{NamedEdge{V}, T}
     underlying_graph::NamedDiGraph{V}
     function SqrtMessageCache{T, V}(::UndefInitializer, vertices) where {T, V}
@@ -38,11 +36,16 @@ struct SqrtMessageCache{T, V} <: AbstractMessageCache{T, V}
     end
 end
 
-# Constructors and convenience factories shared between `MessageCache` and
-# `SqrtMessageCache`: the storage and graph structure are identical, only the
-# semantic interpretation of the message values differs.
+# `MessageCache` and `SqrtMessageCache` are sibling concrete types: the storage
+# and graph structure are identical, only the semantic interpretation of the
+# message values differs. Shared methods are emitted per-type via this loop
+# rather than via a shared abstract supertype. Once
+# `DataGraphs.AbstractEdgeDataGraph` (DataGraphs.jl#121) lands, both can
+# subtype that and most of this loop can fall away.
 for Cache in (:MessageCache, :SqrtMessageCache)
     @eval begin
+        # ============================ constructors ===================================== #
+
         function $Cache{T}(::UndefInitializer, vertices) where {T}
             return $Cache{T, eltype(vertices)}(undef, vertices)
         end
@@ -66,6 +69,105 @@ for Cache in (:MessageCache, :SqrtMessageCache)
         end
 
         Base.copy(cache::$Cache) = $Cache(copy(cache.messages))
+
+        # ============================ key/val types ==================================== #
+
+        Base.keytype(c::$Cache) = keytype(typeof(c))
+        Base.keytype(::Type{<:$Cache{T, V}}) where {T, V} = NamedEdge{V}
+        Base.valtype(c::$Cache) = valtype(typeof(c))
+        Base.valtype(::Type{<:$Cache{T}}) where {T} = T
+        Base.keys(cache::$Cache) = edges(cache)
+
+        # ============================ NamedGraphs interface ============================ #
+
+        function NamedGraphs.add_edge!(c::$Cache, edge)
+            add_edge!(c.underlying_graph, edge)
+            return c
+        end
+
+        function NamedGraphs.rem_edge!(c::$Cache, edge)
+            delete!(c.messages, to_graph_index(c, edge))
+            rem_edge!(c.underlying_graph, edge)
+            return c
+        end
+
+        function NamedGraphs.induced_subgraph_from_vertices(cache::$Cache, subvertices)
+            # TODO: once we have `subgraph_edges` in `NamedGraphs`, simplify this.
+            underlying_subgraph, vlist =
+                Graphs.induced_subgraph(cache.underlying_graph, subvertices)
+            assigned = v -> isassigned(cache, v)
+            assigned_subedges = Iterators.filter(assigned, edges(underlying_subgraph))
+            messages = getindices(cache.messages, Indices(assigned_subedges))
+            return $Cache(messages), vlist
+        end
+
+        # ============================ DataGraphs interface ============================= #
+
+        DataGraphs.underlying_graph(cache::$Cache) = cache.underlying_graph
+        DataGraphs.is_vertex_assigned(::$Cache, _) = false
+        DataGraphs.is_edge_assigned(c::$Cache, edge) = haskey(c.messages, edge)
+
+        function DataGraphs.get_edge_data(c::$Cache, edge::AbstractEdge)
+            return c.messages[edge]
+        end
+        function DataGraphs.set_edge_data!(c::$Cache, val, edge)
+            return set!(c.messages, edge, val)
+        end
+
+        # ============================ equality ========================================= #
+
+        function Base.:(==)(c1::$Cache, c2::$Cache)
+            return c1.underlying_graph == c2.underlying_graph && c1.messages == c2.messages
+        end
+
+        # ============================ copyto! ========================================== #
+
+        # see: copyto!(dest, src) for analogous behaviour to 2 argument method
+        # see: copyto!(dest, Rdest::CartesianIndices, src, Rsrc::CartesianIndices)
+        # for analogous behaviour to 3 argument method.
+        # TODO: these can be made generic for `AbstractDataGraph` in `DataGraphs.jl`.
+        function Base.copyto!(
+                cache_dst::$Cache, cache_src::AbstractDataGraph, inds = nothing
+            )
+            copyto!_messagecache(cache_dst, edge_data(cache_src), inds)
+            return cache_dst
+        end
+
+        function Base.copyto!(
+                cache_dst::$Cache, dictionary_src::Dictionary, inds = nothing
+            )
+            copyto!_messagecache(cache_dst, dictionary_src, inds)
+            return cache_dst
+        end
+
+        function Base.copyto!(
+                cache_dst::$Cache, dict_src::Dict, inds = keys(dict_src)
+            )
+            for key in inds
+                cache_dst[key] = dict_src[key]
+            end
+            return cache_dst
+        end
+
+        # ============================ printing ========================================= #
+
+        # TODO: This is the definition for the proposed `DataGraphs.AbstractEdgeDataGraph`.
+        function Base.show(io::IO, mime::MIME"text/plain", graph::$Cache)
+            println(io, "$(typeof(graph)) with $(nv(graph)) vertices:")
+            show(io, mime, vertices(graph))
+            println(io, "\n")
+            println(io, "and $(ne(graph)) edge(s):")
+            for e in edges(graph)
+                show(io, mime, e)
+                println(io)
+            end
+            println(io)
+            println(io, "with edge data:")
+            show(io, mime, edge_data(graph))
+            return nothing
+        end
+
+        Base.show(io::IO, graph::$Cache) = show(io, MIME"text/plain"(), graph)
     end
 end
 
@@ -75,105 +177,9 @@ messagecache(f, edges) = messagecache(edge => f(edge) for edge in edges)
 sqrtmessagecache(pairs) = SqrtMessageCache(Dict(pairs))
 sqrtmessagecache(f, edges) = sqrtmessagecache(edge => f(edge) for edge in edges)
 
-# compatibility with generic key-val iterables
-Base.keytype(c::AbstractMessageCache) = keytype(typeof(c))
-Base.keytype(::Type{<:AbstractMessageCache{T, V}}) where {T, V} = NamedEdge{V}
-
-Base.valtype(c::AbstractMessageCache) = valtype(typeof(c))
-Base.valtype(::Type{<:AbstractMessageCache{T}}) where {T} = T
-
-Base.keys(cache::AbstractMessageCache) = edges(cache)
-
-# ================================ NamedGraphs interface ================================= #
-function NamedGraphs.add_edge!(c::AbstractMessageCache, edge)
-    add_edge!(c.underlying_graph, edge)
-    return c
-end
-
-function NamedGraphs.rem_edge!(c::AbstractMessageCache, edge)
-    delete!(c.messages, to_graph_index(c, edge))
-    rem_edge!(c.underlying_graph, edge)
-    return c
-end
-
-# ================================= DataGraphs interface ================================= #
-
-DataGraphs.underlying_graph(cache::AbstractMessageCache) = cache.underlying_graph
-
-DataGraphs.is_vertex_assigned(::AbstractMessageCache, _) = false
-DataGraphs.is_edge_assigned(c::AbstractMessageCache, edge) = haskey(c.messages, edge)
-
-function DataGraphs.get_edge_data(c::AbstractMessageCache, edge::AbstractEdge)
-    return c.messages[edge]
-end
-function DataGraphs.set_edge_data!(c::AbstractMessageCache, val, edge)
-    return set!(c.messages, edge, val)
-end
-
-function Base.:(==)(cache1::C, cache2::C) where {C <: AbstractMessageCache}
-    ug1 = cache1.underlying_graph
-    ug2 = cache2.underlying_graph
-
-    ms1 = cache1.messages
-    ms2 = cache2.messages
-
-    return (ug1 == ug2 && ms1 == ms2)
-end
-
-function NamedGraphs.induced_subgraph_from_vertices(cache::MessageCache, subvertices)
-    # TODO: once we have `subgraph_edges` in `NamedGraphs`, simplify this.
-    underlying_subgraph, vlist =
-        Graphs.induced_subgraph(cache.underlying_graph, subvertices)
-
-    assigned = v -> isassigned(cache, v)
-
-    assigned_subedges = Iterators.filter(assigned, edges(underlying_subgraph))
-
-    messages = getindices(cache.messages, Indices(assigned_subedges))
-
-    return MessageCache(messages), vlist
-end
-
-# see: copyto!(dest, src) for analogous behaviour to 2 argument method
-# see: copyto!(dest, Rdest::CartesianIndices, src, Rsrc::CartesianIndices)
-# for analogous behaviour to 3 argument method.
-# TODO: these can be made generic for `AbtractDataGraph` in `DataGraphs.jl`
-function copyto!_messagecache(
-        cache_dst::AbstractMessageCache,
-        cache_src,
-        inds = nothing
-    )
+function copyto!_messagecache(cache_dst, cache_src, inds = nothing)
     inds = isnothing(inds) ? Indices(keys(cache_src)) : Indices(inds)
     view(edge_data(cache_dst), inds) .= view(cache_src, inds)
-    return cache_dst
-end
-
-function Base.copyto!(
-        cache_dst::AbstractMessageCache,
-        cache_src::AbstractDataGraph,
-        inds = nothing
-    )
-    copyto!_messagecache(cache_dst, edge_data(cache_src), inds)
-    return cache_dst
-end
-
-function Base.copyto!(
-        cache_dst::AbstractMessageCache,
-        dictionary_src::Dictionary,
-        inds = nothing
-    )
-    copyto!_messagecache(cache_dst, dictionary_src, inds)
-    return cache_dst
-end
-
-function Base.copyto!(
-        cache_dst::AbstractMessageCache,
-        dict_src::Dict,
-        inds = keys(dict_src)
-    )
-    for key in inds
-        cache_dst[key] = dict_src[key]
-    end
     return cache_dst
 end
 
@@ -274,23 +280,3 @@ function forest_cover_edge_sequence(gi::AbstractGraph; root_vertex = default_roo
     end
     return rv
 end
-
-# ======================================= printing ======================================= #
-
-# TODO: This is the definition for the proposed `DataGraphs.AbstractEdgeDataGraph`.
-function Base.show(io::IO, mime::MIME"text/plain", graph::AbstractMessageCache)
-    println(io, "$(typeof(graph)) with $(nv(graph)) vertices:")
-    show(io, mime, vertices(graph))
-    println(io, "\n")
-    println(io, "and $(ne(graph)) edge(s):")
-    for e in edges(graph)
-        show(io, mime, e)
-        println(io)
-    end
-    println(io)
-    println(io, "with edge data:")
-    show(io, mime, edge_data(graph))
-    return nothing
-end
-
-Base.show(io::IO, graph::AbstractMessageCache) = show(io, MIME"text/plain"(), graph)
