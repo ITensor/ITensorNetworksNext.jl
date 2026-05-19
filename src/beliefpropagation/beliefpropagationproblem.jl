@@ -28,11 +28,12 @@ function beliefpropagation(
     end
 
     cache = MessageCache(messages)
-    problem = BeliefPropagationProblem(factors)
 
     ## Algorithm construction:
 
     edges = isnothing(edges) ? forest_cover_edge_sequence(cache) : edges
+
+    problem = BeliefPropagationProblem(factors, edges)
 
     base_stopping_criterion = AI.StopAfterIteration(maxiter)
 
@@ -46,8 +47,8 @@ function beliefpropagation(
     edge_kwargs = rows(extended_kwargs, maxiter)
 
     algorithm = BeliefPropagationAlgorithm(maxiter; stopping_criterion) do repnum
-        return BeliefPropagationSweepAlgorithm(edges) do edge
-            return SimpleMessageUpdateAlgorithm(; edge, edge_kwargs[repnum]...)
+        return BeliefPropagationSweepAlgorithm(edges) do _
+            return SimpleMessageUpdateAlgorithm(; edge_kwargs[repnum]...)
         end
     end
 
@@ -58,8 +59,9 @@ end
 
 # === Layer 1: BP outer loop (iterative) ===
 
-struct BeliefPropagationProblem{Factors} <: AI.Problem
+struct BeliefPropagationProblem{Factors, Edges} <: AI.Problem
     factors::Factors
+    edges::Edges
 end
 
 @kwdef struct BeliefPropagationAlgorithm{
@@ -114,7 +116,7 @@ function AIE.initialize_subsolve(
         algorithm::BeliefPropagationAlgorithm,
         state::BeliefPropagationState
     )
-    subproblem = BeliefPropagationSweepProblem(problem.factors)
+    subproblem = BeliefPropagationSweepProblem(problem.factors, problem.edges)
     subalgorithm = algorithm.algorithms[state.iteration]
     substate = AI.initialize_state(subproblem, subalgorithm; state.iterate)
     return subproblem, subalgorithm, substate
@@ -122,8 +124,9 @@ end
 
 # === Layer 2: one sweep over edges (iterative) ===
 
-struct BeliefPropagationSweepProblem{Factors} <: AI.Problem
+struct BeliefPropagationSweepProblem{Factors, Edges} <: AI.Problem
     factors::Factors
+    edges::Edges
 end
 
 @kwdef struct BeliefPropagationSweepAlgorithm{
@@ -178,7 +181,8 @@ function AIE.initialize_subsolve(
         algorithm::BeliefPropagationSweepAlgorithm,
         state::BeliefPropagationSweepState
     )
-    subproblem = MessageUpdateProblem(problem.factors)
+    edge = problem.edges[state.iteration]
+    subproblem = MessageUpdateProblem(problem.factors, edge)
     subalgorithm = algorithm.algorithms[state.iteration]
     substate = AI.initialize_state(subproblem, subalgorithm; state.iterate)
     return subproblem, subalgorithm, substate
@@ -186,14 +190,12 @@ end
 
 # === Layer 3: single-edge message update (non-iterative) ===
 
-struct MessageUpdateProblem{Factors} <: AI.Problem
+struct MessageUpdateProblem{Factors, Edge <: AbstractEdge} <: AI.Problem
     factors::Factors
+    edge::Edge
 end
 
-@kwdef struct SimpleMessageUpdateAlgorithm{
-        E <: AbstractEdge, ContractionAlg,
-    } <: AI.Algorithm
-    edge::E
+@kwdef struct SimpleMessageUpdateAlgorithm{ContractionAlg} <: AI.Algorithm
     normalize::Bool = true
     contraction_alg::ContractionAlg = Algorithm"exact"
 end
@@ -222,7 +224,7 @@ function AI.solve_loop!(
         state::MessageUpdateState
     )
     cache = state.iterate
-    edge = algorithm.edge
+    edge = problem.edge
 
     messages = collect(incoming_messages(cache, edge))
     factor = problem.factors[src(edge)]
