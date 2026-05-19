@@ -5,7 +5,8 @@ import TensorAlgebra as TA
 using Base: @kwdef
 using Graphs: dst, src, vertices
 using LinearAlgebra: I, diag, diagm, norm
-using NamedDimsArrays: AbstractNamedDimsArray, dimnames, domainnames, nameddims, randname
+using NamedDimsArrays:
+    AbstractNamedDimsArray, dimnames, domainnames, nameddims, randname, replacedimnames
 using NamedGraphs.GraphsExtensions: all_edges, boundary_edges
 
 # === NestedAlgorithm framework ===
@@ -282,10 +283,10 @@ function apply_gate_bp_nsite!(
     dest[v1] = prod([[Q_v1 * R_v1]; inv_sqrt_envs_v1])
     dest[v2] = prod([[Q_v2 * R_v2]; inv_sqrt_envs_v2])
 
-    # Write fresh sqrt-messages on the (v1, v2) edge of the cache, so that the
-    # cache stays consistent with the new bond name and weights in `dest`.
-    W = diagm(sqrtσ)
-    cache![v1 => v2] = nameddims(W, (randname(new_bond), new_bond))
-    cache![v2 => v1] = nameddims(W, (randname(new_bond), new_bond))
+    # Reuse `sqrt_S_left` as the new (v1, v2) sqrt-message: same data, just
+    # rebind `name_u` to a fresh outer name (a separate `randname` for each
+    # directed edge so the two messages don't accidentally share a leg name).
+    cache![v1 => v2] = replacedimnames(sqrt_S_left, name_u => randname(new_bond))
+    cache![v2 => v1] = replacedimnames(sqrt_S_left, name_u => randname(new_bond))
     return dest
 end
