@@ -4,7 +4,7 @@ import NamedDimsArrays as NDA
 import TensorAlgebra as TA
 using Base: @kwdef
 using Graphs: dst, src, vertices
-using LinearAlgebra: I, diag, diagm, norm
+using LinearAlgebra: norm
 using NamedDimsArrays:
     AbstractNamedDimsArray, dimnames, domainnames, nameddims, randname, replacedimnames
 using NamedGraphs.GraphsExtensions: all_edges, boundary_edges
@@ -160,7 +160,7 @@ function AI.initialize_state!(
 end
 
 # Identity-message cache: trivial Vidal-gauge initialization where each bond
-# carries the identity 2-leg matrix (= √I = I, in sqrt-message form). Stored
+# carries the identity 2-leg map (= √I = I, in sqrt-message form). Stored
 # in a `SqrtMessageCache` so the BP simple update knows to use the messages
 # as gauge-in factors directly and skip the √ step.
 function initialize_cache(
@@ -169,12 +169,10 @@ function initialize_cache(
     T = eltype(iterate[first(vertices(iterate))])
     return sqrtmessagecache(all_edges(iterate)) do edge
         bond_name = only(linknames(iterate, edge))
-        n = Int(length(only(linkaxes(iterate, edge))))
+        bond_axis = only(linkaxes(iterate, edge))
         fresh_name = randname(bond_name)
-        # TODO: Make this work for symmetric tensors (GradedArrays): construct
-        # an identity that respects the sector structure of the bond axis,
-        # rather than a plain `Matrix{T}(I, n, n)` keyed only by length.
-        return nameddims(Matrix{T}(I, n, n), (fresh_name, bond_name))
+        A = identity_map(T, (bond_axis,), (bond_axis,))
+        return nameddims(A, (fresh_name, bond_name))
     end
 end
 
@@ -262,21 +260,15 @@ function apply_gate_bp_nsite!(
     Q_v1, R_v1 = TA.qr(ψ_v1, setdiff(dimnames(ψ_v1), dimnames(ψ_v2), dimnames(op)))
     Q_v2, R_v2 = TA.qr(ψ_v2, setdiff(dimnames(ψ_v2), dimnames(ψ_v1), dimnames(op)))
     op_R_v1v2 = NDA.apply(op, R_v1 * R_v2)
-    # `op_R_v1v2 ≈ U · S · V`, with `S` a 2-leg diagonal NamedDimsArray
-    # on `(name_u, name_v)`. Absorb `√S` symmetrically into the new
-    # `R_v1`, `R_v2` ("balanced gauge") and unify the two SVD bond names
-    # into a single fresh `new_bond` so the gauged tensors share one
-    # bond; the same `√σ` becomes the sqrt-message written back to
-    # `cache!` below.
+    # `op_R_v1v2 ≈ U · S · V`. Absorb `√S` symmetrically into the new
+    # `R_v1`, `R_v2` ("balanced gauge"); the same `√S` factor becomes the
+    # sqrt-message written back to `cache!` below.
     U, S, V = TA.svd(op_R_v1v2, setdiff(dimnames(R_v1), dimnames(R_v2)); trunc)
     if normalize
         S = S / norm(S)
     end
     name_u, name_v = dimnames(S)
-    sqrtσ = sqrt.(diag(S.denamed))
-    new_bond = randname(name_u)
-    sqrt_S_left = nameddims(diagm(sqrtσ), (name_u, new_bond))
-    sqrt_S_right = nameddims(diagm(sqrtσ), (new_bond, name_v))
+    sqrt_S_left, sqrt_S_right = sqrt_factorization(S, (name_u,))
     R_v1 = U * sqrt_S_left
     R_v2 = sqrt_S_right * V
 
@@ -286,7 +278,7 @@ function apply_gate_bp_nsite!(
     # Reuse `sqrt_S_left` as the new (v1, v2) sqrt-message: same data, just
     # rebind `name_u` to a fresh outer name (a separate `randname` for each
     # directed edge so the two messages don't accidentally share a leg name).
-    cache![v1 => v2] = replacedimnames(sqrt_S_left, name_u => randname(new_bond))
-    cache![v2 => v1] = replacedimnames(sqrt_S_left, name_u => randname(new_bond))
+    cache![v1 => v2] = replacedimnames(sqrt_S_left, name_u => randname(name_u))
+    cache![v2 => v1] = replacedimnames(sqrt_S_left, name_u => randname(name_u))
     return dest
 end
