@@ -3,8 +3,8 @@ import ITensorNetworksNext.AlgorithmsInterfaceExtensions as AIE
 using Test: @test, @test_throws, @testset
 
 # Concrete `NestedAlgorithm` subtype: holds a flat list of child algorithms
-# and picks them by iteration index. Mirrors how `BeliefPropagation` shapes
-# itself on top of the minimal `AIE.NestedAlgorithm`.
+# and picks them by iteration index. Mirrors how `BeliefPropagationAlgorithm`
+# shapes itself on top of the minimal `AIE.NestedAlgorithm`.
 struct TestProblem <: AI.Problem end
 
 @kwdef struct TestChildAlgorithm{StoppingCriterion <: AI.StoppingCriterion} <: AI.Algorithm

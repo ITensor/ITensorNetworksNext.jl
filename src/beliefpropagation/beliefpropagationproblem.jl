@@ -21,6 +21,8 @@ function rows(nt::NamedTuple, len::Int = rowlength(nt))
     return [(; (keys(nt) .=> map(v -> v[i], values(nt)))...) for i in 1:len]
 end
 
+# === `StopWhenConverged` stopping criterion ===
+
 @kwdef struct StopWhenConverged <: AI.StoppingCriterion
     tol::Float64
 end
@@ -36,10 +38,7 @@ function AI.initialize_state(::AI.Problem, ::AI.Algorithm, ::StopWhenConverged; 
 end
 
 function AI.initialize_state!(
-        ::AI.Problem,
-        ::AI.Algorithm,
-        ::StopWhenConverged,
-        st::StopWhenConvergedState
+        ::AI.Problem, ::AI.Algorithm, ::StopWhenConverged, st::StopWhenConvergedState
     )
     st.delta = Inf
     return st
@@ -59,7 +58,7 @@ function AI.is_finished!(
 
     st.previous_iterate = copy(iterate)
 
-    # maxdiff = 0.0 initially, so skip this the first time.
+    # delta = 0 initially, so skip this the first time.
     state.iteration == 0 && return false
 
     st.delta = delta
@@ -82,25 +81,7 @@ function AI.is_finished(
     return st.delta < c.tol
 end
 
-struct BeliefPropagationProblem{Factors} <: AI.Problem
-    factors::Factors
-end
-
-# Shared state type for the BP NestedAlgorithm subtypes
-# (`BeliefPropagation` / `BeliefPropagationSweep`). Mirrors the small
-# state shape `BPApplyGate` uses in the apply-operator path.
-@kwdef mutable struct BeliefPropagationState{
-        Iterate, StoppingCriterionState <: AI.StoppingCriterionState,
-    } <: AI.State
-    iterate::Iterate
-    iteration::Int = 0
-    stopping_criterion_state::StoppingCriterionState
-end
-
-function iterate_diff(
-        cache1::MessageCache,
-        cache2::MessageCache
-    )
+function iterate_diff(cache1::MessageCache, cache2::MessageCache)
     return maximum(edges(cache1)) do edge
         m1 = cache1[edge]
         m2 = cache2[edge]
@@ -108,132 +89,44 @@ function iterate_diff(
     end
 end
 
-@kwdef struct BeliefPropagation{
-        ChildAlgorithm <: AI.Algorithm,
-        Algorithms <: AbstractVector{ChildAlgorithm},
-        StoppingCriterion <: AI.StoppingCriterion,
-    } <: AIE.NestedAlgorithm
-    algorithms::Algorithms
-    stopping_criterion::StoppingCriterion = AI.StopAfterIteration(length(algorithms))
+# === Layer 3: single-edge message update (non-iterative) ===
+
+struct MessageUpdateProblem{Factors} <: AI.Problem
+    factors::Factors
 end
 
-function BeliefPropagation(f::Function, niterations::Int; kwargs...)
-    return BeliefPropagation(; algorithms = f.(1:niterations), kwargs...)
-end
-
-struct SimpleMessageUpdate{E <: AbstractEdge, Kwargs <: NamedTuple}
+@kwdef struct SimpleMessageUpdateAlgorithm{
+        E <: AbstractEdge, ContractionAlg,
+    } <: AI.Algorithm
     edge::E
-    kwargs::Kwargs
+    normalize::Bool = true
+    contraction_alg::ContractionAlg = Algorithm"exact"
 end
 
-function SimpleMessageUpdate(
-        edge;
-        normalize = true,
-        contraction_alg = Algorithm"exact",
-        kwargs...
-    )
-    return SimpleMessageUpdate(
-        edge,
-        (; normalize, contraction_alg, kwargs...)
-    )
+@kwdef mutable struct MessageUpdateState{Iterate} <: AI.State
+    iterate::Iterate
 end
-
-function Base.getproperty(alg::SimpleMessageUpdate, name::Symbol)
-    if name in (:edge, :kwargs)
-        return getfield(alg, name)
-    else
-        return getproperty(getfield(alg, :kwargs), name)
-    end
-end
-
-AI.initialize_state(::BeliefPropagationProblem, ::SimpleMessageUpdate; iterate) = iterate
-
-struct BeliefPropagationSweep{
-        ChildAlgorithm, Algorithms <: AbstractVector{ChildAlgorithm},
-    } <: AIE.NestedAlgorithm
-    algorithms::Algorithms
-    stopping_criterion::AI.StopAfterIteration
-    function BeliefPropagationSweep(; algorithms)
-        stopping_criterion = AI.StopAfterIteration(length(algorithms))
-        return new{eltype(algorithms), typeof(algorithms)}(algorithms, stopping_criterion)
-    end
-end
-
-function BeliefPropagationSweep(f::Function, edges)
-    return BeliefPropagationSweep(; algorithms = f.(edges))
-end
-
-# State construction / reset / increment for the BP NestedAlgorithm
-# pair. Both `BeliefPropagation` and `BeliefPropagationSweep` carry a
-# `stopping_criterion`, so the standard AlgorithmsInterface state chain
-# resolves the same way.
-const BeliefPropagationLikeAlgorithm = Union{BeliefPropagation, BeliefPropagationSweep}
 
 function AI.initialize_state(
-        problem::BeliefPropagationProblem,
-        algorithm::BeliefPropagationLikeAlgorithm;
-        iterate, kwargs...
+        ::MessageUpdateProblem, ::SimpleMessageUpdateAlgorithm; iterate
     )
-    stopping_criterion_state = AI.initialize_state(
-        problem, algorithm, algorithm.stopping_criterion; iterate
-    )
-    return BeliefPropagationState(; iterate, stopping_criterion_state, kwargs...)
+    return MessageUpdateState(; iterate)
 end
 
+# Non-iterative algorithm: no per-call state to reset.
 function AI.initialize_state!(
-        problem::BeliefPropagationProblem,
-        algorithm::BeliefPropagationLikeAlgorithm,
-        state::BeliefPropagationState;
-        iteration = 0, kwargs...
-    )
-    for (k, v) in pairs(kwargs)
-        setproperty!(state, k, v)
-    end
-    state.iteration = iteration
-    AI.initialize_state!(
-        problem, algorithm, algorithm.stopping_criterion, state.stopping_criterion_state
+        ::MessageUpdateProblem, ::SimpleMessageUpdateAlgorithm, state::MessageUpdateState
     )
     return state
 end
 
-function AI.increment!(
-        problem::BeliefPropagationProblem,
-        algorithm::BeliefPropagationLikeAlgorithm,
-        state::BeliefPropagationState
+# Non-iterative algorithm: bypass the step!/stopping-criterion loop.
+function AI.solve_loop!(
+        problem::MessageUpdateProblem,
+        algorithm::SimpleMessageUpdateAlgorithm,
+        state::MessageUpdateState
     )
-    return AI.increment!(state)
-end
-
-# `BeliefPropagation` and `BeliefPropagationSweep` carry a flat list of
-# child algorithms. Each step picks the child algorithm by the current
-# iteration index and reuses the parent problem.
-function AIE.initialize_subsolve(
-        problem::BeliefPropagationProblem,
-        algorithm::BeliefPropagationLikeAlgorithm,
-        state::AI.State
-    )
-    subproblem = problem
-    subalgorithm = algorithm.algorithms[state.iteration]
-    substate = AI.initialize_state(subproblem, subalgorithm; state.iterate)
-    return subproblem, subalgorithm, substate
-end
-
-function AIE.finalize_substate!(
-        ::BeliefPropagationProblem,
-        ::BeliefPropagationSweep,
-        state::BeliefPropagationState,
-        cache::MessageCache
-    )
-    state.iterate = cache
-
-    return state
-end
-
-function AI.solve!(
-        problem::BeliefPropagationProblem,
-        algorithm::SimpleMessageUpdate,
-        cache::MessageCache
-    )
+    cache = state.iterate
     edge = algorithm.edge
 
     messages = collect(incoming_messages(cache, edge))
@@ -250,8 +143,138 @@ function AI.solve!(
 
     cache[edge] = new_message
 
-    return cache
+    return state
 end
+
+# === Layer 2: one sweep over edges (iterative) ===
+
+struct BeliefPropagationSweepProblem{Factors} <: AI.Problem
+    factors::Factors
+end
+
+@kwdef struct BeliefPropagationSweepAlgorithm{
+        ChildAlgorithm <: AI.Algorithm,
+        Algorithms <: AbstractVector{ChildAlgorithm},
+        StoppingCriterion <: AI.StoppingCriterion,
+    } <: AIE.NestedAlgorithm
+    algorithms::Algorithms
+    stopping_criterion::StoppingCriterion = AI.StopAfterIteration(length(algorithms))
+end
+
+function BeliefPropagationSweepAlgorithm(f::Function, edges)
+    return BeliefPropagationSweepAlgorithm(; algorithms = f.(edges))
+end
+
+@kwdef mutable struct BeliefPropagationSweepState{
+        Iterate, SCState <: AI.StoppingCriterionState,
+    } <: AI.State
+    iterate::Iterate
+    iteration::Int = 0
+    stopping_criterion_state::SCState
+end
+
+function AI.initialize_state(
+        problem::BeliefPropagationSweepProblem,
+        algorithm::BeliefPropagationSweepAlgorithm;
+        iterate, iteration::Int = 0
+    )
+    stopping_criterion_state = AI.initialize_state(
+        problem, algorithm, algorithm.stopping_criterion; iterate
+    )
+    return BeliefPropagationSweepState(;
+        iterate, iteration, stopping_criterion_state
+    )
+end
+
+function AI.initialize_state!(
+        problem::BeliefPropagationSweepProblem,
+        algorithm::BeliefPropagationSweepAlgorithm,
+        state::BeliefPropagationSweepState;
+        iteration::Int = 0
+    )
+    state.iteration = iteration
+    AI.initialize_state!(
+        problem, algorithm, algorithm.stopping_criterion, state.stopping_criterion_state
+    )
+    return state
+end
+
+function AIE.initialize_subsolve(
+        problem::BeliefPropagationSweepProblem,
+        algorithm::BeliefPropagationSweepAlgorithm,
+        state::BeliefPropagationSweepState
+    )
+    subproblem = MessageUpdateProblem(problem.factors)
+    subalgorithm = algorithm.algorithms[state.iteration]
+    substate = AI.initialize_state(subproblem, subalgorithm; state.iterate)
+    return subproblem, subalgorithm, substate
+end
+
+# === Layer 1: BP outer loop (iterative) ===
+
+struct BeliefPropagationProblem{Factors} <: AI.Problem
+    factors::Factors
+end
+
+@kwdef struct BeliefPropagationAlgorithm{
+        ChildAlgorithm <: AI.Algorithm,
+        Algorithms <: AbstractVector{ChildAlgorithm},
+        StoppingCriterion <: AI.StoppingCriterion,
+    } <: AIE.NestedAlgorithm
+    algorithms::Algorithms
+    stopping_criterion::StoppingCriterion = AI.StopAfterIteration(length(algorithms))
+end
+
+function BeliefPropagationAlgorithm(f::Function, niterations::Int; kwargs...)
+    return BeliefPropagationAlgorithm(; algorithms = f.(1:niterations), kwargs...)
+end
+
+@kwdef mutable struct BeliefPropagationState{
+        Iterate, SCState <: AI.StoppingCriterionState,
+    } <: AI.State
+    iterate::Iterate
+    iteration::Int = 0
+    stopping_criterion_state::SCState
+end
+
+function AI.initialize_state(
+        problem::BeliefPropagationProblem,
+        algorithm::BeliefPropagationAlgorithm;
+        iterate, iteration::Int = 0
+    )
+    stopping_criterion_state = AI.initialize_state(
+        problem, algorithm, algorithm.stopping_criterion; iterate
+    )
+    return BeliefPropagationState(;
+        iterate, iteration, stopping_criterion_state
+    )
+end
+
+function AI.initialize_state!(
+        problem::BeliefPropagationProblem,
+        algorithm::BeliefPropagationAlgorithm,
+        state::BeliefPropagationState;
+        iteration::Int = 0
+    )
+    state.iteration = iteration
+    AI.initialize_state!(
+        problem, algorithm, algorithm.stopping_criterion, state.stopping_criterion_state
+    )
+    return state
+end
+
+function AIE.initialize_subsolve(
+        problem::BeliefPropagationProblem,
+        algorithm::BeliefPropagationAlgorithm,
+        state::BeliefPropagationState
+    )
+    subproblem = BeliefPropagationSweepProblem(problem.factors)
+    subalgorithm = algorithm.algorithms[state.iteration]
+    substate = AI.initialize_state(subproblem, subalgorithm; state.iterate)
+    return subproblem, subalgorithm, substate
+end
+
+# === Top-level user entry point ===
 
 function beliefpropagation(
         factors, messages;
@@ -287,9 +310,9 @@ function beliefpropagation(
     extended_kwargs = extend_columns((; kwargs...), maxiter)
     edge_kwargs = rows(extended_kwargs, maxiter)
 
-    algorithm = BeliefPropagation(maxiter; stopping_criterion) do repnum
-        return BeliefPropagationSweep(edges) do edge
-            return SimpleMessageUpdate(edge; edge_kwargs[repnum]...)
+    algorithm = BeliefPropagationAlgorithm(maxiter; stopping_criterion) do repnum
+        return BeliefPropagationSweepAlgorithm(edges) do edge
+            return SimpleMessageUpdateAlgorithm(; edge, edge_kwargs[repnum]...)
         end
     end
 
