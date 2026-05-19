@@ -260,17 +260,17 @@ function apply_gate_bp_nsite!(
     Q_v1, R_v1 = TA.qr(ψ_v1, setdiff(dimnames(ψ_v1), dimnames(ψ_v2), dimnames(op)))
     Q_v2, R_v2 = TA.qr(ψ_v2, setdiff(dimnames(ψ_v2), dimnames(ψ_v1), dimnames(op)))
     op_R_v1v2 = NDA.apply(op, R_v1 * R_v2)
-    # `op_R_v1v2 ≈ U · S · V`. Absorb `√S` symmetrically into the new
-    # `R_v1`, `R_v2` ("balanced gauge"); the same `√S` factor becomes the
-    # sqrt-message written back to `cache!` below.
-    U, S, V = TA.svd(op_R_v1v2, setdiff(dimnames(R_v1), dimnames(R_v2)); trunc)
+    # `op_R_v1v2 ≈ U_v1 · S · U_v2`. Absorb `√S` symmetrically into the
+    # new `R_v1`, `R_v2` ("balanced gauge"); the same `√S` factor becomes
+    # the sqrt-message written back to `cache!` below.
+    U_v1, S, U_v2 = TA.svd(op_R_v1v2, setdiff(dimnames(R_v1), dimnames(R_v2)); trunc)
     if normalize
         S = S / norm(S)
     end
     name_v1, name_v2 = dimnames(S)
     sqrt_S_v1, sqrt_S_v2 = sqrt_factorization(S, (name_v1,))
-    R_v1 = U * sqrt_S_v1
-    R_v2 = sqrt_S_v2 * V
+    R_v1 = U_v1 * sqrt_S_v1
+    R_v2 = sqrt_S_v2 * U_v2
 
     dest[v1] = prod([[Q_v1 * R_v1]; inv_sqrt_envs_v1])
     dest[v2] = prod([[Q_v2 * R_v2]; inv_sqrt_envs_v2])
