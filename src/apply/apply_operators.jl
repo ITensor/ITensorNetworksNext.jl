@@ -268,22 +268,42 @@ function apply_gate_bp_nsite!(
         S = S / norm(S)
     end
     name_v1, name_v2 = dimnames(S)
-    sqrt_S_v1, sqrt_S_v2 = balanced_eigh_factorization(S, (name_v1,), (name_v2,))
-    R_v1 = U_v1 * sqrt_S_v1
-    R_v2 = sqrt_S_v2 * U_v2
+    # `sqrt(S, (name_v1,), (name_v2,))` is NDA's matrix sqrt of `S` —
+    # a single 2-leg named array with dimnames `(name_v1, name_v2)`
+    # satisfying `sqrt_S * sqrt_S ≈ S` in the matrix algebra (each
+    # `sqrt_S` factor contracts on one of `S`'s legs). Eventual endpoint:
+    # 1-arg `sqrt(S)` once `TA.svd` returns `S` as a `NamedDimsOperator`.
+    sqrt_S = sqrt(S, (name_v1,), (name_v2,))
+    # Build R factors by absorbing `sqrt_S` on each side; the rebind on
+    # the v1 side picks `name_v1` as the new shared bond between
+    # `dest[v1]` and `dest[v2]`. With a `NamedDimsOperator` wrapper, the
+    # rebind becomes `apply(sqrt_S, U_v1)`.
+    R_v1 = replacedimnames(U_v1 * sqrt_S, name_v2 => name_v1)
+    R_v2 = sqrt_S * U_v2
 
     dest[v1] = prod([[Q_v1 * R_v1]; inv_sqrt_envs_v1])
     dest[v2] = prod([[Q_v2 * R_v2]; inv_sqrt_envs_v2])
 
-    # Reuse the two `sqrt_S` factors as new sqrt-messages, rebinding the
-    # outer (SVD-codomain / SVD-domain) leg to a fresh name per directed
-    # edge so the two messages don't share a leg name. Each direction
-    # picks the factor whose shared-bond arrow contracts with the
-    # receiving tensor: `sqrt_S_v1`'s bond arrow contracts with `dest[v2]`
-    # (v1 => v2), `sqrt_S_v2`'s with `dest[v1]` (v2 => v1). For dense
-    # backings the two factors carry the same data and the choice is
-    # invisible; the distinction matters for graded / fermionic axes.
-    cache![v1 => v2] = replacedimnames(sqrt_S_v1, name_v1 => randname(name_v1))
-    cache![v2 => v1] = replacedimnames(sqrt_S_v2, name_v2 => randname(name_v2))
+    # Both directed sqrt-messages derive from the same `sqrt_S`, but
+    # with different name-slot choices so each message's "matching" leg
+    # (name_v1, contracting with the receiving tensor) carries the
+    # correct arrow direction.
+    #
+    # `dest[v1]`'s name_v1 bond inherits the domain-side arrow of `S`
+    # (from the `name_v2 => name_v1` rebind in `R_v1`), and `dest[v2]`'s
+    # name_v1 bond inherits the codomain-side arrow (from `sqrt_S * U_v2`).
+    # So:
+    #   * `cache![v2 => v1]`'s matching leg needs the codomain-side arrow
+    #     → use sqrt_S's name_v1 leg directly; relabel name_v2 to fresh.
+    #   * `cache![v1 => v2]`'s matching leg needs the domain-side arrow
+    #     → swap roles: rename sqrt_S's name_v2 to name_v1, and the
+    #     original name_v1 (now the internal-rank slot) to a fresh name.
+    # For dense backings sqrt_S equals its transpose, so the two choices
+    # coincide numerically; the distinction matters for graded /
+    # fermionic axes.
+    cache![v1 => v2] = replacedimnames(
+        sqrt_S, name_v1 => randname(name_v1), name_v2 => name_v1
+    )
+    cache![v2 => v1] = replacedimnames(sqrt_S, name_v2 => randname(name_v2))
     return dest
 end

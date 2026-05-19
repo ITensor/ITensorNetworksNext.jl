@@ -89,57 +89,17 @@ function identity_map(::Type{T}, codomain_axes, domain_axes) where {T}
     return reshape(Matrix{T}(I, n_co, n_dom), (co_lens..., dom_lens...))
 end
 
-# === balanced_eigh_factorization ===
-#
-# Balanced eigh-based factorization of a Hermitian PSD named array `a`:
-# returns `(X, Y)` with `X * Y ≈ a` via named contraction, sharing a
-# fresh-named bond. For k-codomain input, `X` has names
-# `(codomain..., new_bond)` and `Y` has names `(new_bond, domain...)`.
-#
-# Conceptually: `a = U Λ U†` via eigh, then split Λ = √Λ · √Λ symmetrically
-# between the two halves so `X = U √Λ` and `Y = √Λ U†`. For
-# diagonal-Hermitian-PSD input (the BP simple-update SVD-`S` case),
-# eigh is trivial and this reduces to the per-element √ split.
-#
-# Layered through `TA.matricize` → matrix `sqrt` → `TA.unmatricize`,
-# matching the shape of `inv_regularized` above. The N-d / TA layer
-# is namespaced locally (intended `TA.balanced_eigh_factorization`),
-# the named layer extends here. See `gate_application/Overview.md` in
-# `ITensorDevelopmentPlans` for the operator-design synthesis this
-# slots into (`balanced_eigh_factor` single-factor companion,
-# `cholesky_factor`, `positive_factor` umbrella).
-
-function balanced_eigh_factorization(
-        style::TA.FusionStyle, A::AbstractArray, ndims_codomain::Val
-    )
-    M = TA.matricize(style, A, ndims_codomain)
-    sqrtM = sqrt(M)
-    biperm = TA.trivialbiperm(ndims_codomain, Val(ndims(A)))
-    axes_codomain, axes_domain = TA.blocks(axes(A)[biperm])
-    bond_axis = axes(sqrtM, 2)
-    return (
-        TA.unmatricize(style, sqrtM, axes_codomain, (bond_axis,)),
-        TA.unmatricize(style, sqrtM, (bond_axis,), axes_domain),
-    )
-end
-function balanced_eigh_factorization(A::AbstractArray, ndims_codomain::Val)
-    return balanced_eigh_factorization(TA.FusionStyle(A), A, ndims_codomain)
-end
-
-function balanced_eigh_factorization(
-        a::AbstractNamedDimsArray, codomain_dimnames, domain_dimnames
-    )
-    codomain_names = collect(name.(codomain_dimnames))
-    domain_names = collect(name.(domain_dimnames))
-    biperm = TA.blockedperm_indexin(
-        Tuple.((dimnames(a), codomain_names, domain_names))...
-    )
-    perm_codomain, perm_domain = TA.blocks(biperm)
-    A_perm = TA.bipermutedims(denamed(a), perm_codomain, perm_domain)
-    X_denamed, Y_denamed = balanced_eigh_factorization(A_perm, Val(length(perm_codomain)))
-    new_bond = randname(first(codomain_names))
-    return (
-        nameddims(X_denamed, [codomain_names; [new_bond]]),
-        nameddims(Y_denamed, [[new_bond]; domain_names]),
-    )
-end
+# Note: the BP simple-update `√S` split uses NDA's existing
+# `Base.sqrt(::AbstractNamedDimsArray, codomain_dimnames,
+# domain_dimnames)` (matrix sqrt as a single named array) directly,
+# combined with explicit `replacedimnames` at the call site to split
+# the result into two factors sharing a fresh bond. See the comment in
+# `apply_gate_bp_nsite!` (Val{2} method) for the call-site
+# choreography. A tuple-returning `factorize_sqrt` primitive — splitting
+# a Hermitian PSD `M` into `(X, Y)` with a fresh shared bond — was
+# previously staged here as a local stand-in but isn't needed for the
+# current `√S` use case (K=1 codomain). It can be reintroduced when a
+# multi-codomain (K>1) factorization use case lands, alongside the
+# rest of the `factorize_<backend>` family
+# (`factorize_balanced_eigh`, `factorize_cholesky`) discussed in
+# `gate_application/Overview.md` in `ITensorDevelopmentPlans`.
