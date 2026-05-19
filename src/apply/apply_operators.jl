@@ -13,10 +13,10 @@ using NamedGraphs.GraphsExtensions: all_edges, boundary_edges
 
 abstract type NestedAlgorithm <: AI.Algorithm end
 
-function initialize_subproblem(
+function initialize_subsolve(
         problem::AI.Problem, algorithm::AI.Algorithm, state::AI.State
     )
-    return throw(MethodError(initialize_subproblem, (problem, algorithm, state)))
+    return throw(MethodError(initialize_subsolve, (problem, algorithm, state)))
 end
 
 function finalize_substate!(
@@ -27,7 +27,7 @@ function finalize_substate!(
 end
 
 function AI.step!(problem::AI.Problem, algorithm::NestedAlgorithm, state::AI.State)
-    subproblem, subalgorithm, substate = initialize_subproblem(problem, algorithm, state)
+    subproblem, subalgorithm, substate = initialize_subsolve(problem, algorithm, state)
     AI.solve!(subproblem, subalgorithm, substate)
     finalize_substate!(problem, algorithm, state, substate)
     return state
@@ -89,7 +89,7 @@ function AI.initialize_state!(
     return state
 end
 
-function initialize_subproblem(
+function initialize_subsolve(
         problem::ApplyOperatorsProblem, algorithm::ApplyOperators,
         state::ApplyOperatorsState
     )
