@@ -45,12 +45,13 @@ function beliefpropagation(
     extended_kwargs = extend_columns((; kwargs...), maxiter)
     edge_kwargs = rows(extended_kwargs, maxiter)
 
-    algorithm = BeliefPropagationAlgorithm(maxiter; stopping_criterion) do repnum
+    sweep_stopping_criterion = AI.StopAfterIteration(length(edges))
+    algorithm = BeliefPropagationAlgorithm(maxiter; edges, stopping_criterion) do repnum
         return BeliefPropagationSweepAlgorithm(;
-            edges,
             message_update_algorithm = SimpleMessageUpdateAlgorithm(;
                 edge_kwargs[repnum]...
-            )
+            ),
+            stopping_criterion = sweep_stopping_criterion
         )
     end
 
@@ -66,16 +67,18 @@ struct BeliefPropagationProblem{Factors} <: AI.Problem
 end
 
 @kwdef struct BeliefPropagationAlgorithm{
+        Edges,
         ChildAlgorithm <: AI.Algorithm,
         Algorithms <: AbstractVector{ChildAlgorithm},
         StoppingCriterion <: AI.StoppingCriterion,
     } <: AIE.NestedAlgorithm
+    edges::Edges
     algorithms::Algorithms
     stopping_criterion::StoppingCriterion = AI.StopAfterIteration(length(algorithms))
 end
 
-function BeliefPropagationAlgorithm(f::Function, niterations::Int; kwargs...)
-    return BeliefPropagationAlgorithm(; algorithms = f.(1:niterations), kwargs...)
+function BeliefPropagationAlgorithm(f::Function, niterations::Int; edges, kwargs...)
+    return BeliefPropagationAlgorithm(; edges, algorithms = f.(1:niterations), kwargs...)
 end
 
 @kwdef mutable struct BeliefPropagationState{
@@ -118,7 +121,7 @@ function AIE.initialize_subsolve(
         state::BeliefPropagationState
     )
     subalgorithm = algorithm.algorithms[state.iteration]
-    subproblem = BeliefPropagationSweepProblem(problem.factors, subalgorithm.edges)
+    subproblem = BeliefPropagationSweepProblem(problem.factors, algorithm.edges)
     substate = AI.initialize_state(subproblem, subalgorithm; state.iterate)
     return subproblem, subalgorithm, substate
 end
@@ -131,13 +134,11 @@ struct BeliefPropagationSweepProblem{Factors, Edges} <: AI.Problem
 end
 
 @kwdef struct BeliefPropagationSweepAlgorithm{
-        Edges,
         ChildAlgorithm <: AI.Algorithm,
         StoppingCriterion <: AI.StoppingCriterion,
     } <: AIE.NestedAlgorithm
-    edges::Edges
     message_update_algorithm::ChildAlgorithm
-    stopping_criterion::StoppingCriterion = AI.StopAfterIteration(length(edges))
+    stopping_criterion::StoppingCriterion
 end
 
 @kwdef mutable struct BeliefPropagationSweepState{
