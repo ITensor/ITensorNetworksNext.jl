@@ -103,32 +103,28 @@ end
 
 max_iterations(algorithm::NestedAlgorithm) = length(algorithm.algorithms)
 
-function get_subproblem(
-        problem::AI.Problem, algorithm::NestedAlgorithm, state::AI.State
+# Subtypes of `NestedAlgorithm` must override `initialize_subsolve` — it
+# returns the `(subproblem, subalgorithm, substate)` tuple that the next
+# inner `AI.solve!` call consumes. The default `finalize_substate!` copies
+# the substate's iterate back into the parent state; subtypes can override
+# when more is required.
+function initialize_subsolve(
+        problem::AI.Problem, algorithm::AI.Algorithm, state::AI.State
     )
-    subproblem = problem
-    subalgorithm = algorithm.algorithms[state.iteration]
-    substate = AI.initialize_state(subproblem, subalgorithm; state.iterate)
-    return subproblem, subalgorithm, substate
+    return throw(MethodError(initialize_subsolve, (problem, algorithm, state)))
 end
 
-function set_substate!(
-        problem::AI.Problem, algorithm::NestedAlgorithm, state::AI.State, substate::AI.State
+function finalize_substate!(
+        problem::AI.Problem, algorithm::AI.Algorithm, state::AI.State, substate::AI.State
     )
     state.iterate = substate.iterate
     return state
 end
 
 function AI.step!(problem::AI.Problem, algorithm::NestedAlgorithm, state::AI.State)
-    # Get the subproblem, subalgorithm, and substate.
-    subproblem, subalgorithm, substate = get_subproblem(problem, algorithm, state)
-
-    # Solve the subproblem with the subalgorithm.
+    subproblem, subalgorithm, substate = initialize_subsolve(problem, algorithm, state)
     AI.solve!(subproblem, subalgorithm, substate)
-
-    # Update the state with the substate.
-    set_substate!(problem, algorithm, state, substate)
-
+    finalize_substate!(problem, algorithm, state, substate)
     return state
 end
 
@@ -148,6 +144,15 @@ from a list of stored algorithms.
 end
 function DefaultNestedAlgorithm(f::Function, iterable; kwargs...)
     return DefaultNestedAlgorithm(; algorithms = f.(iterable), kwargs...)
+end
+
+function initialize_subsolve(
+        problem::AI.Problem, algorithm::DefaultNestedAlgorithm, state::AI.State
+    )
+    subproblem = problem
+    subalgorithm = algorithm.algorithms[state.iteration]
+    substate = AI.initialize_state(subproblem, subalgorithm; state.iterate)
+    return subproblem, subalgorithm, substate
 end
 
 # ============================ FlattenedAlgorithm ==========================================

@@ -139,7 +139,22 @@ function BeliefPropagationSweep(f::Function, edges)
     return BeliefPropagationSweep(; algorithms = f.(edges))
 end
 
-function AIE.set_substate!(
+# `BeliefPropagation` and `BeliefPropagationSweep` carry a flat list of
+# child algorithms, mirroring `AIE.DefaultNestedAlgorithm`. Each step picks
+# the child algorithm by the current iteration index and reuses the parent
+# problem.
+function AIE.initialize_subsolve(
+        problem::BeliefPropagationProblem,
+        algorithm::Union{BeliefPropagation, BeliefPropagationSweep},
+        state::AI.State
+    )
+    subproblem = problem
+    subalgorithm = algorithm.algorithms[state.iteration]
+    substate = AI.initialize_state(subproblem, subalgorithm; state.iterate)
+    return subproblem, subalgorithm, substate
+end
+
+function AIE.finalize_substate!(
         ::BeliefPropagationProblem,
         ::BeliefPropagationSweep,
         state::AIE.DefaultState,

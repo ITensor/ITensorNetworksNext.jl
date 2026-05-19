@@ -213,8 +213,8 @@ end
         @test state.iteration == 2
     end
 
-    @testset "get_subproblem and set_substate!" begin
-        # Test get_subproblem
+    @testset "initialize_subsolve and finalize_substate!" begin
+        # Test initialize_subsolve
         problem = TestProblem([1.0, 2.0])
         nested_alg = AIE.nested_algorithm(2) do i
             return TestAlgorithmStep(; stopping_criterion = AI.StopAfterIteration(1))
@@ -229,17 +229,19 @@ end
             stopping_criterion_state
         )
 
-        subproblem, subalgorithm, substate = AIE.get_subproblem(problem, nested_alg, state)
+        subproblem, subalgorithm, substate = AIE.initialize_subsolve(
+            problem, nested_alg, state
+        )
         @test subproblem === problem
         @test subalgorithm === nested_alg.algorithms[1]
         @test substate.iterate ≈ [5.0, 10.0]
 
-        # Test set_substate!
+        # Test finalize_substate!
         new_substate = AIE.DefaultState(;
             iterate = [100.0, 200.0],
             substate.stopping_criterion_state
         )
-        AIE.set_substate!(problem, nested_alg, state, new_substate)
+        AIE.finalize_substate!(problem, nested_alg, state, new_substate)
         @test state.iterate ≈ [100.0, 200.0]
     end
 
