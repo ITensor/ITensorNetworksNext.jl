@@ -31,13 +31,13 @@ end
     previous_iterate::Iterate
 end
 
-function AI.initialize_state(::AIE.Problem, ::AIE.Algorithm, ::StopWhenConverged; iterate)
+function AI.initialize_state(::AI.Problem, ::AI.Algorithm, ::StopWhenConverged; iterate)
     return StopWhenConvergedState(; previous_iterate = copy(iterate))
 end
 
 function AI.initialize_state!(
-        ::AIE.Problem,
-        ::AIE.Algorithm,
+        ::AI.Problem,
+        ::AI.Algorithm,
         ::StopWhenConverged,
         st::StopWhenConvergedState
     )
@@ -46,9 +46,9 @@ function AI.initialize_state!(
 end
 
 function AI.is_finished!(
-        problem::AIE.Problem,
-        algorithm::AIE.Algorithm,
-        state::AIE.State,
+        problem::AI.Problem,
+        algorithm::AI.Algorithm,
+        state::AI.State,
         c::StopWhenConverged,
         st::StopWhenConvergedState
     )
@@ -73,17 +73,28 @@ function AI.is_finished!(
 end
 
 function AI.is_finished(
-        ::AIE.Problem,
-        ::AIE.Algorithm,
-        ::AIE.State,
+        ::AI.Problem,
+        ::AI.Algorithm,
+        ::AI.State,
         c::StopWhenConverged,
         st::StopWhenConvergedState
     )
     return st.delta < c.tol
 end
 
-struct BeliefPropagationProblem{Factors} <: AIE.Problem
+struct BeliefPropagationProblem{Factors} <: AI.Problem
     factors::Factors
+end
+
+# Shared state type for the BP NestedAlgorithm subtypes
+# (`BeliefPropagation` / `BeliefPropagationSweep`). Mirrors the small
+# state shape `BPApplyGate` uses in the apply-operator path.
+@kwdef mutable struct BeliefPropagationState{
+        Iterate, StoppingCriterionState <: AI.StoppingCriterionState,
+    } <: AI.State
+    iterate::Iterate
+    iteration::Int = 0
+    stopping_criterion_state::StoppingCriterionState
 end
 
 function iterate_diff(
@@ -98,7 +109,7 @@ function iterate_diff(
 end
 
 @kwdef struct BeliefPropagation{
-        ChildAlgorithm <: AIE.Algorithm,
+        ChildAlgorithm <: AI.Algorithm,
         Algorithms <: AbstractVector{ChildAlgorithm},
         StoppingCriterion <: AI.StoppingCriterion,
     } <: AIE.NestedAlgorithm
@@ -152,12 +163,53 @@ function BeliefPropagationSweep(f::Function, edges)
     return BeliefPropagationSweep(; algorithms = f.(edges))
 end
 
+# State construction / reset / increment for the BP NestedAlgorithm
+# pair. Both `BeliefPropagation` and `BeliefPropagationSweep` carry a
+# `stopping_criterion`, so the standard AlgorithmsInterface state chain
+# resolves the same way.
+const BeliefPropagationLikeAlgorithm = Union{BeliefPropagation, BeliefPropagationSweep}
+
+function AI.initialize_state(
+        problem::BeliefPropagationProblem,
+        algorithm::BeliefPropagationLikeAlgorithm;
+        iterate, kwargs...
+    )
+    stopping_criterion_state = AI.initialize_state(
+        problem, algorithm, algorithm.stopping_criterion; iterate
+    )
+    return BeliefPropagationState(; iterate, stopping_criterion_state, kwargs...)
+end
+
+function AI.initialize_state!(
+        problem::BeliefPropagationProblem,
+        algorithm::BeliefPropagationLikeAlgorithm,
+        state::BeliefPropagationState;
+        iteration = 0, kwargs...
+    )
+    for (k, v) in pairs(kwargs)
+        setproperty!(state, k, v)
+    end
+    state.iteration = iteration
+    AI.initialize_state!(
+        problem, algorithm, algorithm.stopping_criterion, state.stopping_criterion_state
+    )
+    return state
+end
+
+function AI.increment!(
+        problem::BeliefPropagationProblem,
+        algorithm::BeliefPropagationLikeAlgorithm,
+        state::BeliefPropagationState
+    )
+    return AI.increment!(state)
+end
+
 # `BeliefPropagation` and `BeliefPropagationSweep` carry a flat list of
 # child algorithms. Each step picks the child algorithm by the current
 # iteration index and reuses the parent problem.
 function AIE.initialize_subsolve(
         problem::BeliefPropagationProblem,
-        algorithm::Union{BeliefPropagation, BeliefPropagationSweep},
+        algorithm::BeliefPropagationLikeAlgorithm,
         state::AI.State
     )
     subproblem = problem
@@ -169,7 +221,7 @@ end
 function AIE.finalize_substate!(
         ::BeliefPropagationProblem,
         ::BeliefPropagationSweep,
-        state::AIE.DefaultState,
+        state::BeliefPropagationState,
         cache::MessageCache
     )
     state.iterate = cache
@@ -211,7 +263,7 @@ function beliefpropagation(
     if isnothing(maxiter)
         throw(
             ArgumentError(
-                "`maxiter` must be specified for non-tree graphs, even when 
+                "`maxiter` must be specified for non-tree graphs, even when
                     `stopping_criterion` is provided."
             )
         )
