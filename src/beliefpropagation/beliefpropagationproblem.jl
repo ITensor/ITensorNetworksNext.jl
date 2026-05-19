@@ -45,13 +45,12 @@ function beliefpropagation(
     extended_kwargs = extend_columns((; kwargs...), maxiter)
     edge_kwargs = rows(extended_kwargs, maxiter)
 
-    sweep_stopping_criterion = AI.StopAfterIteration(length(edges))
     algorithm = BeliefPropagationAlgorithm(maxiter; edges, stopping_criterion) do repnum
+        message_update_algorithm = SimpleMessageUpdateAlgorithm(;
+            edge_kwargs[repnum]...
+        )
         return BeliefPropagationSweepAlgorithm(;
-            message_update_algorithm = SimpleMessageUpdateAlgorithm(;
-                edge_kwargs[repnum]...
-            ),
-            stopping_criterion = sweep_stopping_criterion
+            algorithms = Dict(edge => message_update_algorithm for edge in edges)
         )
     end
 
@@ -68,11 +67,11 @@ end
 
 @kwdef struct BeliefPropagationAlgorithm{
         Edges,
-        ChildAlgorithm <: AI.Algorithm,
-        Algorithms <: AbstractVector{ChildAlgorithm},
+        Algorithms,
         StoppingCriterion <: AI.StoppingCriterion,
     } <: AIE.NestedAlgorithm
     edges::Edges
+    # Indexable by iteration count (e.g. `Vector` or `Dict{Int, ...}`).
     algorithms::Algorithms
     stopping_criterion::StoppingCriterion = AI.StopAfterIteration(length(algorithms))
 end
@@ -134,11 +133,14 @@ struct BeliefPropagationSweepProblem{Factors, Edges} <: AI.Problem
 end
 
 @kwdef struct BeliefPropagationSweepAlgorithm{
-        ChildAlgorithm <: AI.Algorithm,
+        Algorithms,
         StoppingCriterion <: AI.StoppingCriterion,
     } <: AIE.NestedAlgorithm
-    message_update_algorithm::ChildAlgorithm
-    stopping_criterion::StoppingCriterion
+    # Indexable by edge (e.g. `Dict{Edge, MessageUpdateAlgorithm}`); the
+    # default constructor in `beliefpropagation()` builds one with the same
+    # template copied across every edge.
+    algorithms::Algorithms
+    stopping_criterion::StoppingCriterion = AI.StopAfterIteration(length(algorithms))
 end
 
 @kwdef mutable struct BeliefPropagationSweepState{
@@ -182,7 +184,7 @@ function AIE.initialize_subsolve(
     )
     edge = problem.edges[state.iteration]
     subproblem = MessageUpdateProblem(problem.factors, edge)
-    subalgorithm = algorithm.message_update_algorithm
+    subalgorithm = algorithm.algorithms[edge]
     substate = AI.initialize_state(subproblem, subalgorithm; state.iterate)
     return subproblem, subalgorithm, substate
 end
