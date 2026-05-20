@@ -20,11 +20,7 @@ function select_message_update_algorithm(kwargs::NamedTuple)
     return default_message_update_algorithm(; kwargs...)
 end
 
-function select_beliefpropagation_stopping_criterion(
-        stopping_criterion::AI.StoppingCriterion
-    )
-    return stopping_criterion
-end
+select_beliefpropagation_stopping_criterion(c::AI.StoppingCriterion) = c
 function select_beliefpropagation_stopping_criterion(::Nothing)
     return throw(
         ArgumentError(
@@ -59,21 +55,16 @@ function beliefpropagation(
         message_update_algorithm = default_message_update_algorithm()
     )
     problem = BeliefPropagationProblem(factors)
-    cache = MessageCache(messages)
 
-    stopping_criterion = select_beliefpropagation_stopping_criterion(stopping_criterion)
     message_update_algorithm = select_message_update_algorithm(message_update_algorithm)
-
     sweep_algorithm = BeliefPropagationSweepAlgorithm(;
         message_update_algorithm,
         stopping_criterion = AI.StopAfterIteration(length(edges))
     )
+    stopping_criterion = select_beliefpropagation_stopping_criterion(stopping_criterion)
+    algorithm = BeliefPropagationAlgorithm(; edges, sweep_algorithm, stopping_criterion)
 
-    algorithm = BeliefPropagationAlgorithm(;
-        edges,
-        sweep_algorithm,
-        stopping_criterion
-    )
+    cache = MessageCache(messages)
 
     return AI.solve(problem, algorithm; iterate = cache) # -> typeof(cache)
 end
@@ -110,9 +101,7 @@ function AI.initialize_state(
     stopping_criterion_state = AI.initialize_state(
         problem, algorithm, algorithm.stopping_criterion; iterate
     )
-    return BeliefPropagationState(;
-        iterate, iteration, stopping_criterion_state
-    )
+    return BeliefPropagationState(; iterate, iteration, stopping_criterion_state)
 end
 
 function AI.initialize_state!(
@@ -170,9 +159,7 @@ function AI.initialize_state(
     stopping_criterion_state = AI.initialize_state(
         problem, algorithm, algorithm.stopping_criterion; iterate
     )
-    return BeliefPropagationSweepState(;
-        iterate, iteration, stopping_criterion_state
-    )
+    return BeliefPropagationSweepState(; iterate, iteration, stopping_criterion_state)
 end
 
 function AI.initialize_state!(
