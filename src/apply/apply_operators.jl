@@ -50,7 +50,8 @@ function AI.initialize_state(
         problem::ApplyOperatorsProblem, algorithm::ApplyOperators;
         iterate, cache! = nothing, iteration::Int = 0
     )
-    cache! = initialize_cache(cache!, algorithm.operator_algorithm, iterate)
+    cache! =
+        initialize_cache(apply_operator!, cache!, algorithm.operator_algorithm, iterate)
     stopping_criterion_state = AI.initialize_state(
         problem, algorithm, algorithm.stopping_criterion; iterate
     )
@@ -94,7 +95,7 @@ function AIE.default_algorithm(::typeof(apply_operator!), ::Type{<:Tuple}; kwarg
 end
 
 function apply_operator(algorithm::ApplyOperatorAlgorithm, operator, state; kwargs...)
-    dest = AIE.initialize_output(apply_operator!, operator, state, algorithm)
+    dest = AIE.initialize_output(apply_operator!, algorithm, operator, state)
     return apply_operator!(algorithm, dest, operator, state; kwargs...)
 end
 
@@ -110,8 +111,8 @@ function apply_operator(operator, state; alg = nothing, cache! = nothing, kwargs
     return apply_operator(algorithm, operator, state; cache!)
 end
 
-initialize_cache(cache!, algorithm, state) = cache!
-initialize_cache(::Nothing, algorithm, state) = default_cache(algorithm, state)
+initialize_cache(f, cache!, algorithm, state) = cache!
+initialize_cache(f, ::Nothing, algorithm, state) = default_cache(f, algorithm, state)
 
 # === Default strategy: BPApplyGate ===
 
@@ -122,7 +123,7 @@ initialize_cache(::Nothing, algorithm, state) = default_cache(algorithm, state)
 end
 
 function AIE.initialize_output(
-        ::typeof(apply_operator!), operator, state, ::BPApplyGate
+        ::typeof(apply_operator!), ::BPApplyGate, operator, state
     )
     return copy(state)
 end
@@ -130,7 +131,7 @@ end
 function apply_operator!(
         algorithm::BPApplyGate, dest, operator, state; cache! = nothing
     )
-    cache! = initialize_cache(cache!, algorithm, state)
+    cache! = initialize_cache(apply_operator!, cache!, algorithm, state)
     apply_gate_bp!(
         dest, operator, state;
         cache!, algorithm.trunc, algorithm.pinv_kwargs, algorithm.normalize
@@ -139,7 +140,9 @@ function apply_operator!(
 end
 
 # Initialize the BP message cache to identity square-root messages.
-function default_cache(::BPApplyGate, iterate::AbstractTensorNetwork)
+function default_cache(
+        ::typeof(apply_operator!), ::BPApplyGate, iterate::AbstractTensorNetwork
+    )
     return sqrtmessagecache(all_edges(iterate)) do edge
         factor = iterate[dst(edge)]
         return state(one(similar_operator(factor, linkaxes(iterate, edge))))
