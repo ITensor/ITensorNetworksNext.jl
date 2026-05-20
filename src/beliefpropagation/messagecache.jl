@@ -1,5 +1,6 @@
-using DataGraphs: DataGraphs, AbstractDataGraph, edge_data, edge_data_type,
-    set_vertex_data!, underlying_graph, underlying_graph_type, vertex_data, vertex_data_type
+using DataGraphs: DataGraphs, AbstractDataGraph, AbstractEdgeDataGraph, edge_data,
+    edge_data_type, set_vertex_data!, underlying_graph, underlying_graph_type, vertex_data,
+    vertex_data_type
 using Dictionaries: Dictionary, delete!, getindices, set!
 using Graphs: AbstractGraph, connected_components, is_directed, is_tree
 using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArray, lazy, parenttype
@@ -7,10 +8,10 @@ using NamedGraphs.GraphsExtensions: IsDirected, boundary_edges, default_root_ver
     directed_graph, forest_cover, in_incident_edges, post_order_dfs_edges, undirected_graph,
     vertextype
 using NamedGraphs.PartitionedGraphs: QuotientEdge, QuotientView, quotient_graph
-using NamedGraphs: NamedDiGraph, Vertices, convert_vertextype, ordered_vertices,
-    parent_graph_indices, position_graph, to_graph_index, vertex_positions
+using NamedGraphs: AbstractNamedEdge, NamedDiGraph, NamedEdge, Vertices, convert_vertextype,
+    ordered_vertices, parent_graph_indices, position_graph, to_graph_index, vertex_positions
 
-struct MessageCache{T, V} <: AbstractDataGraph{V, Nothing, T}
+struct MessageCache{T, V} <: AbstractEdgeDataGraph{T, V}
     messages::Dictionary{NamedEdge{V}, T}
     underlying_graph::NamedDiGraph{V}
     function MessageCache{T, V}(::UndefInitializer, vertices) where {T, V}
@@ -21,16 +22,12 @@ struct MessageCache{T, V} <: AbstractDataGraph{V, Nothing, T}
 end
 
 # single type parameter version of the inner constructor
+function MessageCache(::UndefInitializer, vertices)
+    return MessageCache{Any}(undef, vertices)
+end
 function MessageCache{T}(::UndefInitializer, vertices) where {T}
     return MessageCache{T, eltype(vertices)}(undef, vertices)
 end
-
-# compatibility with generic key-val iterables
-Base.keytype(c::MessageCache) = keytype(typeof(c))
-Base.keytype(::Type{<:MessageCache{T, V}}) where {T, V} = NamedEdge{V}
-
-Base.valtype(c::MessageCache) = valtype(typeof(c))
-Base.valtype(::Type{<:MessageCache{T}}) where {T} = T
 
 Base.keys(cache::MessageCache) = edges(cache)
 
@@ -47,7 +44,6 @@ function MessageCache{T, V}(messages) where {T, V}
     edges = keys(messages)
     vertices = union(src.(edges), dst.(edges))
     cache = MessageCache{T, V}(undef, vertices)
-    add_edges!(cache.underlying_graph, edges)
     copyto!(cache, messages)
     return cache
 end
@@ -55,16 +51,29 @@ end
 messagecache(pairs) = MessageCache(Dict(pairs))
 messagecache(f, edges) = messagecache(edge => f(edge) for edge in edges)
 
-# ================================ NamedGraphs interface ================================= #
-function NamedGraphs.add_edge!(c::MessageCache, edge)
-    add_edge!(c.underlying_graph, edge)
-    return c
-end
-
-function NamedGraphs.rem_edge!(c::MessageCache, edge)
+function Graphs.rem_edge!(c::MessageCache, edge)
     delete!(c.messages, to_graph_index(c, edge))
     rem_edge!(c.underlying_graph, edge)
     return c
+end
+
+function Graphs.add_vertex!(c::MessageCache, vertex)
+    add_edge!(c.underlying_graph, vertex)
+    return c
+end
+
+function Graphs.has_edge(c::MessageCache, edge::AbstractNamedEdge)
+    return has_edge(c.underlying_graph, edge)
+end
+
+# ================================ NamedGraphs interface ================================= #
+
+function NamedGraphs.similar_graph(::Type{<:MessageCache}, vertices)
+    return MessageCache(undef, vertices)
+end
+
+function NamedGraphs.similar_graph(::MessageCache, ED::Type, vertices::Vertices)
+    return MessageCache{ED}(undef, collect(vertices))
 end
 
 # ================================= DataGraphs interface ================================= #
@@ -74,37 +83,11 @@ DataGraphs.underlying_graph(cache::MessageCache) = cache.underlying_graph
 DataGraphs.is_vertex_assigned(::MessageCache, _) = false
 DataGraphs.is_edge_assigned(c::MessageCache, edge) = haskey(c.messages, edge)
 
-function DataGraphs.get_edge_data(c::MessageCache, edge::AbstractEdge)
-    return c.messages[edge]
-end
+DataGraphs.get_edge_data(c::MessageCache, edge::AbstractEdge) = c.messages[edge]
 function DataGraphs.set_edge_data!(c::MessageCache, val, edge)
-    return set!(c.messages, edge, val)
-end
-
-Base.copy(cache::MessageCache) = MessageCache(copy(cache.messages))
-
-function Base.:(==)(cache1::MessageCache, cache2::MessageCache)
-    ug1 = cache1.underlying_graph
-    ug2 = cache2.underlying_graph
-
-    ms1 = cache1.messages
-    ms2 = cache2.messages
-
-    return (ug1 == ug2 && ms1 == ms2)
-end
-
-function NamedGraphs.induced_subgraph_from_vertices(cache::MessageCache, subvertices)
-    # TODO: once we have `subgraph_edges` in `NamedGraphs`, simplify this.
-    underlying_subgraph, vlist =
-        Graphs.induced_subgraph(cache.underlying_graph, subvertices)
-
-    assigned = v -> isassigned(cache, v)
-
-    assigned_subedges = Iterators.filter(assigned, edges(underlying_subgraph))
-
-    messages = getindices(cache.messages, Indices(assigned_subedges))
-
-    return MessageCache(messages), vlist
+    has_edge(c, edge) || add_edge!(c.underlying_graph, edge)
+    set!(c.messages, edge, val)
+    return c
 end
 
 # ===================================== contraction ====================================== #
@@ -186,21 +169,4 @@ function bethe_free_energy(factors, messages)
     end
 
     return sum(log.(numerator_terms)) - sum(log.(denominator_terms))
-end
-
-# TODO: This needs to go in NamedGraphs.GraphsExtensions
-function forest_cover_edge_sequence(gi::AbstractGraph; root_vertex = default_root_vertex)
-    # All we care about are the edges so the type of the graph doesnt matter
-    g = similar_graph(NamedGraph, vertices(gi))
-    add_edges!(g, edges(gi))
-    forests = forest_cover(g)
-    rv = edgetype(g)[]
-    for forest in forests
-        trees = [forest[Vertices(vs)] for vs in connected_components(forest)]
-        for tree in trees
-            tree_edges = post_order_dfs_edges(tree, root_vertex(tree))
-            push!(rv, vcat(tree_edges, reverse(reverse.(tree_edges)))...)
-        end
-    end
-    return rv
 end

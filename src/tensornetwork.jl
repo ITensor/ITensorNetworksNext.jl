@@ -3,7 +3,8 @@ using Combinatorics: combinations
 using DataGraphs.DataGraphsPartitionedGraphsExt
 using DataGraphs: DataGraphs, AbstractDataGraph, DataGraph, edge_data, get_vertices_data,
     vertex_data, vertex_data_type
-using Dictionaries: AbstractDictionary, Dictionary, Indices, dictionary, set!, unset!
+using Dictionaries:
+    Dictionaries, AbstractDictionary, Dictionary, Indices, dictionary, set!, unset!
 using Graphs:
     AbstractSimpleGraph, SimpleGraph, edges, has_edge, rem_edge!, rem_vertex!, vertices
 using NamedDimsArrays:
@@ -18,17 +19,17 @@ using NamedGraphs.PartitionedGraphs: AbstractPartitionedGraph, PartitionedGraphs
     quotientvertices
 using NamedGraphs: NamedGraphs, NamedEdge, NamedGraph, PositionGraphView, Vertices,
     parent_graph_indices, vertextype
+using SplitApplyCombine: mapview
 
 struct TensorNetwork{T, V, I} <: AbstractTensorNetwork{T, V}
     tensors::Dictionary{V, T}
     index_locations::Dictionary{I, Set{V}}
-    # TODO: Use a NamedGraph here.
-    link_indices::Dictionary{NamedEdge{V}, Set{I}}
+    underlying_graph::NamedGraph{V}
     function TensorNetwork{T, V, I}(::UndefInitializer, vertices) where {T, V, I}
-        tensors = similar(Indices{V}(vertices), T)
+        tensors = Dictionary{V, T}()
         index_locations = Dictionary{I, Set{V}}()
-        link_indices = Dictionary{NamedEdge{V}, Set{I}}()
-        return new{T, V, I}(tensors, index_locations, link_indices)
+        underlying_graph = NamedGraph(vertices)
+        return new{T, V, I}(tensors, index_locations, underlying_graph)
     end
 end
 
@@ -51,8 +52,7 @@ end
 
 NamedDimsArrays.nametype(::Type{<:TensorNetwork{T, V, I}}) where {T, V, I} = I
 
-Graphs.vertices(tn::TensorNetwork) = OrderedIndices(keys(tn.tensors))
-Graphs.edges(tn::TensorNetwork) = keys(tn.link_indices)
+Graphs.vertices(tn::TensorNetwork) = vertices(tn.underlying_graph)
 
 function NamedGraphs.vertex_positions(graph::TensorNetwork)
     return index_positions(vertices(graph))
@@ -61,7 +61,7 @@ function NamedGraphs.ordered_vertices(graph::TensorNetwork)
     return ordered_indices(vertices(graph))
 end
 
-NamedGraphs.position_graph(graph::TensorNetwork) = PositionGraphView(graph)
+NamedGraphs.position_graph(graph::TensorNetwork) = position_graph(graph.underlying_graph)
 
 function Base.copy(tn::TensorNetwork{T}) where {T}
     tn_dst = TensorNetwork{T}(undef, vertices(tn))
@@ -87,6 +87,7 @@ function Graphs.rem_vertex!(tn::TensorNetwork, vertex)
         isempty(vertex_list) && delete!(tn.index_locations, ind)
     end
 
+    rem_vertex!(tn.underlying_graph, vertex)
     delete!(tn.tensors, vertex)
 
     return tn
@@ -98,7 +99,7 @@ function delete_ind_edge!(tn, ind)
 
     if length(vertex_list) == 2
         src, dst = vertex_list
-        delete!(tn.link_indices, arrange_edge(NamedEdge(src, dst)))
+        rem_edge!(tn.underlying_graph, src => dst)
     end
 
     return tn
@@ -116,9 +117,6 @@ end
 
 tensornetwork(f, vertices) = TensorNetwork(Dict(v => f(v) for v in vertices))
 
-Graphs.nv(tn::TensorNetwork) = length(tn.tensors)
-Graphs.ne(tn::TensorNetwork) = length(tn.link_indices)
-
 Graphs.is_directed(::Type{<:TensorNetwork}) = false
 
 # ====================================== DataGraphs ====================================== #
@@ -128,13 +126,22 @@ DataGraphs.is_edge_assigned(::TensorNetwork, _edge) = false
 
 DataGraphs.get_vertex_data(tn::TensorNetwork, v) = tn.tensors[v]
 
-# TODO: dont have this add an vertex
+function DataGraphs.insert_vertex_data!(tn::TensorNetwork, vertex, tensor)
+    add_vertex!(tn.underlying_graph, vertex)
+    set!_tensornetwork(tn, vertex, tensor)
+    return tn
+end
+
 function DataGraphs.set_vertex_data!(tn::TensorNetwork, tensor, vertex)
+    set!_tensornetwork(tn, vertex, tensor)
+    return tn
+end
+
+# "upsert"
+function set!_tensornetwork(tn::TensorNetwork, vertex, tensor)
     newinds = dimnames(tensor)
 
-    I = nametype(eltype(tensor))
-
-    oldinds = isassigned(tn.tensors, vertex) ? dimnames(tn.tensors[vertex]) : Set{I}()
+    oldinds = get(mapview(dimnames, tn.tensors), vertex, Set())
 
     # Only have to deal with the indices that aren't shared.
     for ind in symdiff(oldinds, newinds)
@@ -155,11 +162,11 @@ function DataGraphs.set_vertex_data!(tn::TensorNetwork, tensor, vertex)
             )
         end
         push!(vertex_list, vertex)
+
+        # Add an edge if the index is now shared between two vertices.
         if length(vertex_list) == 2
             src, dst = vertex_list
-            edge = arrange_edge(NamedEdge(src, dst))
-            link_ind_list = get!(tn.link_indices, edge, Set())
-            push!(link_ind_list, ind)
+            add_edge!(tn.underlying_graph, src, dst)
         end
     end
 
@@ -168,8 +175,10 @@ function DataGraphs.set_vertex_data!(tn::TensorNetwork, tensor, vertex)
     return tn
 end
 
-function DataGraphs.underlying_graph_type(::Type{<:TensorNetwork{V}}) where {V}
-    return NamedGraph{V, SimpleGraph{V}}
+Dictionaries.isinsertable(::TensorNetwork) = true
+
+function DataGraphs.underlying_graph_type(type::Type{<:TensorNetwork{T, V}}) where {T, V}
+    return fieldtype(type, :underlying_graph)
 end
 
 function Graphs.rem_edge!(::TensorNetwork, _edge)
@@ -178,18 +187,17 @@ function Graphs.rem_edge!(::TensorNetwork, _edge)
     )
 end
 
-# PERF: fast lookup compared to `AbstractTensorNetwork` fallback.
-function linkinds(tn::TensorNetwork, e::NamedEdge)
-    names = collect(tn.link_indices[arrange_edge(e)])
-    a = tn[src(e)]
-    return map(name -> axes(a, dim(a, name)), names)
+function Graphs.add_edge!(::TensorNetwork, _edge)
+    return throw(
+        ErrorException("Adding edges to the `TensorNetwork` type is not supported.")
+    )
 end
 
 # PERF: fast lookup compared to `AbstractTensorNetwork` fallback.
 indsites(tn::TensorNetwork, ind) = tn.index_locations[name(ind)]
 
 # PERF: fast lookup compared to `AbstractTensorNetwork` fallback.
-has_ind(tn::AbstractTensorNetwork, ind) = haskey(tn.index_locations, name(ind))
+has_ind(tn::TensorNetwork, ind) = haskey(tn.index_locations, name(ind))
 
 function NamedGraphs.similar_graph(
         T::Type{<:TensorNetwork},
@@ -209,4 +217,10 @@ function NamedGraphs.convert_vertextype(V::Type, tn_src::TensorNetwork{T}) where
     tn_dst = TensorNetwork{eltype(tn_src), V}(undef, vertices(tn_src))
     copyto!(tn_dst, tn_src)
     return tn_dst
+end
+
+function NamedGraphs.induced_subgraph_from_vertices(tn::TensorNetwork, subvertices)
+    subgraph = similar_graph(tn, subvertices)
+    copyto!(subgraph, tn, subvertices)
+    return subgraph, subvertices
 end

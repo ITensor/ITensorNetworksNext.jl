@@ -13,7 +13,7 @@ using NamedGraphs.GraphsExtensions: directed_graph, incident_edges, rem_edges!, 
 using NamedGraphs.OrdinalIndexing: OrdinalSuffixedInteger
 using NamedGraphs: NamedGraphs, NamedGraph, not_implemented, similar_graph
 
-abstract type AbstractTensorNetwork{T, V} <: AbstractVertexDataGraph{V, T} end
+abstract type AbstractTensorNetwork{T, V} <: AbstractVertexDataGraph{T, V} end
 
 # ====================================== Graphs.jl ======================================= #
 
@@ -33,26 +33,6 @@ end
 
 # Overload if needed
 Graphs.is_directed(::Type{<:AbstractTensorNetwork}) = false
-
-# Ambiguity stemming from `Graphs.jl`
-Graphs.inneighbors(tn::AbstractTensorNetwork, v::Integer) = inneighbors_tensornetwork(tn, v)
-Graphs.inneighbors(tn::AbstractTensorNetwork, v) = inneighbors_tensornetwork(tn, v)
-
-function inneighbors_tensornetwork(tn::AbstractGraph, v)
-    indices = inds(tn[v])
-    in_neighbors = Set{eltype(vertices(tn))}()
-    for ind in indices
-        vertex_list = indsites(tn, ind)
-        union!(in_neighbors, vertex_list)
-    end
-    return collect(delete!(in_neighbors, v))
-end
-
-# Ambiguity stemming from `Graphs.jl`
-Graphs.outneighbors(g::AbstractTensorNetwork, v::Integer) = Graphs.inneighbors(g, v)
-Graphs.outneighbors(g::AbstractTensorNetwork, v) = Graphs.inneighbors(g, v)
-
-# ==================================== NamedGraphs.jl ==================================== #
 
 # ==================================== DataGraphs.jl ===================================== #
 
@@ -122,37 +102,4 @@ function has_ind(tn::AbstractGraph, ind)
         end
     end
     return false
-end
-
-# WARN: this may be ill-defined for fermions
-# TODO: Delete (or replace with factorization method)
-function add_link!(tn::AbstractTensorNetwork, edge)
-    ind = rand_trivial_namedunitrange(eltype(inds(tn[src(edge)])))
-    add_link!(tn, edge, ind)
-    return tn
-end
-function add_link!(tn::AbstractTensorNetwork, edge, ind)
-    has_ind(tn, ind) && throw(ArgumentError("index $ind already exists"))
-
-    x = similar(tn[src(edge)], (ind,))
-    x .= false
-    x[1] = true
-
-    new_src = tn[src(edge)] * x
-    new_dst = tn[dst(edge)] * x
-
-    tn[src(edge)] = new_src
-    tn[dst(edge)] = new_dst
-
-    return tn
-end
-
-function trivial_unitrange(type::Type{<:AbstractUnitRange})
-    return Base.oneto(one(eltype(type)))
-end
-
-function rand_trivial_namedunitrange(
-        ::Type{<:AbstractNamedUnitRange{<:Any, R, N}}
-    ) where {R, N}
-    return namedunitrange(trivial_unitrange(R), randname(N))
 end

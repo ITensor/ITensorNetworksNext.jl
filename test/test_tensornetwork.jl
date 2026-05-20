@@ -50,8 +50,8 @@ using Test: @test, @test_throws, @testset
 
         # `setindex!` for edges is intentionally unimplemented.
         e = first(edges(tn))
-        @test_throws ErrorException tn[e] = randn(2, 2)
-        @test_throws ErrorException tn[src(e) => dst(e)] = randn(2, 2)
+        @test_throws MethodError tn[e] = randn(2, 2)
+        @test_throws MethodError tn[src(e) => dst(e)] = randn(2, 2)
 
         # `rem_edge!` is intentionally unimplemented.
         @test_throws ErrorException rem_edge!(tn, (1, 1) => (2, 1))
@@ -64,7 +64,7 @@ using Test: @test, @test_throws, @testset
 
         rem_vertex!(tn, (2, 2))
         @test !has_vertex(tn, (2, 2))
-        tn[2, 2] = randn(Index(2))
+        insert!(tn, (2, 2), randn(Index(2)))
         @test has_vertex(tn, (2, 2))
         @test isassigned(tn, (2, 2))
 
