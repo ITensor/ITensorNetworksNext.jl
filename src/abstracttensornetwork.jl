@@ -8,17 +8,14 @@ using Graphs: Graphs, AbstractEdge, AbstractGraph, add_edge!, add_vertex!, dst, 
 using LinearAlgebra: LinearAlgebra
 using MacroTools: @capture
 using NamedDimsArrays: dimnames, inds
-using NamedGraphs.GraphsExtensions:
-    directed_graph, incident_edges, rem_edges!, similar_graph, vertextype
+using NamedGraphs.GraphsExtensions: directed_graph, incident_edges, rem_edges!, vertextype
 using NamedGraphs.OrdinalIndexing: OrdinalSuffixedInteger
-using NamedGraphs: NamedGraphs, NamedGraph, not_implemented
+using NamedGraphs: NamedGraphs, NamedGraph, not_implemented, similar_graph
 
 abstract type AbstractTensorNetwork{V, VD} <: AbstractDataGraph{V, VD, Nothing} end
 
 # Need to be careful about removing edges from tensor networks in case there is a bond
 Graphs.rem_edge!(::AbstractTensorNetwork, edge) = not_implemented()
-
-DataGraphs.edge_data_type(::Type{<:AbstractTensorNetwork}) = not_implemented()
 
 # Graphs.jl overloads
 function Graphs.weights(graph::AbstractTensorNetwork)
@@ -88,15 +85,15 @@ function siteinds(tn::AbstractGraph, v)
     end
     return s
 end
-function siteaxes(tn::AbstractGraph, edge::AbstractEdge)
-    s = axes(tn[src(edge)]) ∩ axes(tn[dst(edge)])
+function siteaxes(tn::AbstractGraph, v)
+    s = axes(tn[v])
     for v′ in neighbors(tn, v)
         s = setdiff(s, axes(tn[v′]))
     end
     return s
 end
-function sitenames(tn::AbstractGraph, edge::AbstractEdge)
-    s = dimnames(tn[src(edge)]) ∩ dimnames(tn[dst(edge)])
+function sitenames(tn::AbstractGraph, v)
+    s = dimnames(tn[v])
     for v′ in neighbors(tn, v)
         s = setdiff(s, dimnames(tn[v′]))
     end
@@ -163,7 +160,12 @@ end
 # Fix the edges of the TensorNetwork `tn` to match
 # the tensor connectivity at vertex `v`.
 function fix_edges!(tn::AbstractGraph, v)
-    rem_edges!(tn, incident_edges(tn, v))
+    for e in incident_edges(tn, v)
+        # Remove an edge if there is no index on that edge.
+        if isempty(linkinds(tn, e))
+            rem_edge!(tn, e)
+        end
+    end
     add_missing_edges!(tn, v)
     return tn
 end

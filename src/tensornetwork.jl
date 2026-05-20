@@ -44,6 +44,12 @@ function TensorNetwork{V, VD, UG, Tensors}(
     return _TensorNetwork(graph, Tensors())
 end
 
+function Graphs.rem_vertex!(tn::TensorNetwork, v)
+    delete!(tn.tensors, v)
+    rem_vertex!(tn.underlying_graph, v)
+    return tn
+end
+
 # DataGraphs interface
 
 DataGraphs.underlying_graph(tn::TensorNetwork) = tn.underlying_graph
@@ -110,16 +116,12 @@ TensorNetwork(tn::TensorNetwork) = copy(tn)
 TensorNetwork{V}(tn::TensorNetwork{V}) where {V} = copy(tn)
 function TensorNetwork{V}(tn::TensorNetwork) where {V}
     g = convert_vertextype(V, underlying_graph(tn))
-    d = dictionary(V(k) => tn[k] for k in keys(d))
+    d = dictionary(V(k) => tn[k] for k in vertices(tn))
     return TensorNetwork(g, d)
 end
 
 NamedGraphs.convert_vertextype(::Type{V}, tn::TensorNetwork{V}) where {V} = tn
 NamedGraphs.convert_vertextype(V::Type, tn::TensorNetwork) = TensorNetwork{V}(tn)
-
-function Graphs.connected_components(tn::TensorNetwork)
-    return Graphs.connected_components(underlying_graph(tn))
-end
 
 function Graphs.rem_edge!(tn::TensorNetwork, e)
     if !has_edge(underlying_graph(tn), e)
@@ -136,22 +138,36 @@ function Graphs.rem_edge!(tn::TensorNetwork, e)
     return true
 end
 
-function GraphsExtensions.similar_graph(type::Type{<:TensorNetwork})
+function NamedGraphs.similar_graph(
+        type::Type{<:TensorNetwork},
+        vertices = vertextype(type)[]
+    )
     DT = fieldtype(type, :tensors)
     empty_dict = DT()
-    return TensorNetwork(similar_graph(underlying_graph_type(type)), empty_dict)
-end
-function GraphsExtensions.similar_graph(tn::TensorNetwork, underlying_graph::AbstractGraph)
-    DT = fieldtype(typeof(tn), :tensors)
-    empty_dict = DT()
+
+    underlying_graph = similar_graph(underlying_graph_type(type), vertices)
+
     return _TensorNetwork(underlying_graph, empty_dict)
+end
+function NamedGraphs.similar_graph(
+        graph::TensorNetwork,
+        VD::Type,
+        ::Type{<:Nothing},
+        vertices
+    )
+    V = eltype(vertices)
+    empty_dict = Dictionary{V, VD}()
+
+    new_underlying_graph = similar_graph(underlying_graph(graph), vertices)
+
+    return _TensorNetwork(new_underlying_graph, empty_dict)
 end
 
 function NamedGraphs.induced_subgraph_from_vertices(graph::TensorNetwork, subvertices)
-    return tensornetwork_induced_subgraph(graph, subvertices)
+    return induced_subgraph_tensornetwork(graph, subvertices)
 end
 
-function tensornetwork_induced_subgraph(graph, subvertices)
+function induced_subgraph_tensornetwork(graph, subvertices)
     underlying_subgraph, vlist =
         Graphs.induced_subgraph(underlying_graph(graph), subvertices)
 
@@ -163,6 +179,10 @@ function tensornetwork_induced_subgraph(graph, subvertices)
 end
 
 ## PartitionedGraphs
+function PartitionedGraphs.partitioned_vertices(tn::TensorNetwork)
+    return partitioned_vertices(tn.underlying_graph)
+end
+
 function PartitionedGraphs.quotient_graph(tn::TensorNetwork)
     ug = quotient_graph(underlying_graph(tn))
 

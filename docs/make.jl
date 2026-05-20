@@ -1,11 +1,12 @@
 using Documenter: Documenter, DocMeta, deploydocs, makedocs
+using ITensorFormatter: ITensorFormatter
 using ITensorNetworksNext: ITensorNetworksNext
 
 DocMeta.setdocmeta!(
     ITensorNetworksNext, :DocTestSetup, :(using ITensorNetworksNext); recursive = true
 )
 
-include("make_index.jl")
+ITensorFormatter.make_index!(pkgdir(ITensorNetworksNext))
 
 makedocs(;
     modules = [ITensorNetworksNext],
