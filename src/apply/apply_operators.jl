@@ -1,3 +1,4 @@
+import .AlgorithmsInterfaceExtensions as AIE
 import AlgorithmsInterface as AI
 import MatrixAlgebraKit as MAK
 import NamedDimsArrays as NDA
@@ -9,49 +10,41 @@ using NamedDimsArrays: AbstractNamedDimsArray, dimnames, domainnames, nameddims,
     replacedimnames, state
 using NamedGraphs.GraphsExtensions: all_edges, boundary_edges
 
-# === NestedAlgorithm framework ===
+# === Top-level user entry point (singular) ===
 
-abstract type NestedAlgorithm <: AI.Algorithm end
+abstract type ApplyOperatorAlgorithm <: AIE.AbstractAlgorithm end
 
-function initialize_subsolve(
-        problem::AI.Problem, algorithm::AI.Algorithm, state::AI.State
+function apply_operator! end
+
+function apply_operator(algorithm::ApplyOperatorAlgorithm, operator, state; kwargs...)
+    dest = AIE.initialize_output(apply_operator!, operator, state, algorithm)
+    return apply_operator!(algorithm, dest, operator, state; kwargs...)
+end
+
+# Convenience entries that pick the strategy via `AIE.select_algorithm`.
+function apply_operator!(dest, operator, state; alg = nothing, cache! = nothing, kwargs...)
+    algorithm = AIE.select_algorithm(
+        apply_operator!, alg, (dest, operator, state); kwargs...
     )
-    return throw(MethodError(initialize_subsolve, (problem, algorithm, state)))
+    return apply_operator!(algorithm, dest, operator, state; cache!)
+end
+function apply_operator(operator, state; alg = nothing, cache! = nothing, kwargs...)
+    algorithm = AIE.select_algorithm(apply_operator!, alg, (operator, state); kwargs...)
+    return apply_operator(algorithm, operator, state; cache!)
 end
 
-function finalize_substate!(
-        problem::AI.Problem, algorithm::AI.Algorithm, state::AI.State, substate::AI.State
-    )
-    state.iterate = substate.iterate
-    return state
-end
-
-function AI.step!(problem::AI.Problem, algorithm::NestedAlgorithm, state::AI.State)
-    subproblem, subalgorithm, substate = initialize_subsolve(problem, algorithm, state)
-    AI.solve!(subproblem, subalgorithm, substate)
-    finalize_substate!(problem, algorithm, state, substate)
-    return state
-end
-
-# === apply_operators (plural, iterative over a list of operators) ===
-
-function apply_operators(ops, state; op_alg = BPApplyGate(), kwargs...)
-    problem = ApplyOperatorsProblem(; operators = ops, init = state)
-    algorithm = ApplyOperators(;
-        operator_algorithm = op_alg,
-        stopping_criterion = AI.StopAfterIteration(length(ops))
-    )
-    return AI.solve(problem, algorithm; iterate = copy(state), kwargs...)
-end
+# === apply_operators (plural, still AI-based) ===
 
 @kwdef struct ApplyOperatorsProblem{Ops, Init} <: AI.Problem
     operators::Ops
     init::Init
 end
 
-@kwdef struct ApplyOperators{OpAlg} <: NestedAlgorithm
+@kwdef struct ApplyOperators{
+        OpAlg <: ApplyOperatorAlgorithm, SC <: AI.StoppingCriterion,
+    } <: AI.Algorithm
     operator_algorithm::OpAlg
-    stopping_criterion::AI.StopAfterIteration
+    stopping_criterion::SC
 end
 
 @kwdef mutable struct ApplyOperatorsState{
@@ -66,7 +59,7 @@ end
 function AI.initialize_state(
         problem::ApplyOperatorsProblem, algorithm::ApplyOperators;
         iterate,
-        cache! = initialize_cache(problem, algorithm, iterate),
+        cache! = initialize_cache(nothing, algorithm.operator_algorithm, iterate),
         iteration::Int = 0
     )
     stopping_criterion_state = AI.initialize_state(
@@ -89,98 +82,63 @@ function AI.initialize_state!(
     return state
 end
 
-function initialize_subsolve(
+function AI.step!(
         problem::ApplyOperatorsProblem, algorithm::ApplyOperators,
         state::ApplyOperatorsState
     )
-    op_i = problem.operators[state.iteration]
-    subproblem = ApplyOperatorProblem(; op = op_i, init = state.iterate)
-    subalgorithm = algorithm.operator_algorithm
-    substate = AI.initialize_state(
-        subproblem, subalgorithm; state.iterate, cache! = state.cache
+    op = problem.operators[state.iteration]
+    apply_operator!(
+        algorithm.operator_algorithm, state.iterate, op, state.iterate;
+        cache! = state.cache
     )
-    return subproblem, subalgorithm, substate
+    return state
 end
 
-function initialize_cache(problem::AI.Problem, algorithm::AI.Algorithm, iterate)
-    return throw(MethodError(initialize_cache, (problem, algorithm, iterate)))
-end
-
-function initialize_cache(
-        problem::ApplyOperatorsProblem, algorithm::ApplyOperators, iterate
+function apply_operators(operators, state; op_alg = nothing, kwargs...)
+    op_alg = AIE.select_algorithm(apply_operator!, op_alg, (state,))
+    problem = ApplyOperatorsProblem(; operators, init = state)
+    algorithm = ApplyOperators(;
+        operator_algorithm = op_alg,
+        stopping_criterion = AI.StopAfterIteration(length(operators))
     )
-    subproblem = ApplyOperatorProblem(; op = first(problem.operators), init = iterate)
-    subalgorithm = algorithm.operator_algorithm
-    return initialize_cache(subproblem, subalgorithm, iterate)
+    return AI.solve(problem, algorithm; iterate = copy(state), kwargs...)
 end
 
-# === apply_operator (singular, one gate application) ===
+# === BPApplyGate strategy ===
 
-@kwdef struct ApplyOperatorProblem{Op, Init} <: AI.Problem
-    op::Op
-    init::Init
-end
-
-function apply_operator(op, state; alg = BPApplyGate(), kwargs...)
-    problem = ApplyOperatorProblem(; op, init = state)
-    return AI.solve(problem, alg; iterate = copy(state), kwargs...)
-end
-
-function apply_operator!(dest, op, state; alg = BPApplyGate(), kwargs...)
-    problem = ApplyOperatorProblem(; op, init = state)
-    alg_state = AI.initialize_state(problem, alg; iterate = dest, kwargs...)
-    return AI.solve!(problem, alg, alg_state)
-end
-
-# === BPApplyGate (non-iterative; overloads solve_loop! directly) ===
-
-@kwdef struct BPApplyGate{Trunc, PinvKwargs <: NamedTuple} <: AI.Algorithm
+@kwdef struct BPApplyGate{Trunc, PinvKwargs <: NamedTuple} <: ApplyOperatorAlgorithm
     trunc::Trunc = nothing
     pinv_kwargs::PinvKwargs = (; tol = 0)
     normalize::Bool = false
 end
 
-@kwdef mutable struct BPApplyGateState{Iterate, Cache} <: AI.State
-    iterate::Iterate
-    cache::Cache
+function AIE.default_algorithm(::typeof(apply_operator!), ::Type{<:Tuple}; kwargs...)
+    return BPApplyGate(; kwargs...)
 end
-
-function AI.initialize_state(
-        problem::ApplyOperatorProblem, algorithm::BPApplyGate;
-        iterate, cache! = initialize_cache(problem, algorithm, iterate)
+function AIE.initialize_output(
+        ::typeof(apply_operator!), operator, state, ::BPApplyGate
     )
-    return BPApplyGateState(; iterate, cache = cache!)
+    return copy(state)
 end
 
-# Non-iterative algorithm: no per-call state to reset.
-function AI.initialize_state!(
-        ::ApplyOperatorProblem, ::BPApplyGate, state::BPApplyGateState
+function apply_operator!(
+        algorithm::BPApplyGate, dest, operator, state; cache! = nothing
     )
-    return state
+    cache! = initialize_cache(cache!, algorithm, state)
+    apply_gate_bp!(
+        dest, operator, state;
+        cache!, algorithm.trunc, algorithm.pinv_kwargs, algorithm.normalize
+    )
+    return dest
 end
 
+initialize_cache(cache!, ::BPApplyGate, iterate::AbstractTensorNetwork) = cache!
 # Initialize the BP message cache to identity square-root messages.
-function initialize_cache(
-        ::ApplyOperatorProblem, ::BPApplyGate, iterate::AbstractTensorNetwork
-    )
+function initialize_cache(::Nothing, ::BPApplyGate, iterate::AbstractTensorNetwork)
     return sqrtmessagecache(all_edges(iterate)) do edge
         factor = iterate[dst(edge)]
         return state(one(similar_operator(factor, linkaxes(iterate, edge))))
     end
-end
-
-# Non-iterative algorithm: bypass the step!/stopping-criterion loop.
-function AI.solve_loop!(
-        problem::ApplyOperatorProblem, algorithm::BPApplyGate,
-        state::BPApplyGateState
-    )
-    apply_gate_bp!(
-        state.iterate, problem.op, problem.init;
-        cache! = state.cache,
-        trunc = algorithm.trunc, pinv_kwargs = algorithm.pinv_kwargs,
-        normalize = algorithm.normalize
-    )
-    return state
 end
 
 # === BP simple-update implementation ===

@@ -81,6 +81,12 @@ function select_algorithm(f, alg::NamedTuple, ::Type{Args}; kwargs...) where {Ar
     )
     return default_algorithm(f, Args; alg...)
 end
+# Allocate the destination for an in-place call to `f`. Operations overload
+# `initialize_output(::typeof(f), args..., alg)` to control allocation.
+function initialize_output(f, args...; kwargs...)
+    return throw(MethodError(initialize_output, (f, args...)))
+end
+
 function select_algorithm(f, alg::AbstractAlgorithm, ::Type{<:Tuple}; kwargs...)
     isempty(kwargs) || throw(
         ArgumentError(
