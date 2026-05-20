@@ -31,6 +31,51 @@ function AI.step!(problem::AI.Problem, algorithm::NestedAlgorithm, state::AI.Sta
     return state
 end
 
+# ============================ NestedState =================================================
+
+# State that wraps an inner `substate` and forwards `:iterate` accesses to it,
+# so the inner-loop iterate is shared without duplicating storage on the outer
+# state. Subtypes must store the inner state as a field named `substate`.
+abstract type NestedState <: AI.State end
+
+# Use `getfield` on the right-hand side so future edits to this forwarder
+# can't accidentally recurse through the overload.
+function Base.getproperty(state::NestedState, name::Symbol)
+    name === :iterate && return getfield(state, :substate).iterate
+    return getfield(state, name)
+end
+function Base.setproperty!(state::NestedState, name::Symbol, value)
+    name === :iterate && return (getfield(state, :substate).iterate = value)
+    return setfield!(state, name, value)
+end
+function Base.propertynames(state::NestedState)
+    return (fieldnames(typeof(state))..., :iterate)
+end
+
+# ============================ select_algorithm / default_algorithm ========================
+
+# Modeled on `MatrixAlgebraKit.select_algorithm` / `default_algorithm`. An
+# operation `f` (a function) declares its default algorithm strategy by
+# overloading `default_algorithm(::typeof(f); kwargs...)`. The strategy can
+# then be selected at a call site via `select_algorithm(f, alg; kwargs...)`,
+# accepting either `nothing` (use defaults), a `NamedTuple` of keyword
+# arguments forwarded to the default constructor, or an explicit algorithm
+# instance — the last dispatched per-operation (e.g. on a strategy
+# supertype).
+function default_algorithm(f; kwargs...)
+    return throw(MethodError(default_algorithm, (f,)))
+end
+
+select_algorithm(f, ::Nothing; kwargs...) = default_algorithm(f; kwargs...)
+function select_algorithm(f, alg::NamedTuple; kwargs...)
+    isempty(kwargs) || throw(
+        ArgumentError(
+            "Additional keyword arguments are not allowed when `alg` is a `NamedTuple`."
+        )
+    )
+    return default_algorithm(f; alg...)
+end
+
 # ============================ StopWhenConverged ===========================================
 
 # Stopping criterion that fires once `iterate_diff(iterate, previous_iterate) < tol`.
