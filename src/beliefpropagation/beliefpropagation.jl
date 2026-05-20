@@ -18,7 +18,8 @@ function select_beliefpropagation_stopping_criterion(::Nothing)
     return throw(
         ArgumentError(
             "`stopping_criterion` must be specified, e.g.\n" *
-                "  `stopping_criterion = (; maxiter = 10)` or\n" *
+                "  `stopping_criterion = (; maxiter = 10)`,\n" *
+                "  `stopping_criterion = (; maxiter = 10, tol = 1.0e-10)`, or\n" *
                 "  `stopping_criterion = AI.StopAfterIteration(10) | StopWhenConverged(1.0e-10)`."
         )
     )
@@ -26,19 +27,31 @@ end
 function select_beliefpropagation_stopping_criterion(kwargs::NamedTuple)
     return select_beliefpropagation_stopping_criterion(; kwargs...)
 end
-function select_beliefpropagation_stopping_criterion(; maxiter = nothing, kwargs...)
-    if isnothing(maxiter)
-        throw(ArgumentError("`maxiter` must be specified in `stopping_criterion`."))
-    end
+function select_beliefpropagation_stopping_criterion(;
+        maxiter = nothing, tol = nothing, kwargs...
+    )
     if !isempty(kwargs)
         throw(
             ArgumentError(
                 "Unrecognized `stopping_criterion` kwargs: $(keys(kwargs)). " *
-                    "Only `maxiter` is currently supported."
+                    "Supported: `maxiter`, `tol`."
             )
         )
     end
-    return AI.StopAfterIteration(maxiter)
+    if isnothing(maxiter) && isnothing(tol)
+        throw(
+            ArgumentError("At least one of `maxiter` or `tol` must be specified.")
+        )
+    end
+    criterion = nothing
+    if !isnothing(maxiter)
+        criterion = AI.StopAfterIteration(maxiter)
+    end
+    if !isnothing(tol)
+        converged = StopWhenConverged(; tol)
+        criterion = isnothing(criterion) ? converged : criterion | converged
+    end
+    return criterion
 end
 
 function beliefpropagation(
@@ -228,7 +241,7 @@ function message_update!(algorithm::SimpleMessageUpdate, cache, factors, edge)
     end
 
     cache[edge] = new_message
-    return nothing
+    return cache
 end
 
 # === `iterate_diff` for `MessageCache` (used by `AIE.StopWhenConverged`) ===

@@ -202,11 +202,9 @@ end
 
                     messages = Dict(edge => randt(tn, edge) for edge in all_edges(g))
 
-                    stopping_criterion =
-                        AI.StopAfterIteration(10) | StopWhenConverged(tol = 1.0e-10)
-
                     cache = ITensorNetworksNext.beliefpropagation(
-                        tn, messages; stopping_criterion
+                        tn, messages;
+                        stopping_criterion = (; maxiter = 10, tol = 1.0e-10)
                     )
 
                     z_bp = exp(bethe_free_energy(tn, cache))
