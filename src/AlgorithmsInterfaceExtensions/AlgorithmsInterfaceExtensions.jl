@@ -54,26 +54,40 @@ end
 
 # ============================ select_algorithm / default_algorithm ========================
 
-# Modeled on `MatrixAlgebraKit.select_algorithm` / `default_algorithm`. An
-# operation `f` (a function) declares its default algorithm strategy by
-# overloading `default_algorithm(::typeof(f); kwargs...)`. The strategy can
-# then be selected at a call site via `select_algorithm(f, alg; kwargs...)`,
-# accepting either `nothing` (use defaults), a `NamedTuple` of keyword
-# arguments forwarded to the default constructor, or an explicit algorithm
-# instance — the last dispatched per-operation (e.g. on a strategy
-# supertype).
-function default_algorithm(f; kwargs...)
-    return throw(MethodError(default_algorithm, (f,)))
+# Like `MatrixAlgebraKit.select_algorithm` / `default_algorithm`, but
+# selection-relevant inputs are packed into an `args` tuple so the value
+# and type domains stay disjoint: `(1.2,)` vs `Tuple{Float64}`. Strategy
+# types subtype `AbstractAlgorithm` so the passthrough overload is generic.
+abstract type AbstractAlgorithm end
+
+function default_algorithm(f, ::Type{Args}; kwargs...) where {Args <: Tuple}
+    return throw(MethodError(default_algorithm, (f, Args)))
+end
+function default_algorithm(f, args::Tuple; kwargs...)
+    return default_algorithm(f, typeof(args); kwargs...)
 end
 
-select_algorithm(f, ::Nothing; kwargs...) = default_algorithm(f; kwargs...)
-function select_algorithm(f, alg::NamedTuple; kwargs...)
+function select_algorithm(f, alg, args::Tuple; kwargs...)
+    return select_algorithm(f, alg, typeof(args); kwargs...)
+end
+function select_algorithm(f, ::Nothing, ::Type{Args}; kwargs...) where {Args <: Tuple}
+    return default_algorithm(f, Args; kwargs...)
+end
+function select_algorithm(f, alg::NamedTuple, ::Type{Args}; kwargs...) where {Args <: Tuple}
     isempty(kwargs) || throw(
         ArgumentError(
             "Additional keyword arguments are not allowed when `alg` is a `NamedTuple`."
         )
     )
-    return default_algorithm(f; alg...)
+    return default_algorithm(f, Args; alg...)
+end
+function select_algorithm(f, alg::AbstractAlgorithm, ::Type{<:Tuple}; kwargs...)
+    isempty(kwargs) || throw(
+        ArgumentError(
+            "Additional keyword arguments are not allowed when `alg` is an `AbstractAlgorithm` instance."
+        )
+    )
+    return alg
 end
 
 # ============================ StopWhenConverged ===========================================

@@ -3,7 +3,7 @@ import AlgorithmsInterface as AI
 using .AlgorithmsInterfaceExtensions: StopWhenConverged, iterate_diff
 using BackendSelection: @Algorithm_str, Algorithm
 using DataGraphs: edge_data
-using Graphs: AbstractEdge, edges, has_edge, vertices
+using Graphs: AbstractEdge, edges, edgetype, has_edge, vertices
 using LinearAlgebra: norm, normalize
 using NamedDimsArrays: AbstractNamedDimsArray
 using NamedGraphs.GraphsExtensions: add_edges!, boundary_edges, subgraph
@@ -48,9 +48,13 @@ function beliefpropagation(
         message_update_algorithm = nothing
     )
     problem = BeliefPropagationProblem(factors)
+    cache = MessageCache(messages)
 
+    # No concrete `edge` value here, so the args tuple uses `edgetype(factors)`.
     message_update_algorithm = AIE.select_algorithm(
-        message_update!, message_update_algorithm
+        message_update!,
+        message_update_algorithm,
+        Tuple{typeof(cache), typeof(factors), edgetype(factors)}
     )
     subalgorithm = BeliefPropagationSweepAlgorithm(;
         message_update_algorithm,
@@ -58,8 +62,6 @@ function beliefpropagation(
     )
     stopping_criterion = select_beliefpropagation_stopping_criterion(stopping_criterion)
     algorithm = BeliefPropagationAlgorithm(; edges, subalgorithm, stopping_criterion)
-
-    cache = MessageCache(messages)
 
     return AI.solve(problem, algorithm; iterate = cache) # -> typeof(cache)
 end
@@ -188,23 +190,13 @@ end
 # message is computed and written back into the message store. Plug in a
 # new strategy by subtyping `MessageUpdateAlgorithm` and overloading
 # `message_update!(strategy, cache, factors, edge)`.
-abstract type MessageUpdateAlgorithm end
+abstract type MessageUpdateAlgorithm <: AIE.AbstractAlgorithm end
 
 function message_update! end
 
-# Algorithm selection (MAK-style; see `AIE.select_algorithm`).
-function AIE.default_algorithm(::typeof(message_update!); kwargs...)
+# `args` tuple mirrors the `message_update!(cache, factors, edge)` call shape.
+function AIE.default_algorithm(::typeof(message_update!), ::Type{<:Tuple}; kwargs...)
     return SimpleMessageUpdate(; kwargs...)
-end
-function AIE.select_algorithm(
-        ::typeof(message_update!), alg::MessageUpdateAlgorithm; kwargs...
-    )
-    isempty(kwargs) || throw(
-        ArgumentError(
-            "Additional keyword arguments are not allowed when `alg` is a `MessageUpdateAlgorithm` instance."
-        )
-    )
-    return alg
 end
 
 # Convenience entry: pick the strategy via `AIE.select_algorithm`
@@ -212,7 +204,8 @@ end
 # kwargs forwarded to the default algorithm), then dispatch.
 function message_update!(cache, factors, edge; alg = nothing, kwargs...)
     return message_update!(
-        AIE.select_algorithm(message_update!, alg; kwargs...), cache, factors, edge
+        AIE.select_algorithm(message_update!, alg, (cache, factors, edge); kwargs...),
+        cache, factors, edge
     )
 end
 
