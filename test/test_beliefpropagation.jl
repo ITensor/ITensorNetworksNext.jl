@@ -167,7 +167,9 @@ end
 
             messages = Dict(edge => onet(tn, edge) for edge in all_edges(g))
 
-            cache = ITensorNetworksNext.beliefpropagation(tn, messages; maxiter = 1)
+            cache = ITensorNetworksNext.beliefpropagation(
+                tn, messages; stopping_criterion = (; maxiter = 1)
+            )
             z_bp = exp(bethe_free_energy(tn, cache))
             z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
             @test z_bp ≈ z_exact
@@ -184,7 +186,9 @@ end
 
             messages = Dict(edge => onet(tn, edge) for edge in all_edges(g))
 
-            cache = ITensorNetworksNext.beliefpropagation(tn, messages; maxiter = 1)
+            cache = ITensorNetworksNext.beliefpropagation(
+                tn, messages; stopping_criterion = (; maxiter = 1)
+            )
             z_bp = exp(bethe_free_energy(tn, cache))
             z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
             @test z_bp ≈ z_exact
@@ -198,13 +202,9 @@ end
 
                     messages = Dict(edge => randt(tn, edge) for edge in all_edges(g))
 
-                    stopping_criterion = StopWhenConverged(tol = 1.0e-10)
-
                     cache = ITensorNetworksNext.beliefpropagation(
-                        tn,
-                        messages;
-                        maxiter = 10,
-                        stopping_criterion
+                        tn, messages;
+                        stopping_criterion = (; maxiter = 10, tol = 1.0e-10)
                     )
 
                     z_bp = exp(bethe_free_energy(tn, cache))
