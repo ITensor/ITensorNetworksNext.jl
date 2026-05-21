@@ -194,16 +194,6 @@ function apply_gate_bp_nsite!(
     edges_in = boundary_edges(cache!, vs; dir = :in)
     sqrt_envs_v1 = [cache![e] for e in edges_in if dst(e) == v1]
     sqrt_envs_v2 = [cache![e] for e in edges_in if dst(e) == v2]
-    inv_sqrt_envs_v1 = map(sqrt_envs_v1) do env
-        return MAK.inv_regularized(
-            env, setdiff(dimnames(env), dimnames(state[v1])); pinv_kwargs...
-        )
-    end
-    inv_sqrt_envs_v2 = map(sqrt_envs_v2) do env
-        return MAK.inv_regularized(
-            env, setdiff(dimnames(env), dimnames(state[v2])); pinv_kwargs...
-        )
-    end
 
     ψ_v1 = prod([[state[v1]]; sqrt_envs_v1])
     ψ_v2 = prod([[state[v2]]; sqrt_envs_v2])
@@ -220,6 +210,16 @@ function apply_gate_bp_nsite!(
     R_v1 = replacedimnames(U_v1 * sqrt_S, name_v2 => name_v1)
     R_v2 = sqrt_S * U_v2
 
+    inv_sqrt_envs_v1 = map(sqrt_envs_v1) do env
+        return MAK.inv_regularized(
+            env, setdiff(dimnames(env), dimnames(state[v1])); pinv_kwargs...
+        )
+    end
+    inv_sqrt_envs_v2 = map(sqrt_envs_v2) do env
+        return MAK.inv_regularized(
+            env, setdiff(dimnames(env), dimnames(state[v2])); pinv_kwargs...
+        )
+    end
     dest[v1] = prod([[Q_v1 * R_v1]; inv_sqrt_envs_v1])
     dest[v2] = prod([[Q_v2 * R_v2]; inv_sqrt_envs_v2])
 
