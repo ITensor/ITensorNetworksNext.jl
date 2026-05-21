@@ -120,21 +120,10 @@ function apply_operator!(
     )
     apply_gate_bp!(
         dest, operator, state;
-        env_cache!, algorithm.trunc, algorithm.pinv_kwargs, algorithm.normalize
+        sqrt_messages! = env_cache!,
+        algorithm.trunc, algorithm.pinv_kwargs, algorithm.normalize
     )
     return dest
-end
-
-# A `BPApplyGate`-compatible cache of identity sqrt-messages on every directed
-# edge of `state`. Cheap to construct, but only a meaningful starting point
-# for workloads where the initial BP environment doesn't matter (e.g. imaginary
-# time evolution toward a ground state). For real-time evolution or other
-# accuracy-sensitive workloads, pass a converged BP cache instead.
-function identity_sqrt_messages(state::AbstractTensorNetwork)
-    return sqrtmessagecache(all_edges(state)) do edge
-        factor = state[dst(edge)]
-        return NDA.state(one(similar_operator(factor, linkaxes(state, edge))))
-    end
 end
 
 # === BP simple-update implementation ===
@@ -161,12 +150,13 @@ end
 function apply_gate_bp_nsite!(
         ::Val{1}, dest::AbstractTensorNetwork, op::AbstractNamedDimsArray,
         state::AbstractTensorNetwork, vs;
-        env_cache!, normalize, kwargs...
+        sqrt_messages!, normalize, kwargs...
     )
     v = only(vs)
     ψv = NDA.apply(op, state[v])
     if normalize
-        sqrt_envs = [env_cache![e] for e in boundary_edges(env_cache!, vs; dir = :in)]
+        sqrt_envs =
+            [sqrt_messages![e] for e in boundary_edges(sqrt_messages!, vs; dir = :in)]
         ψv /= norm(prod([[ψv]; sqrt_envs]))
     end
     dest[v] = ψv
@@ -176,12 +166,12 @@ end
 function apply_gate_bp_nsite!(
         ::Val{2}, dest::AbstractTensorNetwork, op::AbstractNamedDimsArray,
         state::AbstractTensorNetwork, vs;
-        env_cache!, trunc, pinv_kwargs, normalize
+        sqrt_messages!, trunc, pinv_kwargs, normalize
     )
     v1, v2 = vs
-    edges_in = boundary_edges(env_cache!, vs; dir = :in)
-    sqrt_envs_v1 = [env_cache![e] for e in edges_in if dst(e) == v1]
-    sqrt_envs_v2 = [env_cache![e] for e in edges_in if dst(e) == v2]
+    edges_in = boundary_edges(sqrt_messages!, vs; dir = :in)
+    sqrt_envs_v1 = [sqrt_messages![e] for e in edges_in if dst(e) == v1]
+    sqrt_envs_v2 = [sqrt_messages![e] for e in edges_in if dst(e) == v2]
 
     ψ_v1 = prod([[state[v1]]; sqrt_envs_v1])
     ψ_v2 = prod([[state[v2]]; sqrt_envs_v2])
@@ -211,9 +201,9 @@ function apply_gate_bp_nsite!(
     dest[v1] = prod([[Q_v1 * R_v1]; inv_sqrt_envs_v1])
     dest[v2] = prod([[Q_v2 * R_v2]; inv_sqrt_envs_v2])
 
-    env_cache![v1 => v2] = replacedimnames(
+    sqrt_messages![v1 => v2] = replacedimnames(
         sqrt_S, name_v1 => randname(name_v1), name_v2 => name_v1
     )
-    env_cache![v2 => v1] = replacedimnames(sqrt_S, name_v2 => randname(name_v2))
+    sqrt_messages![v2 => v1] = replacedimnames(sqrt_S, name_v2 => randname(name_v2))
     return dest
 end
