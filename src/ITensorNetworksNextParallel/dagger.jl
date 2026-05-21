@@ -1,18 +1,22 @@
 import ..ITensorNetworksNext.AlgorithmsInterfaceExtensions as AIE
 import AlgorithmsInterface as AI
-using Dictionaries: Dictionary
 using ITensorNetworksNext: AbstractBeliefPropagationCache
 
+abstract type Driver end
+
+struct SERIAL <: Driver end
+struct DAGGER <: Driver end
+
 @kwdef mutable struct DaggerState{
-        Iterate, StoppingCriterionState <: AI.StoppingCriterionState, DTask,
-    } <: AIE.State
-    iterate::Iterate # DaggerBeliefPropagationCache
+        Substate, StoppingCriterionState <: AI.StoppingCriterionState, DTask,
+    } <: AIE.NestedState
+    substate::Substate
     iteration::Int = 0
     stopping_criterion_state::StoppingCriterionState
-    remote_results::Dictionary{Int, DTask} = Dict{Int, Any}()
+    remote_results::Dict{Int, DTask} = Dict{Int, Any}()
 end
 
-function initialize_dagger_state(problem, algorithm; kwargs...)
+function initialize_dagger_state(_problem, _algorithm; _kwargs...)
     throw(
         ErrorException(
             "Package Dagger not loaded. Please install and load the Dagger package."
@@ -20,16 +24,14 @@ function initialize_dagger_state(problem, algorithm; kwargs...)
     )
 end
 
-@kwdef struct DaggerNestedAlgorithm{
-        ChildAlgorithm <: AIE.Algorithm,
-        Algorithms <: AbstractVector{ChildAlgorithm},
-        StoppingCriterion <: AI.StoppingCriterion,
-    } <: ParallelAlgorithm{ChildAlgorithm}
-    algorithms::Algorithms
-    stopping_criterion::StoppingCriterion = AI.StopAfterIteration(length(algorithms))
+@kwdef struct InParallel{Algorithm <: AI.Algorithm}
+    parent::Algorithm
+
 end
 
-function dagger_algorithm(f, iterable; kwargs...)
+
+
+function step_dagger!(_problem, _algorithm, _state)
     throw(
         ErrorException(
             "Package Dagger not loaded. Please install and load the Dagger package."

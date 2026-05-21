@@ -45,16 +45,19 @@ function beliefpropagation(
         factors, messages;
         edges = default_beliefpropagation_edges(factors),
         stopping_criterion = nothing,
-        message_update_algorithm = nothing
+        message_update_algorithm = nothing,
+        driver = nothing
     )
     problem = BeliefPropagationProblem(factors)
 
     message_update_algorithm = AIE.select_algorithm(
         message_update!, message_update_algorithm
     )
-    subalgorithm = BeliefPropagationSweepAlgorithm(;
-        message_update_algorithm,
-        stopping_criterion = AI.StopAfterIteration(length(edges))
+    subalgorithm = Daggered(
+        BeliefPropagationSweepAlgorithm(;
+            message_update_algorithm,
+            stopping_criterion = AI.StopAfterIteration(length(edges))
+        )
     )
     stopping_criterion = select_beliefpropagation_stopping_criterion(stopping_criterion)
     algorithm = BeliefPropagationAlgorithm(; edges, subalgorithm, stopping_criterion)
@@ -173,6 +176,18 @@ end
 function AI.step!(
         problem::BeliefPropagationSweepProblem,
         algorithm::BeliefPropagationSweepAlgorithm,
+        state::BeliefPropagationSweepState
+    )
+    edge = problem.edges[state.iteration]
+    message_update!(
+        algorithm.message_update_algorithm, state.iterate, problem.factors, edge
+    )
+    return state
+end
+
+function AI.step!(
+        problem::BeliefPropagationSweepProblem,
+        algorithm::Dagger{BeliefPropagationSweepAlgorithm},
         state::BeliefPropagationSweepState
     )
     edge = problem.edges[state.iteration]
