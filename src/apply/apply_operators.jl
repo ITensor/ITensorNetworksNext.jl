@@ -15,7 +15,7 @@ using NamedGraphs.GraphsExtensions: all_edges, boundary_edges
 function apply_operators(operators, state; op_alg = nothing, kwargs...)
     op_alg = AIE.select_algorithm(apply_operator!, op_alg, (state,))
     problem = ApplyOperatorsProblem(; operators, init = state)
-    algorithm = ApplyOperators(;
+    algorithm = ApplyOperatorsAlgorithm(;
         operator_algorithm = op_alg,
         stopping_criterion = AI.StopAfterIteration(length(operators))
     )
@@ -29,7 +29,7 @@ end
     init::Init
 end
 
-@kwdef struct ApplyOperators{
+@kwdef struct ApplyOperatorsAlgorithm{
         OperatorAlgorithm,
         StoppingCriterion <: AI.StoppingCriterion,
     } <: AI.Algorithm
@@ -47,7 +47,7 @@ end
 end
 
 function AI.initialize_state(
-        problem::ApplyOperatorsProblem, algorithm::ApplyOperators;
+        problem::ApplyOperatorsProblem, algorithm::ApplyOperatorsAlgorithm;
         iterate, cache! = nothing, iteration::Int = 0
     )
     cache! =
@@ -61,7 +61,7 @@ function AI.initialize_state(
 end
 
 function AI.initialize_state!(
-        problem::ApplyOperatorsProblem, algorithm::ApplyOperators,
+        problem::ApplyOperatorsProblem, algorithm::ApplyOperatorsAlgorithm,
         state::ApplyOperatorsState; iteration::Int = 0
     )
     state.iteration = iteration
@@ -73,7 +73,7 @@ function AI.initialize_state!(
 end
 
 function AI.step!(
-        problem::ApplyOperatorsProblem, algorithm::ApplyOperators,
+        problem::ApplyOperatorsProblem, algorithm::ApplyOperatorsAlgorithm,
         state::ApplyOperatorsState
     )
     op = problem.operators[state.iteration]
