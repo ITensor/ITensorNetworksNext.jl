@@ -1,6 +1,7 @@
 import Graphs
 using ITensorBase: Index
-using ITensorNetworksNext: TensorNetwork, apply_operator, apply_operators
+using ITensorNetworksNext:
+    TensorNetwork, apply_operator, apply_operators, identity_sqrt_messages
 using LinearAlgebra: I, norm
 using NamedDimsArrays: AbstractNamedDimsArray, dimnames, name, nameddims, operator, randname
 using NamedGraphs.GraphsExtensions: incident_edges
@@ -35,7 +36,7 @@ end
         n_v = name(s_v)
         co_n = randname(n_v)
         id1 = operator(reshape(Matrix{Float64}(I, 2, 2), 2, 2), (co_n,), (n_v,))
-        ψ_id = apply_operator(id1, ψ)
+        ψ_id = apply_operator(id1, ψ; env_cache! = identity_sqrt_messages(ψ))
         @test issetequal(dimnames(ψ_id[v]), dimnames(ψ[v]))
         @test ψ_id[v] ≈ ψ[v]
     end
@@ -49,7 +50,7 @@ end
             reshape(Matrix{Float64}(I, 4, 4), 2, 2, 2, 2),
             (co_n1, co_n2), (n_v1, n_v2)
         )
-        ψ_id = apply_operator(id4, ψ)
+        ψ_id = apply_operator(id4, ψ; env_cache! = identity_sqrt_messages(ψ))
         # Site dimnames are preserved at each vertex.
         @test n_v1 in dimnames(ψ_id[v1])
         @test n_v2 in dimnames(ψ_id[v2])
@@ -70,7 +71,7 @@ end
         # tensor, so we keep H real and use exp(H)/||exp(H)|| as a stand-in.
         U = exp(0.1 .* H)
         gate = operator(reshape(U, 2, 2, 2, 2), (co_n1, co_n2), (n_v1, n_v2))
-        ψ_g = apply_operator(gate, ψ)
+        ψ_g = apply_operator(gate, ψ; env_cache! = identity_sqrt_messages(ψ))
         # The bond between v1 and v2 is fresh and small (≤ 2*2 = 4, since
         # there's no extra factor from the gate beyond the site dims).
         new_bond_dim = Int(length(only(intersect(axes(ψ_g[v1]), axes(ψ_g[v2])))))
@@ -86,8 +87,8 @@ end
             reshape(Matrix{Float64}(I, 4, 4), 2, 2, 2, 2),
             (co_n1, co_n2), (n_v1, n_v2)
         )
-        ψ_single = apply_operator(id4, ψ)
-        ψ_seq = apply_operators([id4, id4], ψ)
+        ψ_single = apply_operator(id4, ψ; env_cache! = identity_sqrt_messages(ψ))
+        ψ_seq = apply_operators([id4, id4], ψ; env_cache! = identity_sqrt_messages(ψ))
         # Two identity gates is the same as one (up to bond renaming): site
         # names of `ψ` are preserved at each vertex.
         @test all(Graphs.vertices(g)) do v
