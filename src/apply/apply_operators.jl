@@ -3,7 +3,7 @@ import AlgorithmsInterface as AI
 import MatrixAlgebraKit as MAK
 import NamedDimsArrays as NDA
 import TensorAlgebra as TA
-using Base: @kwdef
+using Base: @kwdef, @something
 using Graphs: dst, src, vertices
 using LinearAlgebra: norm
 using NamedDimsArrays: AbstractNamedDimsArray, dimnames, domainnames, nameddims, randname,
@@ -20,6 +20,10 @@ function apply_operators(operators, state; op_alg = nothing, kwargs...)
         stopping_criterion = AI.StopAfterIteration(length(operators))
     )
     return AI.solve(problem, algorithm; iterate = copy(state), kwargs...)
+end
+
+function apply_operator(operator, state; alg = nothing, kwargs...)
+    return apply_operators([operator], state; op_alg = alg, kwargs...)
 end
 
 # === Layer 1: apply_operators iteration ===
@@ -50,8 +54,7 @@ function AI.initialize_state(
         problem::ApplyOperatorsProblem, algorithm::ApplyOperatorsAlgorithm;
         iterate, cache! = nothing, iteration::Int = 0
     )
-    cache! =
-        initialize_cache(apply_operator!, cache!, algorithm.operator_algorithm, iterate)
+    cache! = @something cache! initialize_cache(problem, algorithm; iterate)
     stopping_criterion_state = AI.initialize_state(
         problem, algorithm, algorithm.stopping_criterion; iterate
     )
@@ -94,25 +97,10 @@ function AIE.default_algorithm(::typeof(apply_operator!), ::Type{<:Tuple}; kwarg
     return BPApplyGate(; kwargs...)
 end
 
-function apply_operator(algorithm::ApplyOperatorAlgorithm, operator, state; kwargs...)
+function apply_operator(algorithm::ApplyOperatorAlgorithm, operator, state; cache!)
     dest = AIE.initialize_output(apply_operator!, algorithm, operator, state)
-    return apply_operator!(algorithm, dest, operator, state; kwargs...)
-end
-
-# Convenience entries that pick the strategy via `AIE.select_algorithm`.
-function apply_operator!(dest, operator, state; alg = nothing, cache! = nothing, kwargs...)
-    algorithm = AIE.select_algorithm(
-        apply_operator!, alg, (dest, operator, state); kwargs...
-    )
     return apply_operator!(algorithm, dest, operator, state; cache!)
 end
-function apply_operator(operator, state; alg = nothing, cache! = nothing, kwargs...)
-    algorithm = AIE.select_algorithm(apply_operator!, alg, (operator, state); kwargs...)
-    return apply_operator(algorithm, operator, state; cache!)
-end
-
-initialize_cache(f, cache!, algorithm, state) = cache!
-initialize_cache(f, ::Nothing, algorithm, state) = default_cache(f, algorithm, state)
 
 # === Default strategy: BPApplyGate ===
 
@@ -129,9 +117,8 @@ function AIE.initialize_output(
 end
 
 function apply_operator!(
-        algorithm::BPApplyGate, dest, operator, state; cache! = nothing
+        algorithm::BPApplyGate, dest, operator, state; cache!
     )
-    cache! = initialize_cache(apply_operator!, cache!, algorithm, state)
     apply_gate_bp!(
         dest, operator, state;
         cache!, algorithm.trunc, algorithm.pinv_kwargs, algorithm.normalize
@@ -140,8 +127,9 @@ function apply_operator!(
 end
 
 # Initialize the BP message cache to identity square-root messages.
-function default_cache(
-        ::typeof(apply_operator!), ::BPApplyGate, iterate::AbstractTensorNetwork
+function initialize_cache(
+        ::ApplyOperatorsProblem,
+        ::ApplyOperatorsAlgorithm{<:BPApplyGate}; iterate
     )
     return sqrtmessagecache(all_edges(iterate)) do edge
         factor = iterate[dst(edge)]
