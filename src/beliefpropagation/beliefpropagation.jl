@@ -3,7 +3,7 @@ import AlgorithmsInterface as AI
 using .AlgorithmsInterfaceExtensions: StopWhenConverged, iterate_diff
 using BackendSelection: @Algorithm_str, Algorithm
 using DataGraphs: edge_data
-using Graphs: AbstractEdge, edges, has_edge, vertices
+using Graphs: AbstractEdge, edges, edgetype, has_edge, vertices
 using LinearAlgebra: norm, normalize
 using NamedDimsArrays: AbstractNamedDimsArray
 using NamedGraphs.GraphsExtensions: add_edges!, boundary_edges, subgraph
@@ -18,7 +18,8 @@ function select_beliefpropagation_stopping_criterion(::Nothing)
     return throw(
         ArgumentError(
             "`stopping_criterion` must be specified, e.g.\n" *
-                "  `stopping_criterion = (; maxiter = 10)` or\n" *
+                "  `stopping_criterion = (; maxiter = 10)`,\n" *
+                "  `stopping_criterion = (; maxiter = 10, tol = 1.0e-10)`, or\n" *
                 "  `stopping_criterion = AI.StopAfterIteration(10) | StopWhenConverged(1.0e-10)`."
         )
     )
@@ -26,43 +27,54 @@ end
 function select_beliefpropagation_stopping_criterion(kwargs::NamedTuple)
     return select_beliefpropagation_stopping_criterion(; kwargs...)
 end
-function select_beliefpropagation_stopping_criterion(; maxiter = nothing, kwargs...)
-    if isnothing(maxiter)
-        throw(ArgumentError("`maxiter` must be specified in `stopping_criterion`."))
-    end
+function select_beliefpropagation_stopping_criterion(;
+        maxiter = nothing, tol = nothing, kwargs...
+    )
     if !isempty(kwargs)
         throw(
             ArgumentError(
                 "Unrecognized `stopping_criterion` kwargs: $(keys(kwargs)). " *
-                    "Only `maxiter` is currently supported."
+                    "Supported: `maxiter`, `tol`."
             )
         )
     end
-    return AI.StopAfterIteration(maxiter)
+    if isnothing(maxiter) && isnothing(tol)
+        throw(
+            ArgumentError("At least one of `maxiter` or `tol` must be specified.")
+        )
+    end
+    criterion = nothing
+    if !isnothing(maxiter)
+        criterion = AI.StopAfterIteration(maxiter)
+    end
+    if !isnothing(tol)
+        converged = StopWhenConverged(; tol)
+        criterion = isnothing(criterion) ? converged : criterion | converged
+    end
+    return criterion
 end
 
 function beliefpropagation(
         factors, messages;
         edges = default_beliefpropagation_edges(factors),
         stopping_criterion = nothing,
-        message_update_algorithm = nothing,
-        driver = nothing
+        message_update_algorithm = nothing
     )
     problem = BeliefPropagationProblem(factors)
+    cache = MessageCache(messages)
 
+    # No concrete `edge` value here, so the args tuple uses `edgetype(factors)`.
     message_update_algorithm = AIE.select_algorithm(
-        message_update!, message_update_algorithm
+        message_update!,
+        message_update_algorithm,
+        Tuple{typeof(cache), typeof(factors), edgetype(factors)}
     )
-    subalgorithm = Daggered(
-        BeliefPropagationSweepAlgorithm(;
-            message_update_algorithm,
-            stopping_criterion = AI.StopAfterIteration(length(edges))
-        )
+    subalgorithm = BeliefPropagationSweepAlgorithm(;
+        message_update_algorithm,
+        stopping_criterion = AI.StopAfterIteration(length(edges))
     )
     stopping_criterion = select_beliefpropagation_stopping_criterion(stopping_criterion)
     algorithm = BeliefPropagationAlgorithm(; edges, subalgorithm, stopping_criterion)
-
-    cache = MessageCache(messages)
 
     return AI.solve(problem, algorithm; iterate = cache) # -> typeof(cache)
 end
@@ -185,41 +197,19 @@ function AI.step!(
     return state
 end
 
-function AI.step!(
-        problem::BeliefPropagationSweepProblem,
-        algorithm::Dagger{BeliefPropagationSweepAlgorithm},
-        state::BeliefPropagationSweepState
-    )
-    edge = problem.edges[state.iteration]
-    message_update!(
-        algorithm.message_update_algorithm, state.iterate, problem.factors, edge
-    )
-    return state
-end
-
 # === Layer 3: single-edge message update strategy ===
 
 # Strategy interface: a `MessageUpdateAlgorithm` defines how a single
 # message is computed and written back into the message store. Plug in a
 # new strategy by subtyping `MessageUpdateAlgorithm` and overloading
 # `message_update!(strategy, cache, factors, edge)`.
-abstract type MessageUpdateAlgorithm end
+abstract type MessageUpdateAlgorithm <: AIE.AbstractAlgorithm end
 
 function message_update! end
 
-# Algorithm selection (MAK-style; see `AIE.select_algorithm`).
-function AIE.default_algorithm(::typeof(message_update!); kwargs...)
+# `args` tuple mirrors the `message_update!(cache, factors, edge)` call shape.
+function AIE.default_algorithm(::typeof(message_update!), ::Type{<:Tuple}; kwargs...)
     return SimpleMessageUpdate(; kwargs...)
-end
-function AIE.select_algorithm(
-        ::typeof(message_update!), alg::MessageUpdateAlgorithm; kwargs...
-    )
-    isempty(kwargs) || throw(
-        ArgumentError(
-            "Additional keyword arguments are not allowed when `alg` is a `MessageUpdateAlgorithm` instance."
-        )
-    )
-    return alg
 end
 
 # Convenience entry: pick the strategy via `AIE.select_algorithm`
@@ -227,7 +217,8 @@ end
 # kwargs forwarded to the default algorithm), then dispatch.
 function message_update!(cache, factors, edge; alg = nothing, kwargs...)
     return message_update!(
-        AIE.select_algorithm(message_update!, alg; kwargs...), cache, factors, edge
+        AIE.select_algorithm(message_update!, alg, (cache, factors, edge); kwargs...),
+        cache, factors, edge
     )
 end
 
@@ -250,7 +241,7 @@ function message_update!(algorithm::SimpleMessageUpdate, cache, factors, edge)
     end
 
     cache[edge] = new_message
-    return nothing
+    return cache
 end
 
 # === `iterate_diff` for `MessageCache` (used by `AIE.StopWhenConverged`) ===
