@@ -6,6 +6,7 @@ module ITensorNetworksNext
 # dependency by Aqua.
 using TensorAlgebra: TensorAlgebra
 
+include("select_algorithm.jl")
 include("AlgorithmsInterfaceExtensions/AlgorithmsInterfaceExtensions.jl")
 include("LazyNamedDimsArrays/LazyNamedDimsArrays.jl")
 include("abstracttensornetwork.jl")

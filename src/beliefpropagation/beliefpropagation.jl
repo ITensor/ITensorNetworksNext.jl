@@ -64,7 +64,7 @@ function beliefpropagation(
     cache = MessageCache(messages)
 
     # No concrete `edge` value here, so the args tuple uses `edgetype(factors)`.
-    message_update_algorithm = AIE.select_algorithm(
+    message_update_algorithm = select_algorithm(
         message_update!,
         message_update_algorithm,
         Tuple{typeof(cache), typeof(factors), edgetype(factors)}
@@ -203,21 +203,21 @@ end
 # message is computed and written back into the message store. Plug in a
 # new strategy by subtyping `MessageUpdateAlgorithm` and overloading
 # `message_update!(strategy, cache, factors, edge)`.
-abstract type MessageUpdateAlgorithm <: AIE.AbstractAlgorithm end
+abstract type MessageUpdateAlgorithm <: AbstractAlgorithm end
 
 function message_update! end
 
 # `args` tuple mirrors the `message_update!(cache, factors, edge)` call shape.
-function AIE.default_algorithm(::typeof(message_update!), ::Type{<:Tuple}; kwargs...)
+function default_algorithm(::typeof(message_update!), ::Type{<:Tuple}; kwargs...)
     return SimpleMessageUpdate(; kwargs...)
 end
 
-# Convenience entry: pick the strategy via `AIE.select_algorithm`
+# Convenience entry: pick the strategy via `select_algorithm`
 # (accepts either `alg = ::MessageUpdateAlgorithm` / `::NamedTuple`, or flat
 # kwargs forwarded to the default algorithm), then dispatch.
 function message_update!(cache, factors, edge; alg = nothing, kwargs...)
     return message_update!(
-        AIE.select_algorithm(message_update!, alg, (cache, factors, edge); kwargs...),
+        select_algorithm(message_update!, alg, (cache, factors, edge); kwargs...),
         cache, factors, edge
     )
 end
