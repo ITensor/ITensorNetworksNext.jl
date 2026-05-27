@@ -1,73 +1,103 @@
-# Local stand-ins for a general regularized pseudo-inverse, split across
-# the two upstream namespaces it's intended to live in:
-#
-#   * `MAK.inv_regularized(A::AbstractMatrix, tol; kwargs...)`
-#     already exists upstream as the matrix-layer pseudo-inverse.
-#
-#   * `inv_regularized(A::AbstractArray, ::Val; kwargs...)` (N-d unnamed) is
-#     defined here in this package's namespace. Intended to move into
-#     `TensorAlgebra.jl` as `TA.inv_regularized`, alongside its
-#     existing `TA.svd` / `TA.qr` overload set.
-#
-#   * `MAK.inv_regularized(a::AbstractNamedDimsArray, ...)` is
-#     added here, extending MAK's function directly for named arrays.
-#     Intended to move into `NamedDimsArrays.jl` (mirroring how NDA already
-#     extends `TA.svd` for named arrays).
-#
-# Until those PRs land, this file is the in-place stand-in. Splitting the
-# named overload onto `MAK.inv_regularized` keeps the named and unnamed
-# layers in distinct function namespaces (avoiding cross-layer dispatch
-# ambiguity) and matches the planned upstream landing.
-
 import MatrixAlgebraKit as MAK
 import TensorAlgebra as TA
-using LinearAlgebra: I
+using LinearAlgebra: Diagonal, I, diag
 using NamedDimsArrays: AbstractNamedDimsArray, AbstractNamedDimsOperator, codomainnames,
     denamed, dimnames, domainnames, name, nameddims, operator, randname, setname, state
 
-# === N-d / TensorAlgebra layer ===
-
-function inv_regularized(
-        style::TA.FusionStyle, A::AbstractArray, ndims_codomain::Val;
-        tol = nothing, kwargs...
+pinv_tol(λ, pinv::NamedTuple) = pinv_tol(λ; pinv...)
+function pinv_tol(
+        λ; atol = zero(eltype(λ)),
+        rtol = iszero(atol) ? eps(eltype(λ)) * length(λ) : zero(eltype(λ))
     )
-    A_mat = TA.matricize(style, A, ndims_codomain)
-    tol_value = isnothing(tol) ? MAK.defaulttol(A_mat) : tol
-    Ainv_mat = MAK.inv_regularized(A_mat, tol_value; kwargs...)
+    return max(atol, rtol * maximum(abs, λ; init = zero(eltype(λ))))
+end
+
+sqrt_safe(a::Number, tol = MAK.defaulttol(a)) = abs(a) < tol ? zero(a) : sqrt(a)
+
+# Gram factorization of a PSD matrix `M ≈ X' * X` via its eigendecomposition,
+# laid out like the factorizations in `TensorAlgebra` / `NamedDimsArrays`:
+# self-contained matrix primitives, an `AbstractArray` layer that
+# matricizes/permutes (`FusionStyle`/`Val`, integer-permutation, and label
+# entries), and a named layer that delegates to the label entry and re-wraps
+# the results. `gram_eigh_full` returns the forward factor `X = Diagonal(sqrtλ)
+# * V'` (rank leg first); `gram_eigh_full_with_pinv` additionally returns
+# `Y ≈ pinv(X)` (rank leg last), so that `X * Y ≈ I`. They are separate
+# codepaths (different factor counts / leg layouts); the dispatch forwarders and
+# operator entry, identical for both, are `@eval`-generated.
+
+function gram_eigh_full(A::AbstractMatrix; alg = nothing, pinv = (;))
+    D, V = MAK.eigh_full(A, MAK.select_algorithm(MAK.eigh_full, A, alg))
+    λ = diag(D)
+    sqrtλ = map(l -> sqrt_safe(l, pinv_tol(λ, pinv)), λ)
+    return Diagonal(sqrtλ) * V'
+end
+function gram_eigh_full_with_pinv(A::AbstractMatrix; alg = nothing, pinv = (;))
+    D, V = MAK.eigh_full(A, MAK.select_algorithm(MAK.eigh_full, A, alg))
+    λ = diag(D)
+    sqrtλ = map(l -> sqrt_safe(l, pinv_tol(λ, pinv)), λ)
+    inv_sqrtλ = map(s -> iszero(s) ? s : inv(s), sqrtλ)
+    return Diagonal(sqrtλ) * V', V * Diagonal(inv_sqrtλ)
+end
+
+function gram_eigh_full(
+        style::TA.FusionStyle, A::AbstractArray, ndims_codomain::Val; kwargs...
+    )
+    Xmat = gram_eigh_full(TA.matricize(style, A, ndims_codomain); kwargs...)
     biperm = TA.trivialbiperm(ndims_codomain, Val(ndims(A)))
-    axes_codomain, axes_domain = TA.blocks(axes(A)[biperm])
-    return TA.unmatricize(style, Ainv_mat, axes_domain, axes_codomain)
+    axes_codomain = first(TA.blocks(axes(A)[biperm]))
+    return TA.unmatricize(style, Xmat, (axes(Xmat, 1),), axes_codomain)
 end
-function inv_regularized(A::AbstractArray, ndims_codomain::Val; kwargs...)
-    return inv_regularized(TA.FusionStyle(A), A, ndims_codomain; kwargs...)
+function gram_eigh_full_with_pinv(
+        style::TA.FusionStyle, A::AbstractArray, ndims_codomain::Val; kwargs...
+    )
+    Xmat, Ymat = gram_eigh_full_with_pinv(TA.matricize(style, A, ndims_codomain); kwargs...)
+    biperm = TA.trivialbiperm(ndims_codomain, Val(ndims(A)))
+    axes_codomain = first(TA.blocks(axes(A)[biperm]))
+    rank_axis = axes(Xmat, 1)
+    return TA.unmatricize(style, Xmat, (rank_axis,), axes_codomain),
+        TA.unmatricize(style, Ymat, axes_codomain, (rank_axis,))
 end
 
-# === NamedDimsArrays layer (extends `MAK.inv_regularized`) ===
-
-function MAK.inv_regularized(
+function gram_eigh_full(
         a::AbstractNamedDimsArray, dimnames_codomain, dimnames_domain; kwargs...
     )
-    codomain_names = collect(name.(dimnames_codomain))
-    domain_names = collect(name.(dimnames_domain))
-    biperm = TA.blockedperm_indexin(
-        Tuple.((dimnames(a), codomain_names, domain_names))...
+    codomain = name.(dimnames_codomain)
+    domain = name.(dimnames_domain)
+    X = gram_eigh_full(denamed(a), dimnames(a), codomain, domain; kwargs...)
+    rank_name = randname(dimnames(a, 1))
+    return nameddims(X, (rank_name, codomain...))
+end
+function gram_eigh_full_with_pinv(
+        a::AbstractNamedDimsArray, dimnames_codomain, dimnames_domain; kwargs...
     )
-    perm_codomain, perm_domain = TA.blocks(biperm)
-    A_perm = TA.bipermutedims(denamed(a), perm_codomain, perm_domain)
-    Ainv_denamed = inv_regularized(A_perm, Val(length(perm_codomain)); kwargs...)
-    return nameddims(Ainv_denamed, [domain_names; codomain_names])
+    codomain = name.(dimnames_codomain)
+    domain = name.(dimnames_domain)
+    X, Y = gram_eigh_full_with_pinv(denamed(a), dimnames(a), codomain, domain; kwargs...)
+    rank_name = randname(dimnames(a, 1))
+    return nameddims(X, (rank_name, codomain...)), nameddims(Y, (codomain..., rank_name))
 end
 
-# Short form: supply the codomain dimnames; the domain is inferred as the
-# complement. Matches the 2-arg convention used by `TA.qr` / `TA.lq` /
-# `TA.factorize` / `TA.orth` / `TA.polar` for named arrays
-# (see `NamedDimsArrays/src/tensoralgebra.jl`).
-function MAK.inv_regularized(
-        a::AbstractNamedDimsArray, dimnames_codomain; kwargs...
-    )
-    codomain_names = name.(dimnames_codomain)
-    domain_names = setdiff(dimnames(a), codomain_names)
-    return MAK.inv_regularized(a, codomain_names, domain_names; kwargs...)
+# `FusionStyle` convenience, label entry, and operator entry are identical for
+# both factorizations. (No standalone integer-permutation method: it would be
+# ambiguous with the named-array method, since named arrays subtype
+# `AbstractArray`; the label entry permutes inline instead.)
+for f in (:gram_eigh_full, :gram_eigh_full_with_pinv)
+    @eval begin
+        function $f(A::AbstractArray, ndims_codomain::Val; kwargs...)
+            return $f(TA.FusionStyle(A), A, ndims_codomain; kwargs...)
+        end
+        function $f(A::AbstractArray, labels_A, labels_codomain, labels_domain; kwargs...)
+            biperm = TA.blockedperm_indexin(
+                Tuple.((labels_A, labels_codomain, labels_domain))...
+            )
+            perm_codomain, perm_domain = TA.blocks(biperm)
+            A_perm = TA.bipermutedims(A, perm_codomain, perm_domain)
+            return $f(A_perm, Val(length(perm_codomain)); kwargs...)
+        end
+        function $f(M::AbstractNamedDimsOperator; kwargs...)
+            return $f(state(M), codomainnames(M), domainnames(M); kwargs...)
+        end
+    end
 end
 
 function similar_operator(prototype::AbstractNamedDimsArray, codomain_axes)

@@ -3,7 +3,6 @@ using DataGraphs: DataGraphs, AbstractDataGraph, edge_data, edge_data_type,
 using Dictionaries: Dictionary, delete!, getindices, set!
 using Graphs: AbstractGraph, connected_components, dst, is_directed, is_tree
 using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArray, lazy, parenttype
-using NamedDimsArrays: state
 using NamedGraphs.GraphsExtensions: IsDirected, all_edges, boundary_edges,
     default_root_vertex, directed_graph, forest_cover, in_incident_edges,
     post_order_dfs_edges, undirected_graph, vertextype
@@ -21,29 +20,11 @@ struct MessageCache{T, V} <: AbstractDataGraph{V, Nothing, T}
     end
 end
 
-# A cache that stores sqrt-form messages (in the Vidal-gauge / simple-update
-# sense): the entry on each directed edge is the operator that gets contracted
-# directly into the state for the balanced gauge — i.e. `√M` rather than the
-# "full" message `M`. Structurally identical to `MessageCache`; the apply-
-# operator BP path dispatches on the type to use the messages as gauge
-# factors directly and skip the sqrt-via-eigh step.
-struct SqrtMessageCache{T, V} <: AbstractDataGraph{V, Nothing, T}
-    messages::Dictionary{NamedEdge{V}, T}
-    underlying_graph::NamedDiGraph{V}
-    function SqrtMessageCache{T, V}(::UndefInitializer, vertices) where {T, V}
-        messages = Dictionary{NamedEdge{V}, T}()
-        underlying_graph = NamedDiGraph{V}(vertices)
-        return new{T, V}(messages, underlying_graph)
-    end
-end
-
-# `MessageCache` and `SqrtMessageCache` are sibling concrete types: the storage
-# and graph structure are identical, only the semantic interpretation of the
-# message values differs. Shared methods are emitted per-type via this loop
-# rather than via a shared abstract supertype. Once
-# `DataGraphs.AbstractEdgeDataGraph` (DataGraphs.jl#121) lands, both can
-# subtype that and most of this loop can fall away.
-for Cache in (:MessageCache, :SqrtMessageCache)
+# Methods are emitted via `@eval` rather than written directly so they can be
+# shared with sibling cache types if more are added. Once
+# `DataGraphs.AbstractEdgeDataGraph` (DataGraphs.jl#121) lands, `MessageCache`
+# can subtype that and most of this loop can fall away.
+for Cache in (:MessageCache,)
     @eval begin
         # ============================ constructors ===================================== #
 
@@ -175,13 +156,15 @@ end
 messagecache(pairs) = MessageCache(Dict(pairs))
 messagecache(f, edges) = messagecache(edge => f(edge) for edge in edges)
 
-sqrtmessagecache(pairs) = SqrtMessageCache(Dict(pairs))
-sqrtmessagecache(f, edges) = sqrtmessagecache(edge => f(edge) for edge in edges)
-
-function identity_sqrt_messages(tn::AbstractTensorNetwork)
-    return sqrtmessagecache(all_edges(tn)) do edge
+# Identity BP messages: the identity operator on each directed edge's link axes,
+# interpreting `tn` as a tensor-network state. Cheap to construct, but only a
+# meaningful starting point when the initial BP environment doesn't matter (e.g.
+# imaginary-time evolution toward a ground state). For accuracy-sensitive
+# workloads, run `beliefpropagation` to convergence and pass that cache instead.
+function identity_messages(tn::AbstractTensorNetwork)
+    return messagecache(all_edges(tn)) do edge
         factor = tn[dst(edge)]
-        return state(one(similar_operator(factor, linkaxes(tn, edge))))
+        return one(similar_operator(factor, linkaxes(tn, edge)))
     end
 end
 

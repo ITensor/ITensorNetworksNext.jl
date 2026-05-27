@@ -1,103 +1,120 @@
 import Graphs
+import NamedDimsArrays as NDA
+import TensorAlgebra as TA
+using DataGraphs: underlying_graph
 using ITensorBase: Index
-using ITensorNetworksNext:
-    TensorNetwork, apply_operator, apply_operators, identity_sqrt_messages
-using LinearAlgebra: I, norm
-using NamedDimsArrays: AbstractNamedDimsArray, dimnames, name, nameddims, operator, randname
-using NamedGraphs.GraphsExtensions: incident_edges
-using NamedGraphs.NamedGraphGenerators: named_grid
-using Random: Random
-using Test: @test, @test_throws, @testset
+using ITensorNetworksNext: MessageCache, TensorNetwork, apply_operator, apply_operators,
+    beliefpropagation, linkinds
+using MatrixAlgebraKit: truncrank
+using NamedDimsArrays: name, operator, randname, replacedimnames, setname
+using NamedGraphs.GraphsExtensions: all_edges, incident_edges
+using NamedGraphs.NamedGraphGenerators: named_path_graph
+using Test: @test, @testset
 
-function _random_state(g, sdict, ldict)
-    l(e) = haskey(ldict, e) ? ldict[e] : ldict[reverse(e)]
+# The helpers below are written against the `NamedDimsArrays` interface (named
+# axes, `randname`, `operator`, `randn`), so the array type is determined by the
+# axes passed in. Here we use ITensor `Index`es.
+
+# Random tensor network on `g`: one named site axis per vertex (`site_axes`) and
+# one named link axis per edge (`link_axes`).
+function random_tensornetwork(g, link_axes, site_axes)
+    link_axis(e) = haskey(link_axes, e) ? link_axes[e] : link_axes[reverse(e)]
     return TensorNetwork(g) do v
-        is = (sdict[v], (l(e) for e in incident_edges(g, v))...)
-        return randn(is...)
+        return randn((site_axes[v], (link_axis(e) for e in incident_edges(g, v))...))
     end
 end
 
-@testset "apply_operator on (2, 2) grid" begin
-    # Test reseeds the RNG per @testset, which causes randname collisions with
-    # already-created indices. Break the deterministic seeding.
-    Random.seed!()
-    g = named_grid((2, 2))
-    sdict = Dict(v => Index(2) for v in Graphs.vertices(g))
-    ldict = Dict{Graphs.edgetype(g), Index{Int, Base.OneTo{Int}}}()
-    for e in Graphs.edges(g)
-        ldict[e] = Index(2)
-    end
-    ψ = _random_state(g, sdict, ldict)
+# Random operator acting on `domain_namedaxes`, mapping them to fresh codomain
+# names so that `apply` leaves the acted-on dimension names unchanged. The fresh
+# names come from `randname` on the dimension *names* (not the axes), which is
+# collision-free.
+function rand_operator(domain_namedaxes)
+    codomain_namedaxes = setname.(domain_namedaxes, randname.(name.(domain_namedaxes)))
+    data = randn((codomain_namedaxes..., domain_namedaxes...))
+    return operator(data, name.(codomain_namedaxes), name.(domain_namedaxes))
+end
 
-    @testset "1-site identity gate preserves dimnames and norm of each tensor" begin
-        Random.seed!()
-        v = (1, 1)
-        s_v = sdict[v]
-        n_v = name(s_v)
-        co_n = randname(n_v)
-        id1 = operator(reshape(Matrix{Float64}(I, 2, 2), 2, 2), (co_n,), (n_v,))
-        ψ_id = apply_operator(id1, ψ; env_cache! = identity_sqrt_messages(ψ))
-        @test issetequal(dimnames(ψ_id[v]), dimnames(ψ[v]))
-        @test ψ_id[v] ≈ ψ[v]
+# Converged belief-propagation messages on the double-layer norm network
+# ⟨state|state⟩: the bra layer's link axes get fresh names so they stay distinct
+# from the ket's, while the shared site axis is contracted. Returned as operator
+# messages whose codomain is the ket link and whose domain is the bra link. On a
+# tree these are the exact bond environments, so the resulting gauge reproduces
+# exact (canonical-form) truncation. Anticipates a future
+# `beliefpropagation(NormNetwork(state))`. Forwards `kwargs` to `beliefpropagation`.
+function beliefpropagation_normnetwork(state; kwargs...)
+    g = underlying_graph(state)
+    link_name(e) = name(only(linkinds(state, e)))
+    bra_name = Dict(link_name(e) => randname(link_name(e)) for e in all_edges(g))
+    norm_tn = TensorNetwork(g) do v
+        t = state[v]
+        bra = [link_name(e) => bra_name[link_name(e)] for e in incident_edges(g, v)]
+        return t * replacedimnames(t, bra...)
     end
-
-    @testset "2-site identity gate preserves site dimnames" begin
-        Random.seed!()
-        v1, v2 = (1, 1), (2, 1)
-        n_v1, n_v2 = name(sdict[v1]), name(sdict[v2])
-        co_n1, co_n2 = randname(n_v1), randname(n_v2)
-        id4 = operator(
-            reshape(Matrix{Float64}(I, 4, 4), 2, 2, 2, 2),
-            (co_n1, co_n2), (n_v1, n_v2)
+    init = Dict(e => ones(Float64, Tuple(linkinds(norm_tn, e))) for e in all_edges(g))
+    cache = beliefpropagation(norm_tn, init; kwargs...)
+    return MessageCache(
+        Dict(
+            e => operator(cache[e], (link_name(e),), (bra_name[link_name(e)],))
+                for e in all_edges(g)
         )
-        ψ_id = apply_operator(id4, ψ; env_cache! = identity_sqrt_messages(ψ))
-        # Site dimnames are preserved at each vertex.
-        @test n_v1 in dimnames(ψ_id[v1])
-        @test n_v2 in dimnames(ψ_id[v2])
-        # The bond between v1 and v2 was renamed by the balanced SVD.
-        old_bond = only(intersect(dimnames(ψ[v1]), dimnames(ψ[v2])))
-        new_bond = only(intersect(dimnames(ψ_id[v1]), dimnames(ψ_id[v2])))
-        @test old_bond ≠ new_bond
-    end
+    )
+end
 
-    @testset "2-site Hermitian unitary gate is norm-preserving locally" begin
-        Random.seed!()
-        v1, v2 = (1, 1), (2, 1)
-        n_v1, n_v2 = name(sdict[v1]), name(sdict[v2])
-        co_n1, co_n2 = randname(n_v1), randname(n_v2)
-        H = randn(4, 4)
-        H = (H + H') / 2
-        # exp(iH) is unitary; here we use a real symmetric exponent on a real
-        # tensor, so we keep H real and use exp(H)/||exp(H)|| as a stand-in.
-        U = exp(0.1 .* H)
-        gate = operator(reshape(U, 2, 2, 2, 2), (co_n1, co_n2), (n_v1, n_v2))
-        ψ_g = apply_operator(gate, ψ; env_cache! = identity_sqrt_messages(ψ))
-        # The bond between v1 and v2 is fresh and small (≤ 2*2 = 4, since
-        # there's no extra factor from the gate beyond the site dims).
-        new_bond_dim = Int(length(only(intersect(axes(ψ_g[v1]), axes(ψ_g[v2])))))
-        @test new_bond_dim ≤ 4
-    end
+@testset "apply_operator on a path graph" begin
+    N, χ, d = 4, 4, 2
+    g = named_path_graph(N)
 
-    @testset "apply_operators applies a sequence of gates" begin
-        Random.seed!()
-        v1, v2 = (1, 1), (2, 1)
-        n_v1, n_v2 = name(sdict[v1]), name(sdict[v2])
-        co_n1, co_n2 = randname(n_v1), randname(n_v2)
-        id4 = operator(
-            reshape(Matrix{Float64}(I, 4, 4), 2, 2, 2, 2),
-            (co_n1, co_n2), (n_v1, n_v2)
+    # `@testset` reseeds the global RNG on entry to every (nested) testset, so we
+    # build the network, environment, and gates inside each one. That keeps the
+    # link `Index`es as the first draws from each testset's RNG stream, so every
+    # later `randname` — the gate codomains here, and the rank names created
+    # inside the gate application — stays distinct from the link names.
+    @testset "untruncated gates are exact (gauge-invariant)" begin
+        link_axes = Dict(e => Index(χ) for e in Graphs.edges(g))
+        site_axes = Dict(v => Index(d) for v in Graphs.vertices(g))
+        state = random_tensornetwork(g, link_axes, site_axes)
+        env = beliefpropagation_normnetwork(
+            state; stopping_criterion = (; maxiter = 100, tol = 1.0e-13)
         )
-        ψ_single = apply_operator(id4, ψ; env_cache! = identity_sqrt_messages(ψ))
-        ψ_seq = apply_operators([id4, id4], ψ; env_cache! = identity_sqrt_messages(ψ))
-        # Two identity gates is the same as one (up to bond renaming): site
-        # names of `ψ` are preserved at each vertex.
-        @test all(Graphs.vertices(g)) do v
-            site_names =
-                setdiff(dimnames(ψ[v]), (dimnames(ψ[u]) for u in Graphs.neighbors(g, v))...)
-            return issetequal(
-                intersect(dimnames(ψ_seq[v]), site_names),
-                intersect(dimnames(ψ_single[v]), site_names)
+        # Without truncation the gate is applied exactly, so the gated network
+        # reproduces exact contraction regardless of the gauge.
+        for gate in (
+                rand_operator((site_axes[2],)),
+                rand_operator((site_axes[2], site_axes[3])),
             )
+            gated, _ = apply_operator(gate, state, env)
+            @test prod(gated) ≈ NDA.apply(gate, prod(state))
         end
+    end
+
+    @testset "truncated 2-site gate matches global optimal SVD (rank $k)" for k in 1:3
+        link_axes = Dict(e => Index(χ) for e in Graphs.edges(g))
+        site_axes = Dict(v => Index(d) for v in Graphs.vertices(g))
+        state = random_tensornetwork(g, link_axes, site_axes)
+        env = beliefpropagation_normnetwork(
+            state; stopping_criterion = (; maxiter = 100, tol = 1.0e-13)
+        )
+        gate = rand_operator((site_axes[2], site_axes[3]))
+        # Exact oracle: gate the fully contracted state, then take the globally
+        # optimal rank-`k` SVD truncation across the 2 | 3 cut.
+        Ψ = NDA.apply(gate, prod(state))
+        left = [name(site_axes[v]) for v in 1:2]
+        U, S, Vt = TA.svd(Ψ, left; trunc = truncrank(k))
+        gated, _ = apply_operator(gate, state, env; trunc = truncrank(k))
+        @test prod(gated) ≈ U * S * Vt
+    end
+
+    @testset "apply_operators applies a sequence" begin
+        link_axes = Dict(e => Index(χ) for e in Graphs.edges(g))
+        site_axes = Dict(v => Index(d) for v in Graphs.vertices(g))
+        state = random_tensornetwork(g, link_axes, site_axes)
+        env = beliefpropagation_normnetwork(
+            state; stopping_criterion = (; maxiter = 100, tol = 1.0e-13)
+        )
+        # Gates on neighboring edges sharing site 3, applied in sequence.
+        gA = rand_operator((site_axes[2], site_axes[3]))
+        gB = rand_operator((site_axes[3], site_axes[4]))
+        gated, _ = apply_operators([gA, gB], state, env)
+        @test prod(gated) ≈ NDA.apply(gB, NDA.apply(gA, prod(state)))
     end
 end
