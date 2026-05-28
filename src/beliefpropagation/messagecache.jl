@@ -1,9 +1,12 @@
+import TensorAlgebra as TA
 using DataGraphs: DataGraphs, AbstractDataGraph, edge_data, edge_data_type,
     set_vertex_data!, underlying_graph, underlying_graph_type, vertex_data, vertex_data_type
 using Dictionaries: Dictionary, delete!, getindices, set!
 using Graphs: AbstractGraph, connected_components, dst, is_directed, is_tree
 using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArray, lazy, parenttype
-using NamedDimsArrays: similar_operator
+using LinearAlgebra: I
+using NamedDimsArrays: AbstractNamedDimsArray, AbstractNamedDimsOperator, codomainnames,
+    denamed, dimnames, domainnames, name, nameddims, operator, randname, setname, state
 using NamedGraphs.GraphsExtensions: IsDirected, all_edges, boundary_edges,
     default_root_vertex, directed_graph, forest_cover, in_incident_edges,
     post_order_dfs_edges, undirected_graph, vertextype
@@ -157,6 +160,37 @@ end
 messagecache(pairs) = MessageCache(Dict(pairs))
 messagecache(f, edges) = messagecache(edge => f(edge) for edge in edges)
 
+# Operator-shaped allocation with fresh domain names. Defined here while the
+# upstream `NamedDimsArrays` design for a non-named `similar_map` primitive
+# (and the matching named-array wrapper) is worked out.
+function similar_operator(prototype::AbstractNamedDimsArray, codomain_axes)
+    co_axes = Tuple(codomain_axes)
+    dom_axes = setname.(co_axes, randname.(name.(co_axes)))
+    a = similar(denamed(prototype), (co_axes..., dom_axes...))
+    return operator(a, collect(name.(co_axes)), collect(name.(dom_axes)))
+end
+
+# Identity-on-codomain operator with the same `(codomain, domain)` as `a`.
+# The current implementation matricizes `a`, fills with `LA.I`, and
+# unmatricizes; this only does the right thing for plain (non-symmetric)
+# arrays. A `GradedArrays`-aware version belongs alongside the eventual
+# upstream `one_map` primitive in `TensorAlgebra`.
+function identity_operator(a::AbstractNamedDimsOperator)
+    c = codomainnames(a)
+    d = domainnames(a)
+    a_denamed = denamed(state(a))
+    style = TA.FusionStyle(a_denamed)
+    ndims_codomain = Val(length(c))
+    a_mat = TA.matricize(style, a_denamed, ndims_codomain)
+    id_mat = similar(a_mat)
+    copyto!(id_mat, I)
+    biperm = TA.trivialbiperm(ndims_codomain, Val(ndims(a_denamed)))
+    co_axes, dom_axes = TA.blocks(axes(a_denamed)[biperm])
+    id_denamed = TA.unmatricize(style, id_mat, co_axes, dom_axes)
+    id_nda = nameddims(id_denamed, dimnames(state(a)))
+    return operator(id_nda, c, d)
+end
+
 # Identity BP messages: the identity operator on each directed edge's link axes,
 # interpreting `tn` as a tensor-network state. Cheap to construct, but only a
 # meaningful starting point when the initial BP environment doesn't matter (e.g.
@@ -165,7 +199,7 @@ messagecache(f, edges) = messagecache(edge => f(edge) for edge in edges)
 function identity_messages(tn::AbstractTensorNetwork)
     return messagecache(all_edges(tn)) do edge
         factor = tn[dst(edge)]
-        return one(similar_operator(factor, linkaxes(tn, edge)))
+        return identity_operator(similar_operator(factor, linkaxes(tn, edge)))
     end
 end
 
