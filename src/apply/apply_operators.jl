@@ -21,7 +21,8 @@ end
 # The `apply_operators` iteration algorithm wraps the per-operator algorithm,
 # which is itself resolved via `apply_operator` (overridable with `operator_alg`).
 function default_algorithm(
-        ::typeof(apply_operators), ::Type{Args}; operator_alg = nothing, kwargs...
+        ::typeof(apply_operators), ::Type{Args};
+        operator_alg = nothing, environment_alg = nothing, kwargs...
     ) where {Args <: Tuple}
     # `apply_operator` acts on a single operator, so select on the operator
     # element type, keeping the remaining `(state, env)` argument types.
@@ -29,7 +30,8 @@ function default_algorithm(
     operator_args = Tuple{eltype(operators_type), rest...}
     operator_algorithm =
         select_algorithm(apply_operator, operator_alg, operator_args; kwargs...)
-    return ApplyOperatorsAlgorithm(; operator_algorithm)
+    environment_algorithm = select_algorithm(prepare_environment, environment_alg, Args)
+    return ApplyOperatorsAlgorithm(; operator_algorithm, environment_algorithm)
 end
 
 function apply_operators(algorithm, operators, state, env)
@@ -39,6 +41,7 @@ function apply_operators(algorithm, operators, state, env)
     # where the value is available.
     iteration_algorithm = ApplyOperatorsAlgorithm(;
         algorithm.operator_algorithm,
+        algorithm.environment_algorithm,
         stopping_criterion = AI.StopAfterIteration(length(operators))
     )
     return AI.solve(
@@ -55,9 +58,11 @@ end
 
 @kwdef struct ApplyOperatorsAlgorithm{
         OperatorAlgorithm,
+        EnvironmentAlgorithm,
         StoppingCriterion <: AI.StoppingCriterion,
     } <: AI.Algorithm
     operator_algorithm::OperatorAlgorithm
+    environment_algorithm::EnvironmentAlgorithm = NoEnvironmentPreparation()
     # Placeholder default; the operator-count bound is filled in per call by
     # `apply_operators` (where `length(operators)` is known).
     stopping_criterion::StoppingCriterion = AI.StopAfterIteration(0)
@@ -100,9 +105,13 @@ function AI.step!(
         problem::ApplyOperatorsProblem, algorithm::ApplyOperatorsAlgorithm,
         state::ApplyOperatorsState
     )
-    op = problem.operators[state.iteration]
+    state.iterate, state.env = prepare_environment(
+        algorithm.environment_algorithm, algorithm.operator_algorithm,
+        problem.operators, state.iteration, state.iterate, state.env
+    )
     state.iterate, state.env = apply_operator(
-        algorithm.operator_algorithm, op, state.iterate, state.env
+        algorithm.operator_algorithm, problem.operators[state.iteration], state.iterate,
+        state.env
     )
     return state
 end
@@ -113,7 +122,43 @@ function AI.finalize_state!(
     return state.iterate, state.env
 end
 
-# === Layer 2: single-operator strategy ===
+# === Layer 2: environment-preparation strategy ===
+
+# Before each operator is applied, `prepare_environment` brings the environment
+# (and possibly the factors) up to date with the current state, so the upcoming
+# `apply_operator` sees a consistent gauge. Strategies subtype
+# `EnvironmentPreparationAlgorithm` and overload
+#
+#     prepare_environment(alg, operator_algorithm, operators, iteration, iterate, env)
+#         -> (iterate, env)
+#
+# `operators` and `iteration` give the full gate sequence and the current
+# position (so a strategy can look at the previous/upcoming gates to judge which
+# messages went stale), and `operator_algorithm` lets it condition on how the
+# gate will be applied (e.g. skip reconvergence for an untruncated/unitary gate).
+# A strategy may also return updated factors, since regauging/orthogonalizing can
+# rewrite the tensors themselves. On a loopy graph the stale region is not
+# sharply defined, so the strategy — not a fixed dirty-set on the cache — owns
+# the decision of what to recompute.
+#
+# Only the no-op is implemented for now; reconvergence policies (local BP around
+# the gate support, path reconvergence on a tree, full BP) are left to follow-up
+# work.
+abstract type EnvironmentPreparationAlgorithm <: AbstractAlgorithm end
+
+struct NoEnvironmentPreparation <: EnvironmentPreparationAlgorithm end
+
+function prepare_environment(
+        ::NoEnvironmentPreparation, operator_algorithm, operators, iteration, iterate, env
+    )
+    return iterate, env
+end
+
+function default_algorithm(::typeof(prepare_environment), ::Type{<:Tuple}; kwargs...)
+    return NoEnvironmentPreparation()
+end
+
+# === Layer 3: single-operator strategy ===
 
 abstract type ApplyOperatorAlgorithm <: AbstractAlgorithm end
 
