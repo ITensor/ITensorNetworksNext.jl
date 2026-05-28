@@ -11,6 +11,7 @@ using NamedGraphs.GraphsExtensions: all_edges, boundary_edges
 
 # === Top-level user entry point ===
 
+# Apply a list of operators to a state given the environments.
 function apply_operators(operators, state, env; alg = nothing, kwargs...)
     algorithm = select_algorithm(
         apply_operators, alg, (operators, state, env); kwargs...
@@ -30,7 +31,8 @@ function default_algorithm(
     operator_args = Tuple{eltype(operators_type), rest...}
     operator_algorithm =
         select_algorithm(apply_operator, operator_alg, operator_args; kwargs...)
-    environment_algorithm = select_algorithm(prepare_environment, environment_alg, Args)
+    environment_algorithm =
+        select_algorithm(apply_operator_environment_preparation, environment_alg, Args)
     return ApplyOperatorsAlgorithm(; operator_algorithm, environment_algorithm)
 end
 
@@ -62,7 +64,7 @@ end
         StoppingCriterion <: AI.StoppingCriterion,
     } <: AI.Algorithm
     operator_algorithm::OperatorAlgorithm
-    environment_algorithm::EnvironmentAlgorithm = NoEnvironmentPreparation()
+    environment_algorithm::EnvironmentAlgorithm = NoApplyOperatorEnvironmentPreparation()
     # Placeholder default; the operator-count bound is filled in per call by
     # `apply_operators` (where `length(operators)` is known).
     stopping_criterion::StoppingCriterion = AI.StopAfterIteration(0)
@@ -89,23 +91,13 @@ function AI.initialize_state(
     )
 end
 
-function AI.initialize_state!(
-        problem::ApplyOperatorsProblem, algorithm::ApplyOperatorsAlgorithm,
-        state::ApplyOperatorsState; iteration::Int = 0
-    )
-    state.iteration = iteration
-    AI.initialize_state!(
-        problem, algorithm, algorithm.stopping_criterion,
-        state.stopping_criterion_state
-    )
-    return state
-end
-
 function AI.step!(
         problem::ApplyOperatorsProblem, algorithm::ApplyOperatorsAlgorithm,
         state::ApplyOperatorsState
     )
-    state.iterate, state.env = prepare_environment(
+    # Prepare for the operator application, for example by updating the
+    # environments in a path between where the operators are being applied.
+    state.iterate, state.env = apply_operator_environment_preparation(
         algorithm.environment_algorithm, algorithm.operator_algorithm,
         problem.operators, state.iteration, state.iterate, state.env
     )
@@ -124,52 +116,40 @@ end
 
 # === Layer 2: environment-preparation strategy ===
 
-# Before each operator is applied, `prepare_environment` brings the environment
-# (and possibly the factors) up to date with the current state, so the upcoming
-# `apply_operator` sees a consistent gauge. Strategies subtype
-# `EnvironmentPreparationAlgorithm` and overload
-#
-#     prepare_environment(alg, operator_algorithm, operators, iteration, iterate, env)
-#         -> (iterate, env)
-#
-# `operators` and `iteration` give the full gate sequence and the current
-# position (so a strategy can look at the previous/upcoming gates to judge which
-# messages went stale), and `operator_algorithm` lets it condition on how the
-# gate will be applied (e.g. skip reconvergence for an untruncated/unitary gate).
-# A strategy may also return updated factors, since regauging/orthogonalizing can
-# rewrite the tensors themselves. On a loopy graph the stale region is not
-# sharply defined, so the strategy — not a fixed dirty-set on the cache — owns
-# the decision of what to recompute.
-#
-# Only the no-op is implemented for now; reconvergence policies (local BP around
-# the gate support, path reconvergence on a tree, full BP) are left to follow-up
-# work.
-abstract type EnvironmentPreparationAlgorithm <: AbstractAlgorithm end
+# Update the environment (and possibly the factors) before the next operator is
+# applied. The full `operators`/`iteration` and `operator_algorithm` are passed so
+# a strategy can judge which messages went stale and how much to recompute; it may
+# also return regauged/orthogonalized factors. Only the no-op is implemented for
+# now (reconvergence policies are follow-up work).
+struct NoApplyOperatorEnvironmentPreparation <: AbstractAlgorithm end
 
-struct NoEnvironmentPreparation <: EnvironmentPreparationAlgorithm end
-
-function prepare_environment(
-        ::NoEnvironmentPreparation, operator_algorithm, operators, iteration, iterate, env
+function apply_operator_environment_preparation(
+        ::NoApplyOperatorEnvironmentPreparation, operator_algorithm, operators, iteration,
+        iterate, env
     )
     return iterate, env
 end
 
-function default_algorithm(::typeof(prepare_environment), ::Type{<:Tuple}; kwargs...)
-    return NoEnvironmentPreparation()
+function default_algorithm(
+        ::typeof(apply_operator_environment_preparation), ::Type{<:Tuple}; kwargs...
+    )
+    return NoApplyOperatorEnvironmentPreparation()
 end
 
 # === Layer 3: single-operator strategy ===
 
 abstract type ApplyOperatorAlgorithm <: AbstractAlgorithm end
 
+# Apply a single operator to the state, given the specified environments.
+# Returns an updated state along with updated environments where relevant.
+# Note that it isn't expected that environments are fully recomputed,
+# generally only minimal updates will be made (say to the edge where a 2-site
+# operator is applied).
 function apply_operator(operator, state, env; alg = nothing, kwargs...)
     algorithm = select_algorithm(apply_operator, alg, (operator, state, env); kwargs...)
     return apply_operator(algorithm, operator, state, env)
 end
 
-# Out-of-place per-operator step: `initialize_output` allocates fresh `iterate`
-# and `env` buffers (copies of the inputs) that `apply_operator!` fills in place,
-# leaving the inputs untouched. Returns the new `(iterate, env)` pair.
 function apply_operator(algorithm::ApplyOperatorAlgorithm, operator, state, env)
     dest, env_dest = initialize_output(apply_operator!, algorithm, operator, state, env)
     apply_operator!(algorithm, dest, operator, state, env_dest)
