@@ -3,6 +3,7 @@ using DataGraphs: DataGraphs, AbstractDataGraph, edge_data, edge_data_type,
 using Dictionaries: Dictionary, delete!, getindices, set!
 using Graphs: AbstractGraph, connected_components, dst, is_directed, is_tree
 using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArray, lazy, parenttype
+using NamedDimsArrays: similar_operator
 using NamedGraphs.GraphsExtensions: IsDirected, all_edges, boundary_edges,
     default_root_vertex, directed_graph, forest_cover, in_incident_edges,
     post_order_dfs_edges, undirected_graph, vertextype
