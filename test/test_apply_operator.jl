@@ -28,7 +28,7 @@ end
 # names so that `apply` leaves the acted-on dimension names unchanged. The fresh
 # names come from `randname` on the dimension *names* (not the axes), which is
 # collision-free.
-function rand_operator(domain_namedaxes)
+function randn_operator(domain_namedaxes)
     codomain_namedaxes = setname.(domain_namedaxes, randname.(name.(domain_namedaxes)))
     data = randn((codomain_namedaxes..., domain_namedaxes...))
     return operator(data, name.(codomain_namedaxes), name.(domain_namedaxes))
@@ -79,8 +79,8 @@ end
         # Without truncation the gate is applied exactly, so the gated network
         # reproduces exact contraction regardless of the gauge.
         for gate in (
-                rand_operator((site_axes[2],)),
-                rand_operator((site_axes[2], site_axes[3])),
+                randn_operator((site_axes[2],)),
+                randn_operator((site_axes[2], site_axes[3])),
             )
             gated, _ = apply_operator(gate, state, env)
             @test prod(gated) ≈ NDA.apply(gate, prod(state))
@@ -94,12 +94,12 @@ end
         env = beliefpropagation_normnetwork(
             state; stopping_criterion = (; maxiter = 100, tol = 1.0e-13)
         )
-        gate = rand_operator((site_axes[2], site_axes[3]))
+        gate = randn_operator((site_axes[2], site_axes[3]))
         # Exact oracle: gate the fully contracted state, then take the globally
         # optimal rank-`k` SVD truncation across the 2 | 3 cut.
-        Ψ = NDA.apply(gate, prod(state))
+        gated_full = NDA.apply(gate, prod(state))
         left = [name(site_axes[v]) for v in 1:2]
-        U, S, Vt = TA.svd(Ψ, left; trunc = truncrank(k))
+        U, S, Vt = TA.svd(gated_full, left; trunc = truncrank(k))
         gated, _ = apply_operator(gate, state, env; trunc = truncrank(k))
         @test prod(gated) ≈ U * S * Vt
     end
@@ -112,9 +112,9 @@ end
             state; stopping_criterion = (; maxiter = 100, tol = 1.0e-13)
         )
         # Gates on neighboring edges sharing site 3, applied in sequence.
-        gA = rand_operator((site_axes[2], site_axes[3]))
-        gB = rand_operator((site_axes[3], site_axes[4]))
-        gated, _ = apply_operators([gA, gB], state, env)
-        @test prod(gated) ≈ NDA.apply(gB, NDA.apply(gA, prod(state)))
+        g1 = randn_operator((site_axes[2], site_axes[3]))
+        g2 = randn_operator((site_axes[3], site_axes[4]))
+        gated, _ = apply_operators([g1, g2], state, env)
+        @test prod(gated) ≈ NDA.apply(g2, NDA.apply(g1, prod(state)))
     end
 end

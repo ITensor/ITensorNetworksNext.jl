@@ -16,6 +16,17 @@ end
 function select_algorithm(f, alg, args::Tuple; kwargs...)
     return select_algorithm(f, alg, typeof(args); kwargs...)
 end
+function select_algorithm(f, ::Nothing, args::Tuple; kwargs...)
+    return default_algorithm(f, args; kwargs...)
+end
+function select_algorithm(f, alg::NamedTuple, args::Tuple; kwargs...)
+    isempty(kwargs) || throw(
+        ArgumentError(
+            "Additional keyword arguments are not allowed when `alg` is a `NamedTuple`."
+        )
+    )
+    return default_algorithm(f, args; alg...)
+end
 function select_algorithm(f, ::Nothing, ::Type{Args}; kwargs...) where {Args <: Tuple}
     return default_algorithm(f, Args; kwargs...)
 end
@@ -34,6 +45,9 @@ function select_algorithm(f, alg::AbstractAlgorithm, ::Type{<:Tuple}; kwargs...)
         )
     )
     return alg
+end
+function select_algorithm(f, alg::AbstractAlgorithm, args::Tuple; kwargs...)
+    return select_algorithm(f, alg, typeof(args); kwargs...)
 end
 
 # Allocate the destination for an in-place call to `f`. Operations overload
