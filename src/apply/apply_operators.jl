@@ -22,33 +22,32 @@ end
 # The `apply_operators` iteration algorithm wraps the per-operator algorithm,
 # which is itself resolved via `apply_operator` (overridable with `operator_alg`).
 function default_algorithm(
-        ::typeof(apply_operators), ::Type{Args};
+        ::typeof(apply_operators), args::Tuple;
         operator_alg = nothing, environment_alg = nothing, kwargs...
-    ) where {Args <: Tuple}
+    )
+    operators, state, env = args
     # `apply_operator` acts on a single operator, so select on the operator
     # element type, keeping the remaining `(state, env)` argument types.
-    operators_type, rest... = fieldtypes(Args)
-    operator_args = Tuple{eltype(operators_type), rest...}
+    # We use types here in case the operator list is empty.
+    operator_args = Tuple{eltype(operators), typeof(state), typeof(env)}
     operator_algorithm =
         select_algorithm(apply_operator, operator_alg, operator_args; kwargs...)
-    environment_algorithm =
-        select_algorithm(apply_operator_environment_preparation, environment_alg, Args)
-    return ApplyOperatorsAlgorithm(; operator_algorithm, environment_algorithm)
+    # `apply_operator_environment_preparation` signature (minus the env algorithm):
+    # `(operator_algorithm, operators, iteration::Int, iterate, env)`.
+    prepare_args = (operator_algorithm, operators, 0, state, env)
+    environment_algorithm = select_algorithm(
+        apply_operator_environment_preparation, environment_alg, prepare_args
+    )
+    return ApplyOperatorsAlgorithm(;
+        operator_algorithm,
+        environment_algorithm,
+        stopping_criterion = AI.StopAfterIteration(length(operators))
+    )
 end
 
 function apply_operators(algorithm, operators, state, env)
     problem = ApplyOperatorsProblem(; operators, init = state)
-    # One step per operator. `select_algorithm` dispatches on argument *types*,
-    # so `length(operators)` can't reach it; the operator-count bound is set here,
-    # where the value is available.
-    iteration_algorithm = ApplyOperatorsAlgorithm(;
-        algorithm.operator_algorithm,
-        algorithm.environment_algorithm,
-        stopping_criterion = AI.StopAfterIteration(length(operators))
-    )
-    return AI.solve(
-        problem, iteration_algorithm; iterate = copy(state), env = copy(env)
-    )
+    return AI.solve(problem, algorithm; iterate = copy(state), env = copy(env))
 end
 
 # === Layer 1: apply_operators iteration ===
@@ -65,8 +64,6 @@ end
     } <: AI.Algorithm
     operator_algorithm::OperatorAlgorithm
     environment_algorithm::EnvironmentAlgorithm = NoApplyOperatorEnvironmentPreparation()
-    # Placeholder default; the operator-count bound is filled in per call by
-    # `apply_operators` (where `length(operators)` is known).
     stopping_criterion::StoppingCriterion = AI.StopAfterIteration(0)
 end
 
