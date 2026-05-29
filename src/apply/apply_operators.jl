@@ -156,9 +156,8 @@ end
 
 # === Default strategy: BPApplyGate ===
 
-@kwdef struct BPApplyGate{Trunc, Pinv <: NamedTuple} <: ApplyOperatorAlgorithm
+@kwdef struct BPApplyGate{Trunc} <: ApplyOperatorAlgorithm
     trunc::Trunc = nothing
-    pinv::Pinv = (;)
     normalize::Bool = false
 end
 
@@ -167,7 +166,7 @@ function apply_operator!(
     )
     apply_gate_bp!(
         dest, operator, state, env;
-        algorithm.trunc, algorithm.pinv, algorithm.normalize
+        algorithm.trunc, algorithm.normalize
     )
     return dest
 end
@@ -224,14 +223,14 @@ end
 function apply_gate_bp_nsite!(
         ::Val{2}, dest::AbstractTensorNetwork, op::AbstractNamedDimsArray,
         state::AbstractTensorNetwork, env, vs;
-        trunc, pinv, normalize
+        trunc, normalize
     )
     v1, v2 = vs
     edges_in = boundary_edges(state, vs; dir = :in)
     grams_v1 =
-        [gram_eigh_full_with_pinv(env[e]; pinv) for e in edges_in if dst(e) == v1]
+        [gram_eigh_full_with_pinv(env[e]) for e in edges_in if dst(e) == v1]
     grams_v2 =
-        [gram_eigh_full_with_pinv(env[e]; pinv) for e in edges_in if dst(e) == v2]
+        [gram_eigh_full_with_pinv(env[e]) for e in edges_in if dst(e) == v2]
     gauges_v1, inv_gauges_v1 = first.(grams_v1), last.(grams_v1)
     gauges_v2, inv_gauges_v2 = first.(grams_v2), last.(grams_v2)
 
