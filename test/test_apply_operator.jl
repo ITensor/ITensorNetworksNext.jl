@@ -4,7 +4,8 @@ import TensorAlgebra as TA
 using DataGraphs: underlying_graph
 using ITensorBase: Index
 using ITensorNetworksNext: MessageCache, TensorNetwork, apply_operator, apply_operators,
-    beliefpropagation, linkinds
+    beliefpropagation, identity_norm_messagecache, linkinds, ones_norm_messagecache,
+    randn_norm_messagecache, similar_norm_messagecache
 using MatrixAlgebraKit: truncrank
 using NamedDimsArrays: name, operator, randname, replacedimnames, setname
 using NamedGraphs.GraphsExtensions: all_edges, incident_edges
@@ -116,5 +117,34 @@ end
         g2 = randn_operator((site_axes[3], site_axes[4]))
         gated, _ = apply_operators([g1, g2], state, env)
         @test prod(gated) ≈ NDA.apply(g2, NDA.apply(g1, prod(state)))
+    end
+
+    @testset "norm-messagecache constructors" begin
+        link_axes = Dict(e => Index(χ) for e in Graphs.edges(g))
+        site_axes = Dict(v => Index(d) for v in Graphs.vertices(g))
+        state = random_tensornetwork(g, link_axes, site_axes)
+
+        # All three constructors build a `MessageCache` with two directed edges per
+        # undirected edge of the state.
+        n_directed = 2 * length(collect(Graphs.edges(g)))
+        for ctor in (
+                similar_norm_messagecache, identity_norm_messagecache,
+                ones_norm_messagecache, randn_norm_messagecache,
+            )
+            cache = ctor(state)
+            @test length(collect(Graphs.edges(cache))) == n_directed
+        end
+
+        # Identity env reproduces the gauge-invariant exact-gate property: an
+        # untruncated gate gives the exact result regardless of which valid env we
+        # gauge against.
+        env = identity_norm_messagecache(state)
+        for gate in (
+                randn_operator((site_axes[2],)),
+                randn_operator((site_axes[2], site_axes[3])),
+            )
+            gated, _ = apply_operator(gate, state, env)
+            @test prod(gated) ≈ NDA.apply(gate, prod(state))
+        end
     end
 end

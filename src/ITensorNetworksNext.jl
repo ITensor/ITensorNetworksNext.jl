@@ -13,8 +13,10 @@ include("abstracttensornetwork.jl")
 include("tensornetwork.jl")
 include("TensorNetworkGenerators/TensorNetworkGenerators.jl")
 include("contract_network.jl")
+include("operator_init.jl")
 
 include("beliefpropagation/messagecache.jl")
+include("beliefpropagation/messagecache_constructors.jl")
 include("beliefpropagation/beliefpropagation.jl")
 
 include("apply/apply_operators.jl")
