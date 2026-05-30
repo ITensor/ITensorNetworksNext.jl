@@ -36,10 +36,6 @@ TensorOperations = "6aa20fa7-93e2-5fca-9bc0-fbd0db3c71a2"
 rev = "mf/gram-eigh-full"
 url = "https://github.com/ITensor/NamedDimsArrays.jl.git"
 
-[sources.TensorAlgebra]
-rev = "mf/gram-eigh-full"
-url = "https://github.com/ITensor/TensorAlgebra.jl.git"
-
 [extensions]
 ITensorNetworksNextTensorOperationsExt = "TensorOperations"
 
@@ -61,7 +57,7 @@ NamedDimsArrays = "0.14.3, 0.15"
 NamedGraphs = "0.11"
 SimpleTraits = "0.9.5"
 SplitApplyCombine = "1.2.3"
-TensorAlgebra = "0.9.2"
+TensorAlgebra = "0.9.3"
 TensorOperations = "5.3.1"
 TermInterface = "2"
 TypeParameterAccessors = "0.4.4"
