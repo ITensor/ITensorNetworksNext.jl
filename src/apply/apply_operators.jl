@@ -47,8 +47,9 @@ function default_algorithm(
 end
 
 function apply_operators(algorithm, operators, state, env)
+    isempty(operators) && return copy(state), copy(env)
     problem = ApplyOperatorsProblem(; operators, init = state)
-    return AI.solve(problem, algorithm; iterate = copy(state), env = copy(env))
+    return AI.solve(problem, algorithm; iterate = state, env)
 end
 
 # === Layer 1: apply_operators iteration ===
