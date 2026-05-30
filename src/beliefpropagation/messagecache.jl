@@ -1,7 +1,7 @@
 using DataGraphs: DataGraphs, AbstractDataGraph, edge_data, edge_data_type,
     set_vertex_data!, underlying_graph, underlying_graph_type, vertex_data, vertex_data_type
 using Dictionaries: Dictionary, delete!, getindices, set!
-using Graphs: AbstractGraph, connected_components, dst, is_directed, is_tree
+using Graphs: AbstractGraph, connected_components, is_directed, is_tree
 using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArray, lazy, parenttype
 using NamedGraphs.GraphsExtensions: IsDirected, boundary_edges, default_root_vertex,
     directed_graph, forest_cover, in_incident_edges, post_order_dfs_edges, undirected_graph,
@@ -20,145 +20,133 @@ struct MessageCache{T, V} <: AbstractDataGraph{V, Nothing, T}
     end
 end
 
-# Methods are emitted via `@eval` rather than written directly so they can be
-# shared with sibling cache types if more are added. Once
-# `DataGraphs.AbstractEdgeDataGraph` (DataGraphs.jl#121) lands, `MessageCache`
-# can subtype that and most of this loop can fall away.
-for Cache in (:MessageCache,)
-    @eval begin
-        # ============================ constructors ===================================== #
+# single type parameter version of the inner constructor
+function MessageCache{T}(::UndefInitializer, vertices) where {T}
+    return MessageCache{T, eltype(vertices)}(undef, vertices)
+end
 
-        function $Cache{T}(::UndefInitializer, vertices) where {T}
-            return $Cache{T, eltype(vertices)}(undef, vertices)
-        end
+# compatibility with generic key-val iterables
+Base.keytype(c::MessageCache) = keytype(typeof(c))
+Base.keytype(::Type{<:MessageCache{T, V}}) where {T, V} = NamedEdge{V}
 
-        $Cache(messages) = $Cache{valtype(messages)}(messages)
+Base.valtype(c::MessageCache) = valtype(typeof(c))
+Base.valtype(::Type{<:MessageCache{T}}) where {T} = T
 
-        function $Cache{T}(messages) where {T}
-            V = vertextype(keytype(messages))
-            return $Cache{T, V}(messages)
-        end
+Base.keys(cache::MessageCache) = edges(cache)
 
-        # `messages` is any iterable data structure, where `keys(messages)`
-        # are edges and the values are the messages on those edges.
-        function $Cache{T, V}(messages) where {T, V}
-            edges = keys(messages)
-            vertices = union(src.(edges), dst.(edges))
-            cache = $Cache{T, V}(undef, vertices)
-            add_edges!(cache.underlying_graph, edges)
-            copyto!(cache, messages)
-            return cache
-        end
+MessageCache(messages) = MessageCache{valtype(messages)}(messages)
 
-        Base.copy(cache::$Cache) = $Cache(copy(cache.messages))
+function MessageCache{T}(messages) where {T}
+    V = vertextype(keytype(messages))
+    return MessageCache{T, V}(messages)
+end
 
-        # ============================ key/val types ==================================== #
-
-        Base.keytype(c::$Cache) = keytype(typeof(c))
-        Base.keytype(::Type{<:$Cache{T, V}}) where {T, V} = NamedEdge{V}
-        Base.valtype(c::$Cache) = valtype(typeof(c))
-        Base.valtype(::Type{<:$Cache{T}}) where {T} = T
-        Base.keys(cache::$Cache) = edges(cache)
-
-        # ============================ NamedGraphs interface ============================ #
-
-        function NamedGraphs.add_edge!(c::$Cache, edge)
-            add_edge!(c.underlying_graph, edge)
-            return c
-        end
-
-        function NamedGraphs.rem_edge!(c::$Cache, edge)
-            delete!(c.messages, to_graph_index(c, edge))
-            rem_edge!(c.underlying_graph, edge)
-            return c
-        end
-
-        function NamedGraphs.induced_subgraph_from_vertices(cache::$Cache, subvertices)
-            # TODO: once we have `subgraph_edges` in `NamedGraphs`, simplify this.
-            underlying_subgraph, vlist =
-                Graphs.induced_subgraph(cache.underlying_graph, subvertices)
-            assigned = v -> isassigned(cache, v)
-            assigned_subedges = Iterators.filter(assigned, edges(underlying_subgraph))
-            messages = getindices(cache.messages, Indices(assigned_subedges))
-            return $Cache(messages), vlist
-        end
-
-        # ============================ DataGraphs interface ============================= #
-
-        DataGraphs.underlying_graph(cache::$Cache) = cache.underlying_graph
-        DataGraphs.is_vertex_assigned(::$Cache, _) = false
-        DataGraphs.is_edge_assigned(c::$Cache, edge) = haskey(c.messages, edge)
-
-        function DataGraphs.get_edge_data(c::$Cache, edge::AbstractEdge)
-            return c.messages[edge]
-        end
-        function DataGraphs.set_edge_data!(c::$Cache, val, edge)
-            return set!(c.messages, edge, val)
-        end
-
-        # ============================ equality ========================================= #
-
-        function Base.:(==)(c1::$Cache, c2::$Cache)
-            return c1.underlying_graph == c2.underlying_graph && c1.messages == c2.messages
-        end
-
-        # ============================ copyto! ========================================== #
-
-        # see: copyto!(dest, src) for analogous behaviour to 2 argument method
-        # see: copyto!(dest, Rdest::CartesianIndices, src, Rsrc::CartesianIndices)
-        # for analogous behaviour to 3 argument method.
-        # TODO: these can be made generic for `AbstractDataGraph` in `DataGraphs.jl`.
-        function Base.copyto!(
-                cache_dst::$Cache, cache_src::AbstractDataGraph, inds = nothing
-            )
-            copyto!_messagecache(cache_dst, edge_data(cache_src), inds)
-            return cache_dst
-        end
-
-        function Base.copyto!(
-                cache_dst::$Cache, dictionary_src::Dictionary, inds = nothing
-            )
-            copyto!_messagecache(cache_dst, dictionary_src, inds)
-            return cache_dst
-        end
-
-        function Base.copyto!(
-                cache_dst::$Cache, dict_src::Dict, inds = keys(dict_src)
-            )
-            for key in inds
-                cache_dst[key] = dict_src[key]
-            end
-            return cache_dst
-        end
-
-        # ============================ printing ========================================= #
-
-        # TODO: This is the definition for the proposed `DataGraphs.AbstractEdgeDataGraph`.
-        function Base.show(io::IO, mime::MIME"text/plain", graph::$Cache)
-            println(io, "$(typeof(graph)) with $(nv(graph)) vertices:")
-            show(io, mime, vertices(graph))
-            println(io, "\n")
-            println(io, "and $(ne(graph)) edge(s):")
-            for e in edges(graph)
-                show(io, mime, e)
-                println(io)
-            end
-            println(io)
-            println(io, "with edge data:")
-            show(io, mime, edge_data(graph))
-            return nothing
-        end
-
-        Base.show(io::IO, graph::$Cache) = show(io, MIME"text/plain"(), graph)
-    end
+# `messages` is any iterable data structure, where `keys(messages)` are edges
+# and the values are the messages on those edges.
+function MessageCache{T, V}(messages) where {T, V}
+    edges = keys(messages)
+    vertices = union(src.(edges), dst.(edges))
+    cache = MessageCache{T, V}(undef, vertices)
+    add_edges!(cache.underlying_graph, edges)
+    copyto!(cache, messages)
+    return cache
 end
 
 messagecache(pairs) = MessageCache(Dict(pairs))
 messagecache(f, edges) = messagecache(edge => f(edge) for edge in edges)
 
-function copyto!_messagecache(cache_dst, cache_src, inds = nothing)
+# ================================ NamedGraphs interface ================================= #
+function NamedGraphs.add_edge!(c::MessageCache, edge)
+    add_edge!(c.underlying_graph, edge)
+    return c
+end
+
+function NamedGraphs.rem_edge!(c::MessageCache, edge)
+    delete!(c.messages, to_graph_index(c, edge))
+    rem_edge!(c.underlying_graph, edge)
+    return c
+end
+
+# ================================= DataGraphs interface ================================= #
+
+DataGraphs.underlying_graph(cache::MessageCache) = cache.underlying_graph
+
+DataGraphs.is_vertex_assigned(::MessageCache, _) = false
+DataGraphs.is_edge_assigned(c::MessageCache, edge) = haskey(c.messages, edge)
+
+function DataGraphs.get_edge_data(c::MessageCache, edge::AbstractEdge)
+    return c.messages[edge]
+end
+function DataGraphs.set_edge_data!(c::MessageCache, val, edge)
+    return set!(c.messages, edge, val)
+end
+
+Base.copy(cache::MessageCache) = MessageCache(copy(cache.messages))
+
+function Base.:(==)(cache1::MessageCache, cache2::MessageCache)
+    ug1 = cache1.underlying_graph
+    ug2 = cache2.underlying_graph
+
+    ms1 = cache1.messages
+    ms2 = cache2.messages
+
+    return (ug1 == ug2 && ms1 == ms2)
+end
+
+function NamedGraphs.induced_subgraph_from_vertices(cache::MessageCache, subvertices)
+    # TODO: once we have `subgraph_edges` in `NamedGraphs`, simplify this.
+    underlying_subgraph, vlist =
+        Graphs.induced_subgraph(cache.underlying_graph, subvertices)
+
+    assigned = v -> isassigned(cache, v)
+
+    assigned_subedges = Iterators.filter(assigned, edges(underlying_subgraph))
+
+    messages = getindices(cache.messages, Indices(assigned_subedges))
+
+    return MessageCache(messages), vlist
+end
+
+# see: copyto!(dest, src) for analogous behaviour to 2 argument method
+# see: copyto!(dest, Rdest::CartesianIndices, src, Rsrc::CartesianIndices)
+# for analogous behaviour to 3 argument method.
+# TODO: these can be made generic for `AbtractDataGraph` in `DataGraphs.jl`
+function copyto!_messagecache(
+        cache_dst::MessageCache,
+        cache_src,
+        inds = nothing
+    )
     inds = isnothing(inds) ? Indices(keys(cache_src)) : Indices(inds)
     view(edge_data(cache_dst), inds) .= view(cache_src, inds)
+    return cache_dst
+end
+
+function Base.copyto!(
+        cache_dst::MessageCache,
+        cache_src::AbstractDataGraph,
+        inds = nothing
+    )
+    copyto!_messagecache(cache_dst, edge_data(cache_src), inds)
+    return cache_dst
+end
+
+function Base.copyto!(
+        cache_dst::MessageCache,
+        dictionary_src::Dictionary,
+        inds = nothing
+    )
+    copyto!_messagecache(cache_dst, dictionary_src, inds)
+    return cache_dst
+end
+
+function Base.copyto!(
+        cache_dst::MessageCache,
+        dict_src::Dict,
+        inds = keys(dict_src)
+    )
+    for key in inds
+        cache_dst[key] = dict_src[key]
+    end
     return cache_dst
 end
 
@@ -259,3 +247,23 @@ function forest_cover_edge_sequence(gi::AbstractGraph; root_vertex = default_roo
     end
     return rv
 end
+
+# ======================================= printing ======================================= #
+
+# TODO: This is the definition for the proposed `DataGraphs.AbstractEdgeDataGraph`.
+function Base.show(io::IO, mime::MIME"text/plain", graph::MessageCache)
+    println(io, "$(typeof(graph)) with $(nv(graph)) vertices:")
+    show(io, mime, vertices(graph))
+    println(io, "\n")
+    println(io, "and $(ne(graph)) edge(s):")
+    for e in edges(graph)
+        show(io, mime, e)
+        println(io)
+    end
+    println(io)
+    println(io, "with edge data:")
+    show(io, mime, edge_data(graph))
+    return nothing
+end
+
+Base.show(io::IO, graph::MessageCache) = show(io, MIME"text/plain"(), graph)
