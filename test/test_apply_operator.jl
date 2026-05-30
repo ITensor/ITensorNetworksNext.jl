@@ -1,14 +1,13 @@
 import Graphs
 import NamedDimsArrays as NDA
 import TensorAlgebra as TA
-using DataGraphs: underlying_graph
 using ITensorBase: Index
-using ITensorNetworksNext: MessageCache, TensorNetwork, apply_operator, apply_operators,
-    beliefpropagation, identity_norm_messagecache, linkinds, ones_norm_messagecache,
+using ITensorNetworksNext: TensorNetwork, apply_operator, apply_operators,
+    beliefpropagation_normnetwork, identity_norm_messagecache, ones_norm_messagecache,
     randn_norm_messagecache, similar_norm_messagecache
 using MatrixAlgebraKit: truncrank
-using NamedDimsArrays: name, operator, randname, replacedimnames, setname
-using NamedGraphs.GraphsExtensions: all_edges, incident_edges
+using NamedDimsArrays: name, operator, randname, setname
+using NamedGraphs.GraphsExtensions: incident_edges
 using NamedGraphs.NamedGraphGenerators: named_path_graph
 using Test: @test, @testset
 
@@ -33,32 +32,6 @@ function randn_operator(domain_namedaxes)
     codomain_namedaxes = setname.(domain_namedaxes, randname.(name.(domain_namedaxes)))
     data = randn((codomain_namedaxes..., domain_namedaxes...))
     return operator(data, name.(codomain_namedaxes), name.(domain_namedaxes))
-end
-
-# Converged belief-propagation messages on the double-layer norm network
-# ⟨state|state⟩: the bra layer's link axes get fresh names so they stay distinct
-# from the ket's, while the shared site axis is contracted. Returned as operator
-# messages whose codomain is the ket link and whose domain is the bra link. On a
-# tree these are the exact bond environments, so the resulting gauge reproduces
-# exact (canonical-form) truncation. Anticipates a future
-# `beliefpropagation(NormNetwork(state))`. Forwards `kwargs` to `beliefpropagation`.
-function beliefpropagation_normnetwork(state; kwargs...)
-    g = underlying_graph(state)
-    link_name(e) = name(only(linkinds(state, e)))
-    bra_name = Dict(link_name(e) => randname(link_name(e)) for e in all_edges(g))
-    norm_tn = TensorNetwork(g) do v
-        t = state[v]
-        bra = [link_name(e) => bra_name[link_name(e)] for e in incident_edges(g, v)]
-        return t * replacedimnames(t, bra...)
-    end
-    init = Dict(e => ones(Float64, Tuple(linkinds(norm_tn, e))) for e in all_edges(g))
-    cache = beliefpropagation(norm_tn, init; kwargs...)
-    return MessageCache(
-        Dict(
-            e => operator(cache[e], (link_name(e),), (bra_name[link_name(e)],))
-                for e in all_edges(g)
-        )
-    )
 end
 
 @testset "apply_operator on a path graph" begin

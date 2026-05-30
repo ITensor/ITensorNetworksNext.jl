@@ -18,6 +18,7 @@ include("operator_init.jl")
 include("beliefpropagation/messagecache.jl")
 include("beliefpropagation/messagecache_constructors.jl")
 include("beliefpropagation/beliefpropagation.jl")
+include("beliefpropagation/beliefpropagation_normnetwork.jl")
 
 include("apply/apply_operators.jl")
 
