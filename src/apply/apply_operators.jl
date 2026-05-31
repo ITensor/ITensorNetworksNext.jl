@@ -257,8 +257,7 @@ function apply_gate_bp_nsite!(
     fresh_21 = randname(name_v1)
     # TODO: if `replacedimnames` preserved the operator wrapper (updating the
     # codomain/domain `Bijection` accordingly), we could drop the outer
-    # `operator(...)` wrap here. Tracked in
-    # `Projects/ITensorNetworksNext.jl/gate_application/upstream_blockers.md`.
+    # `operator(...)` wrap here.
     env[v1 => v2] =
         operator(replacedimnames(S, name_v2 => fresh_12), (name_v1,), (fresh_12,))
     env[v2 => v1] =

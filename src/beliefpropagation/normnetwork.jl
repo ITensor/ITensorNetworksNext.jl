@@ -40,8 +40,8 @@ See also: [`ones_norm_messagecache`](@ref), [`randn_norm_messagecache`](@ref),
 """
 function identity_norm_messagecache(tn)
     m = similar_norm_messagecache(tn)
-    # TODO: replace with `map(Base.one, m)` once `map` is defined on `MessageCache`.
-    foreach(e -> m[e] = Base.one(m[e]), edges(m))
+    # TODO: replace with `map(one, m)` once `map` is defined on `MessageCache`.
+    foreach(e -> m[e] = one(m[e]), edges(m))
     return m
 end
 
@@ -58,7 +58,7 @@ function ones_norm_messagecache(tn)
     m = similar_norm_messagecache(tn)
     # TODO: replace with `map(msg -> fill!(msg, one(eltype(msg))), m)` once `map`
     # is defined on `MessageCache`.
-    foreach(e -> m[e] = Base.fill!(m[e], one(eltype(m[e]))), edges(m))
+    foreach(e -> m[e] = fill!(m[e], one(eltype(m[e]))), edges(m))
     return m
 end
 
@@ -73,8 +73,8 @@ function randn_norm_messagecache(tn)
     m = similar_norm_messagecache(tn)
     # TODO: replace with `map(Random.randn!, m)` once `map` is defined on `MessageCache`.
     # `Random.randn!(m[e])` directly does not work on ITensor-backed operators because
-    # `eltype(typeof(::ITensor)) === Any`; peel to the concrete storage instead. Tracked
-    # in `Projects/ITensorNetworksNext.jl/gate_application/upstream_blockers.md`.
+    # `eltype(typeof(::ITensor)) === Any`, which makes `Random.randn!` dispatch on
+    # `Type{Any}`; peel to the concrete storage so it sees the runtime eltype.
     foreach(e -> Random.randn!(denamed(state(m[e]))), edges(m))
     return m
 end
