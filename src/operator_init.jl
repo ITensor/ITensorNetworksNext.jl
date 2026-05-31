@@ -12,13 +12,13 @@ using NamedDimsArrays: AbstractNamedDimsArray, AbstractNamedDimsOperator, codoma
 # Allocate a square operator with the given `codomain` named axes. Domain axes are
 # derived as `dag.(codomain)` with fresh `randname`-generated names; backend / device
 # inherited from `prototype` via `Base.similar`.
-function similar_operator(prototype, ::Type{T}, codomain::Tuple) where {T}
+function similar_operator(prototype, ::Type{T}, codomain) where {T}
     domain_names = randname.(name.(codomain))
     domain_axes = setname.(dag.(codomain), domain_names)
     raw = similar(prototype, T, (codomain..., domain_axes...))
     return operator(raw, name.(codomain), domain_names)
 end
-function similar_operator(prototype, codomain::Tuple)
+function similar_operator(prototype, codomain)
     return similar_operator(prototype, eltype(prototype), codomain)
 end
 
