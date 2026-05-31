@@ -21,19 +21,17 @@ Anticipates a future `NormNetwork(tn)` struct that bundles `norm_tn` and `linkna
 into a single value with `beliefpropagation` dispatch.
 """
 function normnetwork(tn)
-    g = underlying_graph(tn)
-    linknames_map = Dict()
-    for e in edges(tn)
-        ket_to_bra = Dict(name(ind) => randname(name(ind)) for ind in linkinds(tn, e))
-        linknames_map[e] = ket_to_bra
-        linknames_map[reverse(e)] = ket_to_bra
-    end
-    norm_tn = TensorNetwork(g) do v
+    linknames_map = Dict(
+        e => Dict(name(ind) => randname(name(ind)) for ind in linkinds(tn, e))
+            for e in edges(tn)
+    )
+    merge!(linknames_map, Dict(reverse(e) => m for (e, m) in linknames_map))
+    norm_tn = TensorNetwork(underlying_graph(tn)) do v
         t = tn[v]
-        renames = collect(
-            Iterators.flatten(linknames_map[e] for e in incident_edges(g, v))
-        )
-        return t * replacedimnames(t, renames...)
+        ket_to_bra = Dict(p for e in incident_edges(tn, v) for p in linknames_map[e])
+        # TODO: the bra layer should be `dag`'d (or `adjoint`'d) for complex correctness.
+        # Needs `dag` / `adjoint` plumbed through `TensorAlgebra` / `NamedDimsArrays` first.
+        return t * replacedimnames(n -> get(ket_to_bra, n, n), t)
     end
     return norm_tn, linknames_map
 end
