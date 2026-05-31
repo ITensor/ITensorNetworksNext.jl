@@ -1,7 +1,7 @@
 using DataGraphs: underlying_graph
 using Graphs: edges, src
 using NamedDimsArrays:
-    codomainnames, denamed, domainnames, name, operator, randname, replacedimnames, state
+    codomainnames, domainnames, name, operator, randname, replacedimnames, state
 using NamedGraphs.GraphsExtensions: all_edges, incident_edges
 using Random: Random
 
@@ -40,8 +40,10 @@ See also: [`ones_norm_messagecache`](@ref), [`randn_norm_messagecache`](@ref),
 """
 function identity_norm_messagecache(tn)
     m = similar_norm_messagecache(tn)
-    # TODO: replace with `map(one, m)` once `map` is defined on `MessageCache`.
-    foreach(e -> m[e] = one(m[e]), edges(m))
+    # `one_operator` is held locally in `tensoralgebra.jl` and would become
+    # `Base.one(::AbstractNamedDimsOperator)` once that lands upstream.
+    # TODO: replace with `map(one_operator, m)` once `map` is defined on `MessageCache`.
+    foreach(e -> m[e] = one_operator(m[e]), edges(m))
     return m
 end
 
@@ -63,19 +65,22 @@ function ones_norm_messagecache(tn)
 end
 
 """
-    randn_norm_messagecache(tn) -> MessageCache
+    randn_norm_messagecache([rng], tn) -> MessageCache
 
 Allocate a `MessageCache` whose per-edge messages have entries drawn from `randn`.
+`rng` defaults to `Random.default_rng()`.
 
 See also: [`identity_norm_messagecache`](@ref), [`ones_norm_messagecache`](@ref).
 """
-function randn_norm_messagecache(tn)
+randn_norm_messagecache(tn) = randn_norm_messagecache(Random.default_rng(), tn)
+function randn_norm_messagecache(rng::Random.AbstractRNG, tn)
     m = similar_norm_messagecache(tn)
-    # TODO: replace with `map(Random.randn!, m)` once `map` is defined on `MessageCache`.
-    # `Random.randn!(m[e])` directly does not work on ITensor-backed operators because
-    # `eltype(typeof(::ITensor)) === Any`, which makes `Random.randn!` dispatch on
-    # `Type{Any}`; peel to the concrete storage so it sees the runtime eltype.
-    foreach(e -> Random.randn!(denamed(state(m[e]))), edges(m))
+    # `randn_operator!` is held locally in `tensoralgebra.jl` and would become a
+    # method of `Random.randn!` once that lands upstream. It also hides the workaround
+    # for the ITensor `eltype(typeof(::ITensor)) === Any` issue (see its definition).
+    # TODO: replace with `map(msg -> randn_operator!(rng, msg), m)` once `map` is
+    # defined on `MessageCache`.
+    foreach(e -> randn_operator!(rng, m[e]), edges(m))
     return m
 end
 
