@@ -11,7 +11,7 @@ using Random: Random
 function _per_edge_norm_messagecache(f, tn; eltype = _scalartype(tn))
     return messagecache(_all_directed_edges(tn)) do e
         proto = tn[src(e)]
-        codomain = Tuple(linkinds(tn, e))
+        codomain = linkinds(tn, e)
         return f(similar_operator(proto, eltype, codomain))
     end
 end
