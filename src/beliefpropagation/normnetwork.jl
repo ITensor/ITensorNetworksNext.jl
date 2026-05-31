@@ -1,8 +1,85 @@
 using DataGraphs: underlying_graph
-using Graphs: edges
-using NamedDimsArrays:
-    codomainnames, dimnames, domainnames, name, operator, randname, replacedimnames, state
-using NamedGraphs.GraphsExtensions: incident_edges
+using Graphs: edges, src
+using NamedDimsArrays: codomainnames, denamed, dimnames, domainnames, name, operator,
+    randname, replacedimnames, state
+using NamedGraphs.GraphsExtensions: all_edges, incident_edges
+using Random: Random
+
+# === MessageCache constructors keyed to the norm network ⟨tn|tn⟩ ===
+
+"""
+    similar_norm_messagecache(tn) -> MessageCache
+
+Allocate a `MessageCache` of square operator messages with **undefined** data, one per
+directed edge of the undirected graph of `tn` (both directions on every undirected edge).
+Each message's codomain is the link axes on that edge in `tn`; the domain has dual axes
+with fresh `randname`-generated names. The element type and backend are inherited from
+the factor tensors of `tn` via `Base.similar`.
+
+This is the allocator that backs the filled-cache constructors
+(`identity_norm_messagecache`, `ones_norm_messagecache`, `randn_norm_messagecache`).
+Use it directly to construct caches with custom message data, e.g. by mutating each
+entry after allocation.
+"""
+function similar_norm_messagecache(tn)
+    return messagecache(all_edges(tn)) do e
+        return similar_operator(tn[src(e)], linkinds(tn, e))
+    end
+end
+
+"""
+    identity_norm_messagecache(tn) -> MessageCache
+
+Allocate a `MessageCache` of identity-operator messages, one per directed edge of `tn`.
+Each message acts as the identity map on the link axis for its edge — the
+"uncorrelated environment" starting point for belief-propagation simple-update gauging
+on the norm network ⟨tn|tn⟩.
+
+See also: [`ones_norm_messagecache`](@ref), [`randn_norm_messagecache`](@ref),
+[`similar_norm_messagecache`](@ref).
+"""
+function identity_norm_messagecache(tn)
+    m = similar_norm_messagecache(tn)
+    # TODO: replace with `map(Base.one, m)` once `map` is defined on `MessageCache`.
+    foreach(e -> m[e] = Base.one(m[e]), edges(m))
+    return m
+end
+
+"""
+    ones_norm_messagecache(tn) -> MessageCache
+
+Allocate a `MessageCache` whose per-edge messages have every entry equal to `1`. Each
+message is the rank-1 outer product of all-ones vectors on the (codomain, domain) link
+axes.
+
+See also: [`identity_norm_messagecache`](@ref), [`randn_norm_messagecache`](@ref).
+"""
+function ones_norm_messagecache(tn)
+    m = similar_norm_messagecache(tn)
+    # TODO: replace with `map(msg -> fill!(msg, one(eltype(msg))), m)` once `map`
+    # is defined on `MessageCache`.
+    foreach(e -> m[e] = Base.fill!(m[e], one(eltype(m[e]))), edges(m))
+    return m
+end
+
+"""
+    randn_norm_messagecache(tn) -> MessageCache
+
+Allocate a `MessageCache` whose per-edge messages have entries drawn from `randn`.
+
+See also: [`identity_norm_messagecache`](@ref), [`ones_norm_messagecache`](@ref).
+"""
+function randn_norm_messagecache(tn)
+    m = similar_norm_messagecache(tn)
+    # TODO: replace with `map(Random.randn!, m)` once `map` is defined on `MessageCache`.
+    # `Random.randn!(m[e])` directly does not work on ITensor-backed operators because
+    # `eltype(typeof(::ITensor)) === Any`; peel to the concrete storage instead. Tracked
+    # in `Projects/ITensorNetworksNext.jl/gate_application/upstream_blockers.md`.
+    foreach(e -> Random.randn!(denamed(state(m[e]))), edges(m))
+    return m
+end
+
+# === Double-layer construction and BP wrapper ===
 
 """
     normnetwork(tn) -> norm_tn, linknames_map
