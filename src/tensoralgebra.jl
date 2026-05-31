@@ -34,15 +34,18 @@ end
 #
 # Mirrors `TensorAlgebra.svd` / `eigen`: a chain of dispatches accepting (named arrays
 # with names, raw arrays with labels, with biperms, with perms, or in canonical
-# (codomain..., domain...) layout) all funnel into the in-place canonical worker
-# `one_tensor!(a, ndims_codomain::Val)`, which matricizes the array, calls
-# `MatrixAlgebraKit.one!`, and unmatricizes back.
+# (codomain..., domain...) layout) all funnel into the canonical worker
+# `one_tensor(style, a, ndims_codomain::Val)`, which matricizes the array, calls
+# `MatrixAlgebraKit.one!` on the matrix, and unmatricizes back.
 #
 # `one_tensor` is the local name for what would eventually be `TensorAlgebra.one`.
 #
+# All forms are out-of-place: `a` is treated as a shape prototype, not mutated. We
+# rely on `matricize` returning a fresh non-aliasing array; a future view-returning
+# `matricized` would be the lower-level building block for an in-place variant.
+#
 # Named layers extend `Base.one` (piracy on `AbstractNamedDimsArray` /
-# `AbstractNamedDimsOperator`); raw-array layers live in `one_tensor` /
-# `one_tensor!`.
+# `AbstractNamedDimsOperator`); raw-array layers live in `one_tensor`.
 
 # --- Named layers ---
 
@@ -80,16 +83,11 @@ function one_tensor(
     return one_tensor(a_perm, Val(length(perm_codomain)))
 end
 
-# Canonical form (out-of-place): allocate a fresh similar buffer and fill.
+# Canonical form: matricize → matrix-level identity → unmatricize.
 function one_tensor(a::AbstractArray, ndims_codomain::Val)
-    return one_tensor!(similar(a), ndims_codomain)
+    return one_tensor(FusionStyle(a), a, ndims_codomain)
 end
-
-# Canonical-form worker (in-place): matricize → matrix-level identity → unmatricize.
-function one_tensor!(a::AbstractArray, ndims_codomain::Val)
-    return one_tensor!(FusionStyle(a), a, ndims_codomain)
-end
-function one_tensor!(style::FusionStyle, a::AbstractArray, ndims_codomain::Val)
+function one_tensor(style::FusionStyle, a::AbstractArray, ndims_codomain::Val)
     a_mat = matricize(style, a, ndims_codomain)
     MatrixAlgebraKit.one!(a_mat)
     biperm = trivialbiperm(ndims_codomain, Val(ndims(a)))
