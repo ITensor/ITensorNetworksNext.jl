@@ -137,15 +137,16 @@ function beliefpropagation_normnetwork(tn, messages; kwargs...)
     # Adapt input messages onto the norm network: rename each operator's domain (bra)
     # axes to the bra names `linknames_map` chose, paired via the operator's own
     # codomain → domain bijection.
-    raw_messages = Dict{eltype(keys(messages)), Any}()
-    for e in keys(messages)
+    es = collect(keys(messages))
+    raws = map(es) do e
         msg, ket_to_bra = messages[e], linknames_map[e]
         bra_rename = Dict(
             cur => ket_to_bra[kn] for
                 (kn, cur) in zip(codomainnames(msg), domainnames(msg))
         )
-        raw_messages[e] = replacedimnames(n -> get(bra_rename, n, n), state(msg))
+        return replacedimnames(n -> get(bra_rename, n, n), state(msg))
     end
+    raw_messages = Dict(es .=> raws)
 
     cache = beliefpropagation(norm_tn, raw_messages; kwargs...)
 
