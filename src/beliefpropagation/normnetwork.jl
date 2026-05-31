@@ -5,106 +5,101 @@ using NamedDimsArrays:
 using NamedGraphs.GraphsExtensions: all_edges, incident_edges
 using Random: Random
 
-# === MessageCache constructors keyed to the norm network ⟨tn|tn⟩ ===
+# === Norm-network environment constructors ===
+#
+# `*_norm_message_env(tn)` builds a `MessageCache` shaped to act as the BP environment
+# for the norm network ⟨tn|tn⟩, with each entry filled per the leading verb (`identity`,
+# `ones`, `randn`, `rand`). The `_env` suffix is reserved for the high-level
+# environment-builder interface; the low-level `MessageCache` / `messagecache(...)`
+# constructors are used internally. A parallel `*_norm_ctm_env` family is planned for
+# CTMRG environments.
 
 """
-    similar_norm_messagecache(tn) -> MessageCache
+    similar_norm_message_env(tn) -> MessageCache
 
-Allocate a `MessageCache` of square operator messages with **undefined** data, one per
-directed edge of the undirected graph of `tn` (both directions on every undirected edge).
-Each message's codomain is the link axes on that edge in `tn`; the domain has dual axes
-with fresh `randname`-generated names. The element type and backend are inherited from
-the factor tensors of `tn` via `Base.similar`.
+Allocate a BP environment for the norm network ⟨tn|tn⟩ with **undefined** message data:
+one square operator message per directed edge of `tn` (both directions on every
+undirected edge). Each message's codomain is the link axes on that edge in `tn`; the
+domain has dual axes with fresh `randname`-generated names. Element type and backend are
+inherited from the factor tensors of `tn` via `Base.similar`.
 
-This is the allocator that backs the filled-cache constructors
-(`identity_norm_messagecache`, `ones_norm_messagecache`, `randn_norm_messagecache`).
-Use it directly to construct caches with custom message data, e.g. by mutating each
-entry after allocation.
+Used internally by [`norm_message_env`](@ref) and the filled environment constructors
+([`identity_norm_message_env`](@ref), [`ones_norm_message_env`](@ref),
+[`randn_norm_message_env`](@ref), [`rand_norm_message_env`](@ref)). Use it directly to
+construct environments with custom message data, e.g. by mutating each entry after
+allocation.
 """
-function similar_norm_messagecache(tn)
+function similar_norm_message_env(tn)
     return messagecache(all_edges(tn)) do e
         return similar_operator(tn[src(e)], linkinds(tn, e))
     end
 end
 
 """
-    identity_norm_messagecache(tn) -> MessageCache
+    norm_message_env(f, tn) -> MessageCache
 
-Allocate a `MessageCache` of identity-operator messages, one per directed edge of `tn`.
-Each message acts as the identity map on the link axis for its edge — the
+Allocate a norm-network BP environment via [`similar_norm_message_env`](@ref) and apply
+`f` to each operator-message entry. Shared building block for the filled-environment
+constructors.
+"""
+function norm_message_env(f, tn)
+    env = similar_norm_message_env(tn)
+    # TODO: replace with `map(f, env)` once `map` is defined on `MessageCache`.
+    foreach(e -> env[e] = f(env[e]), edges(env))
+    return env
+end
+
+"""
+    identity_norm_message_env(tn) -> MessageCache
+
+Build a norm-network BP environment with identity-operator messages on every edge — the
 "uncorrelated environment" starting point for belief-propagation simple-update gauging
-on the norm network ⟨tn|tn⟩.
+on ⟨tn|tn⟩.
 
-See also: [`ones_norm_messagecache`](@ref), [`randn_norm_messagecache`](@ref),
-[`rand_norm_messagecache`](@ref), [`similar_norm_messagecache`](@ref).
+See also: [`ones_norm_message_env`](@ref), [`randn_norm_message_env`](@ref),
+[`rand_norm_message_env`](@ref), [`similar_norm_message_env`](@ref).
 """
-function identity_norm_messagecache(tn)
-    m = similar_norm_messagecache(tn)
-    # `one_operator` is held locally in `tensoralgebra.jl` and would become
-    # `Base.one(::AbstractNamedDimsOperator)` once that lands upstream.
-    # TODO: replace with `map(one_operator, m)` once `map` is defined on `MessageCache`.
-    foreach(e -> m[e] = one_operator(m[e]), edges(m))
-    return m
+identity_norm_message_env(tn) = norm_message_env(one_operator, tn)
+
+"""
+    ones_norm_message_env(tn) -> MessageCache
+
+Build a norm-network BP environment whose per-edge messages have every entry equal to
+`1` — the rank-1 outer product of all-ones vectors on each (codomain, domain) pair.
+
+See also: [`identity_norm_message_env`](@ref), [`randn_norm_message_env`](@ref),
+[`rand_norm_message_env`](@ref).
+"""
+ones_norm_message_env(tn) = norm_message_env(msg -> fill!(msg, one(eltype(msg))), tn)
+
+randn_norm_message_env(tn) = randn_norm_message_env(Random.default_rng(), tn)
+
+"""
+    randn_norm_message_env([rng], tn) -> MessageCache
+
+Build a norm-network BP environment whose per-edge messages have entries drawn from a
+standard normal distribution. `rng` defaults to `Random.default_rng()`.
+
+See also: [`rand_norm_message_env`](@ref), [`identity_norm_message_env`](@ref),
+[`ones_norm_message_env`](@ref).
+"""
+function randn_norm_message_env(rng::Random.AbstractRNG, tn)
+    return norm_message_env(msg -> randn_operator!(rng, msg), tn)
 end
 
-"""
-    ones_norm_messagecache(tn) -> MessageCache
-
-Allocate a `MessageCache` whose per-edge messages have every entry equal to `1`. Each
-message is the rank-1 outer product of all-ones vectors on the (codomain, domain) link
-axes.
-
-See also: [`identity_norm_messagecache`](@ref), [`randn_norm_messagecache`](@ref),
-[`rand_norm_messagecache`](@ref).
-"""
-function ones_norm_messagecache(tn)
-    m = similar_norm_messagecache(tn)
-    # TODO: replace with `map(msg -> fill!(msg, one(eltype(msg))), m)` once `map`
-    # is defined on `MessageCache`.
-    foreach(e -> m[e] = fill!(m[e], one(eltype(m[e]))), edges(m))
-    return m
-end
-
-randn_norm_messagecache(tn) = randn_norm_messagecache(Random.default_rng(), tn)
+rand_norm_message_env(tn) = rand_norm_message_env(Random.default_rng(), tn)
 
 """
-    randn_norm_messagecache([rng], tn) -> MessageCache
+    rand_norm_message_env([rng], tn) -> MessageCache
 
-Allocate a `MessageCache` whose per-edge messages have entries drawn from a standard
-normal distribution. `rng` defaults to `Random.default_rng()`.
+Build a norm-network BP environment whose per-edge messages have entries drawn from a
+uniform distribution on `[0, 1)`. `rng` defaults to `Random.default_rng()`.
 
-See also: [`rand_norm_messagecache`](@ref), [`identity_norm_messagecache`](@ref),
-[`ones_norm_messagecache`](@ref).
+See also: [`randn_norm_message_env`](@ref), [`identity_norm_message_env`](@ref),
+[`ones_norm_message_env`](@ref).
 """
-function randn_norm_messagecache(rng::Random.AbstractRNG, tn)
-    m = similar_norm_messagecache(tn)
-    # `randn_operator!` is held locally in `tensoralgebra.jl`; would become a
-    # method of `Random.randn!` once that lands upstream.
-    # TODO: replace with `map(msg -> randn_operator!(rng, msg), m)` once `map` is
-    # defined on `MessageCache`.
-    foreach(e -> randn_operator!(rng, m[e]), edges(m))
-    return m
-end
-
-rand_norm_messagecache(tn) = rand_norm_messagecache(Random.default_rng(), tn)
-
-"""
-    rand_norm_messagecache([rng], tn) -> MessageCache
-
-Allocate a `MessageCache` whose per-edge messages have entries drawn from a uniform
-distribution on `[0, 1)`. `rng` defaults to `Random.default_rng()`.
-
-See also: [`randn_norm_messagecache`](@ref), [`identity_norm_messagecache`](@ref),
-[`ones_norm_messagecache`](@ref).
-"""
-function rand_norm_messagecache(rng::Random.AbstractRNG, tn)
-    m = similar_norm_messagecache(tn)
-    # `rand_operator!` is held locally in `tensoralgebra.jl`; would become a
-    # method of `Random.rand!` once that lands upstream.
-    # TODO: replace with `map(msg -> rand_operator!(rng, msg), m)` once `map` is
-    # defined on `MessageCache`.
-    foreach(e -> rand_operator!(rng, m[e]), edges(m))
-    return m
+function rand_norm_message_env(rng::Random.AbstractRNG, tn)
+    return norm_message_env(msg -> rand_operator!(rng, msg), tn)
 end
 
 # === Double-layer construction and BP wrapper ===
@@ -144,7 +139,7 @@ end
 
 Run belief propagation on the norm network `⟨tn|tn⟩` (treating `tn` as the ket),
 starting from a pre-built operator `MessageCache` `messages` (e.g. from
-[`identity_norm_messagecache`](@ref) or any of the other `*_norm_messagecache`
+[`identity_norm_message_env`](@ref) or any of the other `*_norm_message_env`
 constructors).
 
 The norm network built by [`normnetwork`](@ref) is the source of truth for bra-link
