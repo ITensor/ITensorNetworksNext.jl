@@ -181,8 +181,6 @@ function rand_trivial_namedunitrange(
     return namedunitrange(trivial_unitrange(R), randname(N))
 end
 
-dag(x) = x
-
 function insert_trivial_link!(tn, e)
     add_edge!(tn, e)
     l = rand_trivial_namedunitrange(eltype(inds(tn[src(e)])))
