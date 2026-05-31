@@ -16,10 +16,11 @@ using TensorAlgebra: TensorAlgebra, AbstractBlockPermutation, FusionStyle, biper
 #     of `Base.one` on `AbstractNamedDimsOperator` and `AbstractNamedDimsArray`.
 #     Held under the local name `one_operator` until then to avoid piracy on
 #     `NamedDimsArrays` types.
-#   - `randn_operator!([rng,] op)` — eventual method of `Random.randn!` on
-#     `AbstractNamedDimsOperator`. Held locally for the same piracy reason, plus
-#     to hide the workaround for the ITensor `eltype(::Type) === Any` issue (peeling
-#     to the concrete storage so `Random.randn!` sees the runtime eltype).
+#   - `randn_operator!([rng,] op)` / `rand_operator!([rng,] op)` — eventual methods
+#     of `Random.randn!` / `Random.rand!` on `AbstractNamedDimsOperator`. Held locally
+#     for the same piracy reason, plus to hide the workaround for the ITensor
+#     `eltype(::Type) === Any` issue (peeling to the concrete storage so the
+#     stdlib `randn!` / `rand!` sees the runtime eltype).
 #   - `dag`, `dual` — no-op stubs for the tensor and axis involutions.
 
 # Tensor-algebra interface no-op stubs. Currently identity; backends (graded sectors,
@@ -104,16 +105,26 @@ function one_tensor(style::FusionStyle, a::AbstractArray, ndims_codomain::Val)
     return unmatricize(style, a_mat, axes_codomain, axes_domain)
 end
 
-# === randn fill for operators ===
+# === Random fills for operators ===
 #
-# Local helper that would eventually become `Random.randn!(::AbstractNamedDimsOperator)`.
-# Hides the workaround for the ITensor `eltype(typeof(::ITensor)) === Any` issue: a
-# direct `Random.randn!(op)` dispatches on `Type{Any}` and fails, so we peel down to
-# the concrete storage where the runtime eltype is honored.
+# Local helpers that would eventually become methods of `Random.randn!` and
+# `Random.rand!` on `AbstractNamedDimsOperator`. They hide the workaround for the
+# ITensor `eltype(typeof(::ITensor)) === Any` issue: a direct `randn!(op)` / `rand!(op)`
+# dispatches on `Type{Any}` and fails, so we peel down to the concrete storage where
+# the runtime eltype is honored.
+
 function randn_operator!(op::AbstractNamedDimsOperator)
     return randn_operator!(Random.default_rng(), op)
 end
 function randn_operator!(rng::Random.AbstractRNG, op::AbstractNamedDimsOperator)
     Random.randn!(rng, denamed(state(op)))
+    return op
+end
+
+function rand_operator!(op::AbstractNamedDimsOperator)
+    return rand_operator!(Random.default_rng(), op)
+end
+function rand_operator!(rng::Random.AbstractRNG, op::AbstractNamedDimsOperator)
+    Random.rand!(rng, denamed(state(op)))
     return op
 end

@@ -36,7 +36,7 @@ Each message acts as the identity map on the link axis for its edge — the
 on the norm network ⟨tn|tn⟩.
 
 See also: [`ones_norm_messagecache`](@ref), [`randn_norm_messagecache`](@ref),
-[`similar_norm_messagecache`](@ref).
+[`rand_norm_messagecache`](@ref), [`similar_norm_messagecache`](@ref).
 """
 function identity_norm_messagecache(tn)
     m = similar_norm_messagecache(tn)
@@ -54,7 +54,8 @@ Allocate a `MessageCache` whose per-edge messages have every entry equal to `1`.
 message is the rank-1 outer product of all-ones vectors on the (codomain, domain) link
 axes.
 
-See also: [`identity_norm_messagecache`](@ref), [`randn_norm_messagecache`](@ref).
+See also: [`identity_norm_messagecache`](@ref), [`randn_norm_messagecache`](@ref),
+[`rand_norm_messagecache`](@ref).
 """
 function ones_norm_messagecache(tn)
     m = similar_norm_messagecache(tn)
@@ -64,23 +65,45 @@ function ones_norm_messagecache(tn)
     return m
 end
 
+randn_norm_messagecache(tn) = randn_norm_messagecache(Random.default_rng(), tn)
+
 """
     randn_norm_messagecache([rng], tn) -> MessageCache
 
-Allocate a `MessageCache` whose per-edge messages have entries drawn from `randn`.
-`rng` defaults to `Random.default_rng()`.
+Allocate a `MessageCache` whose per-edge messages have entries drawn from a standard
+normal distribution. `rng` defaults to `Random.default_rng()`.
 
-See also: [`identity_norm_messagecache`](@ref), [`ones_norm_messagecache`](@ref).
+See also: [`rand_norm_messagecache`](@ref), [`identity_norm_messagecache`](@ref),
+[`ones_norm_messagecache`](@ref).
 """
-randn_norm_messagecache(tn) = randn_norm_messagecache(Random.default_rng(), tn)
 function randn_norm_messagecache(rng::Random.AbstractRNG, tn)
     m = similar_norm_messagecache(tn)
-    # `randn_operator!` is held locally in `tensoralgebra.jl` and would become a
-    # method of `Random.randn!` once that lands upstream. It also hides the workaround
-    # for the ITensor `eltype(typeof(::ITensor)) === Any` issue (see its definition).
+    # `randn_operator!` is held locally in `tensoralgebra.jl`; would become a
+    # method of `Random.randn!` once that lands upstream.
     # TODO: replace with `map(msg -> randn_operator!(rng, msg), m)` once `map` is
     # defined on `MessageCache`.
     foreach(e -> randn_operator!(rng, m[e]), edges(m))
+    return m
+end
+
+rand_norm_messagecache(tn) = rand_norm_messagecache(Random.default_rng(), tn)
+
+"""
+    rand_norm_messagecache([rng], tn) -> MessageCache
+
+Allocate a `MessageCache` whose per-edge messages have entries drawn from a uniform
+distribution on `[0, 1)`. `rng` defaults to `Random.default_rng()`.
+
+See also: [`randn_norm_messagecache`](@ref), [`identity_norm_messagecache`](@ref),
+[`ones_norm_messagecache`](@ref).
+"""
+function rand_norm_messagecache(rng::Random.AbstractRNG, tn)
+    m = similar_norm_messagecache(tn)
+    # `rand_operator!` is held locally in `tensoralgebra.jl`; would become a
+    # method of `Random.rand!` once that lands upstream.
+    # TODO: replace with `map(msg -> rand_operator!(rng, msg), m)` once `map` is
+    # defined on `MessageCache`.
+    foreach(e -> rand_operator!(rng, m[e]), edges(m))
     return m
 end
 
