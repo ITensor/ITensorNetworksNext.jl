@@ -7,12 +7,20 @@ using NamedDimsArrays: AbstractNamedDimsArray, AbstractNamedDimsOperator, codoma
 # `Base.one(::AbstractNamedDimsOperator)`, intended to move into
 # `TensorAlgebra` / `NamedDimsArrays`.
 
+# Tensor-algebra interface no-op stubs. Currently identity; backends (graded sectors,
+# complex tensors, etc.) will overload these for their semantics.
+#
+# `dag` is the involution on TENSORS (conjugate-transpose, sector-direction flip, …).
+# `dual` is the involution on AXES (vector space → dual vector space).
+dag(x) = x
+dual(x) = x
+
 # Allocate a square operator with the given `codomain` named axes. Domain axes are
-# derived as `dag.(codomain)` with fresh `randname`-generated names; backend / device
+# derived as `dual.(codomain)` with fresh `randname`-generated names; backend / device
 # inherited from `prototype` via `Base.similar`.
 function similar_operator(prototype, ::Type{T}, codomain) where {T}
     domain_names = randname.(name.(codomain))
-    domain_axes = setname.(dag.(codomain), domain_names)
+    domain_axes = setname.(dual.(codomain), domain_names)
     raw = similar(prototype, T, (codomain..., domain_axes...))
     return operator(raw, name.(codomain), domain_names)
 end

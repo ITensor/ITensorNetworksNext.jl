@@ -9,11 +9,11 @@ using TensorAlgebra: TensorAlgebra
 include("select_algorithm.jl")
 include("AlgorithmsInterfaceExtensions/AlgorithmsInterfaceExtensions.jl")
 include("LazyNamedDimsArrays/LazyNamedDimsArrays.jl")
+include("tensoralgebra.jl")
 include("abstracttensornetwork.jl")
 include("tensornetwork.jl")
 include("TensorNetworkGenerators/TensorNetworkGenerators.jl")
 include("contract_network.jl")
-include("tensoralgebra.jl")
 
 include("beliefpropagation/messagecache.jl")
 include("beliefpropagation/beliefpropagation.jl")
