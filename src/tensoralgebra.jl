@@ -6,8 +6,8 @@ using NamedDimsArrays: AbstractNamedDimsArray, AbstractNamedDimsOperator, codoma
 
 # Local stand-ins for upstream `TensorAlgebra.similar_operator` /
 # `NamedDimsArrays.similar_operator` / `Base.one(::AbstractNamedDimsOperator)` /
-# `LinearAlgebra.one!(::AbstractNamedDimsOperator)`. See the upstream split plan in
-# `Projects/TensorAlgebra.jl/operator_shaped_allocation/Overview.md`.
+# `LinearAlgebra.one!(::AbstractNamedDimsOperator)`, intended to move into
+# `TensorAlgebra` / `NamedDimsArrays`.
 
 # Allocate a square operator with the given `codomain` named axes. Domain axes are
 # derived as `dag.(codomain)` with fresh `randname`-generated names; backend / device
