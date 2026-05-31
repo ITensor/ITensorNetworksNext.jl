@@ -4,7 +4,7 @@ import TensorAlgebra as TA
 using ITensorBase: Index
 using ITensorNetworksNext: TensorNetwork, apply_operator, apply_operators,
     beliefpropagation_normnetwork, identity_norm_messagecache, ones_norm_messagecache,
-    randn_norm_messagecache, similar_norm_messagecache
+    rand_norm_messagecache, randn_norm_messagecache, similar_norm_messagecache
 using MatrixAlgebraKit: truncrank
 using NamedDimsArrays: name, operator, randname, setname
 using NamedGraphs.GraphsExtensions: incident_edges
@@ -106,6 +106,7 @@ end
         for ctor in (
                 similar_norm_messagecache, identity_norm_messagecache,
                 ones_norm_messagecache, randn_norm_messagecache,
+                rand_norm_messagecache,
             )
             cache = ctor(state)
             @test length(collect(Graphs.edges(cache))) == n_directed
