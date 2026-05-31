@@ -152,14 +152,7 @@ function beliefpropagation_normnetwork(tn, messages; kwargs...)
 
     # Re-wrap each converged message as an operator with codomain = ket names and
     # domain = paired bra names from the map.
-    return MessageCache(
-        Dict(
-            e => operator(
-                    cache[e],
-                    Tuple(keys(linknames_map[e])),
-                    Tuple(values(linknames_map[e]))
-                )
-                for e in keys(cache)
-        )
-    )
+    return messagecache(keys(cache)) do e
+        return operator(cache[e], keys(linknames_map[e]), values(linknames_map[e]))
+    end
 end
