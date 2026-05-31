@@ -1,9 +1,11 @@
 using MatrixAlgebraKit: MatrixAlgebraKit
 using NamedDimsArrays: AbstractNamedDimsArray, AbstractNamedDimsOperator, codomainnames,
-    denamed, domainnames, name, operator, randname, setname, state
+    denamed, dimnames, domainnames, name, nameddims, operator, randname, setname, state
+using TensorAlgebra: TensorAlgebra, AbstractBlockPermutation, FusionStyle, bipermutedims,
+    blockedperm_indexin, blocks, matricize, trivialbiperm, unmatricize
 
 # Local stand-ins for upstream `TensorAlgebra.similar_operator` /
-# `NamedDimsArrays.similar_operator` / `id_operator` /
+# `NamedDimsArrays.similar_operator` / `TensorAlgebra.one` /
 # `Base.one(::AbstractNamedDimsOperator)`, intended to move into
 # `TensorAlgebra` / `NamedDimsArrays`.
 
@@ -28,36 +30,69 @@ function similar_operator(prototype, codomain)
     return similar_operator(prototype, eltype(prototype), codomain)
 end
 
-# === Identity operator: layered flow ===
+# === Identity tensor: TA-style layered API ===
 #
-#   Operator              (Base.one)
-#     → NamedDimsArray    (id_operator)
-#       → AbstractArray   (via `_matricize`, currently a `reshape` view)
-#         → Matrix        (MatrixAlgebraKit.one!)
+# Mirrors `TensorAlgebra.svd` / `eigen`: a chain of dispatches accepting (named arrays
+# with names, raw arrays with labels, with biperms, with perms, or in canonical
+# (codomain..., domain...) layout) all funnel into the in-place canonical worker
+# `one_tensor!(a, ndims_codomain::Val)`, which matricizes the array, calls
+# `MatrixAlgebraKit.one!`, and unmatricizes back.
 #
-# The matrix-level `one!` mutates a `reshape` view of the underlying storage, so the
-# data propagates back up the layers automatically.
+# `one_tensor` is the local name for what would eventually be `TensorAlgebra.one`.
+#
+# Named layers extend `Base.one` (piracy on `AbstractNamedDimsArray` /
+# `AbstractNamedDimsOperator`); raw-array layers live in `one_tensor` /
+# `one_tensor!`.
 
-# Operator layer: allocate a new operator with the same codomain/domain structure as
-# `op`, filled with the identity map. Codomain and domain names are preserved.
+# --- Named layers ---
+
 function Base.one(op::AbstractNamedDimsOperator)
-    return id_operator(state(op), codomainnames(op), domainnames(op))
+    co, dom = codomainnames(op), domainnames(op)
+    return operator(one(state(op), co, dom), co, dom)
 end
 
-# NamedDimsArray layer: `prototype` is shaped like `(codomain..., domain...)`. Allocate
-# a fresh same-shape named array, fill it with the matricized identity, and wrap as an
-# operator with the given codomain/domain names.
-function id_operator(prototype::AbstractNamedDimsArray, codomain_names, domain_names)
-    a = similar(prototype)
-    MatrixAlgebraKit.one!(_matricize(denamed(a), length(codomain_names)))
-    return operator(a, codomain_names, domain_names)
+function Base.one(na::AbstractNamedDimsArray, codomain_names, domain_names)
+    raw = one_tensor(denamed(na), dimnames(na), codomain_names, domain_names)
+    return nameddims(raw, dimnames(na))
 end
 
-# AbstractArray layer: view `a` as a matrix with its first `K` axes flattened to rows
-# and the remaining axes flattened to columns. Dense-only — graded backends need a
-# sector-aware matricize.
-function _matricize(a::AbstractArray, K::Int)
-    co_dim = prod(ntuple(i -> size(a, i), K))
-    dom_dim = prod(ntuple(i -> size(a, K + i), ndims(a) - K))
-    return reshape(a, co_dim, dom_dim)
+# --- Raw-array layers ---
+
+# Label form: derive a biperm from per-axis labels.
+function one_tensor(a::AbstractArray, labels_a, labels_codomain, labels_domain)
+    biperm = blockedperm_indexin(Tuple.((labels_a, labels_codomain, labels_domain))...)
+    return one_tensor(a, blocks(biperm)...)
+end
+
+# Biperm form.
+function one_tensor(a::AbstractArray, biperm::AbstractBlockPermutation{2})
+    return one_tensor(a, blocks(biperm)...)
+end
+
+# Explicit codomain/domain permutation form: physically permute axes into canonical
+# layout, then dispatch to the canonical form.
+function one_tensor(
+        a::AbstractArray,
+        perm_codomain::Tuple{Vararg{Int}},
+        perm_domain::Tuple{Vararg{Int}}
+    )
+    a_perm = bipermutedims(a, perm_codomain, perm_domain)
+    return one_tensor(a_perm, Val(length(perm_codomain)))
+end
+
+# Canonical form (out-of-place): allocate a fresh similar buffer and fill.
+function one_tensor(a::AbstractArray, ndims_codomain::Val)
+    return one_tensor!(similar(a), ndims_codomain)
+end
+
+# Canonical-form worker (in-place): matricize → matrix-level identity → unmatricize.
+function one_tensor!(a::AbstractArray, ndims_codomain::Val)
+    return one_tensor!(FusionStyle(a), a, ndims_codomain)
+end
+function one_tensor!(style::FusionStyle, a::AbstractArray, ndims_codomain::Val)
+    a_mat = matricize(style, a, ndims_codomain)
+    MatrixAlgebraKit.one!(a_mat)
+    biperm = trivialbiperm(ndims_codomain, Val(ndims(a)))
+    axes_codomain, axes_domain = blocks(axes(a)[biperm])
+    return unmatricize(style, a_mat, axes_codomain, axes_domain)
 end
