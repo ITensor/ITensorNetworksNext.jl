@@ -106,9 +106,7 @@ function normnetwork(tn)
     norm_tn = TensorNetwork(underlying_graph(tn)) do v
         t = tn[v]
         ket_to_bra = Dict(p for e in incident_edges(tn, v) for p in linknames_map[e])
-        # TODO: the bra layer should be `dag`'d (or `adjoint`'d) for complex correctness.
-        # Needs `dag` / `adjoint` plumbed through `TensorAlgebra` / `NamedDimsArrays` first.
-        return t * replacedimnames(n -> get(ket_to_bra, n, n), t)
+        return t * replacedimnames(n -> get(ket_to_bra, n, n), dag(t))
     end
     return norm_tn, linknames_map
 end
