@@ -48,7 +48,8 @@ end
         site_axes = Dict(v => Index(d) for v in Graphs.vertices(g))
         state = random_tensornetwork(g, link_axes, site_axes)
         env = beliefpropagation_normnetwork(
-            state; stopping_criterion = (; maxiter = 100, tol = 1.0e-13)
+            state, ones_norm_messagecache(state);
+            stopping_criterion = (; maxiter = 100, tol = 1.0e-13)
         )
         # Without truncation the gate is applied exactly, so the gated network
         # reproduces exact contraction regardless of the gauge.
@@ -66,7 +67,8 @@ end
         site_axes = Dict(v => Index(d) for v in Graphs.vertices(g))
         state = random_tensornetwork(g, link_axes, site_axes)
         env = beliefpropagation_normnetwork(
-            state; stopping_criterion = (; maxiter = 100, tol = 1.0e-13)
+            state, ones_norm_messagecache(state);
+            stopping_criterion = (; maxiter = 100, tol = 1.0e-13)
         )
         gate = randn_operator((site_axes[2], site_axes[3]))
         # Exact oracle: gate the fully contracted state, then take the globally
@@ -83,7 +85,8 @@ end
         site_axes = Dict(v => Index(d) for v in Graphs.vertices(g))
         state = random_tensornetwork(g, link_axes, site_axes)
         env = beliefpropagation_normnetwork(
-            state; stopping_criterion = (; maxiter = 100, tol = 1.0e-13)
+            state, ones_norm_messagecache(state);
+            stopping_criterion = (; maxiter = 100, tol = 1.0e-13)
         )
         # Gates on neighboring edges sharing site 3, applied in sequence.
         g1 = randn_operator((site_axes[2], site_axes[3]))
