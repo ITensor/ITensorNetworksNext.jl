@@ -1,7 +1,7 @@
 using DataGraphs: underlying_graph
 using Graphs: edges, src
-using NamedDimsArrays: codomainnames, denamed, dimnames, domainnames, name, operator,
-    randname, replacedimnames, state
+using NamedDimsArrays:
+    codomainnames, denamed, domainnames, name, operator, randname, replacedimnames, state
 using NamedGraphs.GraphsExtensions: all_edges, incident_edges
 using Random: Random
 
@@ -133,37 +133,32 @@ network.
 """
 function beliefpropagation_normnetwork(tn, messages; kwargs...)
     norm_tn, linknames_map = normnetwork(tn)
-    raw_messages = Dict(
-        e => _retarget_bra(messages[e], linknames_map[e]) for e in keys(messages)
-    )
+
+    # Adapt input messages onto the norm network: rename each operator's domain (bra)
+    # axes to the bra names `linknames_map` chose, paired via the operator's own
+    # codomain → domain bijection.
+    raw_messages = Dict{eltype(keys(messages)), Any}()
+    for e in keys(messages)
+        msg, ket_to_bra = messages[e], linknames_map[e]
+        bra_rename = Dict(
+            cur => ket_to_bra[kn] for
+                (kn, cur) in zip(codomainnames(msg), domainnames(msg))
+        )
+        raw_messages[e] = replacedimnames(n -> get(bra_rename, n, n), state(msg))
+    end
+
     cache = beliefpropagation(norm_tn, raw_messages; kwargs...)
+
+    # Re-wrap each converged message as an operator with codomain = ket names and
+    # domain = paired bra names from the map.
     return MessageCache(
         Dict(
-            e => _wrap_as_norm_operator(cache[e], linknames_map[e])
+            e => operator(
+                    cache[e],
+                    Tuple(keys(linknames_map[e])),
+                    Tuple(values(linknames_map[e]))
+                )
                 for e in keys(cache)
         )
     )
-end
-
-# Rename the bra (domain) axes of an operator message to match the supplied
-# `ketname => braname` map, returning the underlying named array unwrapped from the
-# operator. Codomain names are assumed to be paired one-to-one with domain names in
-# the operator's `Bijection` (operator constructor invariant).
-function _retarget_bra(op_msg, ket_to_bra)
-    raw = state(op_msg)
-    renames = Pair[]
-    for (kn, current_bn) in zip(codomainnames(op_msg), domainnames(op_msg))
-        target_bn = ket_to_bra[kn]
-        current_bn == target_bn || push!(renames, current_bn => target_bn)
-    end
-    return isempty(renames) ? raw : replacedimnames(raw, renames...)
-end
-
-# Re-wrap a raw double-layer message as an operator. The codomain names are the ket
-# names found in `dimnames(raw)` (a subset of the keys of `ket_to_bra`); the domain
-# names are their bra partners.
-function _wrap_as_norm_operator(raw, ket_to_bra)
-    co_names = Tuple(n for n in dimnames(raw) if haskey(ket_to_bra, n))
-    dom_names = map(n -> ket_to_bra[n], co_names)
-    return operator(raw, co_names, dom_names)
 end
