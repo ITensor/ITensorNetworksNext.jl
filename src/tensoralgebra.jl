@@ -1,13 +1,26 @@
 using MatrixAlgebraKit: MatrixAlgebraKit
 using NamedDimsArrays: AbstractNamedDimsArray, AbstractNamedDimsOperator, codomainnames,
     denamed, dimnames, domainnames, name, nameddims, operator, randname, setname, state
+using Random: Random
 using TensorAlgebra: TensorAlgebra, AbstractBlockPermutation, FusionStyle, bipermutedims,
     blockedperm_indexin, blocks, matricize, trivialbiperm, unmatricize
 
-# Local stand-ins for upstream `TensorAlgebra.similar_operator` /
-# `NamedDimsArrays.similar_operator` / `TensorAlgebra.one` /
-# `Base.one(::AbstractNamedDimsOperator)`, intended to move into
-# `TensorAlgebra` / `NamedDimsArrays`.
+# Local stand-ins for what would eventually become upstream interface functions in
+# `TensorAlgebra` / `NamedDimsArrays`. Naming:
+#
+#   - `similar_operator(prototype, [T,] codomain)` — eventual
+#     `TensorAlgebra.similar_operator` / `NamedDimsArrays.similar_operator`.
+#   - `one_tensor(a, ...)` — eventual `TensorAlgebra.one` (paralleling `TA.svd`,
+#     `TA.eigen`).
+#   - `one_operator(op)` / `one_operator(na, codomain, domain)` — eventual methods
+#     of `Base.one` on `AbstractNamedDimsOperator` and `AbstractNamedDimsArray`.
+#     Held under the local name `one_operator` until then to avoid piracy on
+#     `NamedDimsArrays` types.
+#   - `randn_operator!([rng,] op)` — eventual method of `Random.randn!` on
+#     `AbstractNamedDimsOperator`. Held locally for the same piracy reason, plus
+#     to hide the workaround for the ITensor `eltype(::Type) === Any` issue (peeling
+#     to the concrete storage so `Random.randn!` sees the runtime eltype).
+#   - `dag`, `dual` — no-op stubs for the tensor and axis involutions.
 
 # Tensor-algebra interface no-op stubs. Currently identity; backends (graded sectors,
 # complex tensors, etc.) will overload these for their semantics.
@@ -30,36 +43,32 @@ function similar_operator(prototype, codomain)
     return similar_operator(prototype, eltype(prototype), codomain)
 end
 
-# === Identity tensor: TA-style layered API ===
+# === Identity operator/tensor: TA-style layered API ===
 #
-# Mirrors `TensorAlgebra.svd` / `eigen`: a chain of dispatches accepting (named arrays
-# with names, raw arrays with labels, with biperms, with perms, or in canonical
-# (codomain..., domain...) layout) all funnel into the canonical worker
-# `one_tensor(style, a, ndims_codomain::Val)`, which matricizes the array, calls
-# `MatrixAlgebraKit.one!` on the matrix, and unmatricizes back.
-#
-# `one_tensor` is the local name for what would eventually be `TensorAlgebra.one`.
+# Mirrors `TensorAlgebra.svd` / `eigen`: a chain of dispatches accepting named
+# operators, named arrays with codomain/domain names, raw arrays with labels, with
+# biperms, with perms, or in canonical `(codomain..., domain...)` layout — all funnel
+# into the canonical worker `one_tensor(style, a, ndims_codomain::Val)`, which
+# matricizes the array, calls `MatrixAlgebraKit.one!` on the matrix, and unmatricizes
+# back.
 #
 # All forms are out-of-place: `a` is treated as a shape prototype, not mutated. We
 # rely on `matricize` returning a fresh non-aliasing array; a future view-returning
 # `matricized` would be the lower-level building block for an in-place variant.
-#
-# Named layers extend `Base.one` (piracy on `AbstractNamedDimsArray` /
-# `AbstractNamedDimsOperator`); raw-array layers live in `one_tensor`.
 
-# --- Named layers ---
+# --- Named layers (local `one_operator`; would be `Base.one` upstream) ---
 
-function Base.one(op::AbstractNamedDimsOperator)
+function one_operator(op::AbstractNamedDimsOperator)
     co, dom = codomainnames(op), domainnames(op)
-    return operator(one(state(op), co, dom), co, dom)
+    return operator(one_operator(state(op), co, dom), co, dom)
 end
 
-function Base.one(na::AbstractNamedDimsArray, codomain_names, domain_names)
+function one_operator(na::AbstractNamedDimsArray, codomain_names, domain_names)
     raw = one_tensor(denamed(na), dimnames(na), codomain_names, domain_names)
     return nameddims(raw, dimnames(na))
 end
 
-# --- Raw-array layers ---
+# --- Raw-array layers (`one_tensor`; would be `TensorAlgebra.one` upstream) ---
 
 # Label form: derive a biperm from per-axis labels.
 function one_tensor(a::AbstractArray, labels_a, labels_codomain, labels_domain)
@@ -93,4 +102,18 @@ function one_tensor(style::FusionStyle, a::AbstractArray, ndims_codomain::Val)
     biperm = trivialbiperm(ndims_codomain, Val(ndims(a)))
     axes_codomain, axes_domain = blocks(axes(a)[biperm])
     return unmatricize(style, a_mat, axes_codomain, axes_domain)
+end
+
+# === randn fill for operators ===
+#
+# Local helper that would eventually become `Random.randn!(::AbstractNamedDimsOperator)`.
+# Hides the workaround for the ITensor `eltype(typeof(::ITensor)) === Any` issue: a
+# direct `Random.randn!(op)` dispatches on `Type{Any}` and fails, so we peel down to
+# the concrete storage where the runtime eltype is honored.
+function randn_operator!(op::AbstractNamedDimsOperator)
+    return randn_operator!(Random.default_rng(), op)
+end
+function randn_operator!(rng::Random.AbstractRNG, op::AbstractNamedDimsOperator)
+    Random.randn!(rng, denamed(state(op)))
+    return op
 end
