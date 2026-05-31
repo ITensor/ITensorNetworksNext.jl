@@ -1,12 +1,10 @@
-using LinearAlgebra: LinearAlgebra
 using MatrixAlgebraKit: MatrixAlgebraKit
 using NamedDimsArrays: AbstractNamedDimsArray, AbstractNamedDimsOperator, codomainnames,
-    denamed, dimnames, domainnames, inds, name, nameddims, operator, randname, setname,
-    state
+    denamed, domainnames, name, operator, randname, setname, state
 
 # Local stand-ins for upstream `TensorAlgebra.similar_operator` /
-# `NamedDimsArrays.similar_operator` / `Base.one(::AbstractNamedDimsOperator)` /
-# `LinearAlgebra.one!(::AbstractNamedDimsOperator)`, intended to move into
+# `NamedDimsArrays.similar_operator` / `id_operator` /
+# `Base.one(::AbstractNamedDimsOperator)`, intended to move into
 # `TensorAlgebra` / `NamedDimsArrays`.
 
 # Allocate a square operator with the given `codomain` named axes. Domain axes are
@@ -22,27 +20,36 @@ function similar_operator(prototype, codomain)
     return similar_operator(prototype, eltype(prototype), codomain)
 end
 
-# In-place identity fill. Reshape the underlying data to a (codomain × domain) matrix
-# and call `MAK.one!`. Returns `a`.
+# === Identity operator: layered flow ===
 #
-# Dense-only for now: for a `GradedArray`-backed operator the reshape is not the right
-# matricization, so this would produce a non-sector-aware identity. The upstream version
-# will route through `TA.matricize` / `MAK.diagview` to handle graded backings correctly.
-function MatrixAlgebraKit.one!(a::AbstractNamedDimsOperator)
-    raw = denamed(state(a))
-    K = length(codomainnames(a))
-    co_dims = ntuple(i -> size(raw, i), K)
-    dom_dims = ntuple(i -> size(raw, K + i), ndims(raw) - K)
-    M = reshape(raw, prod(co_dims), prod(dom_dims))
-    MatrixAlgebraKit.one!(M)
-    return a
+#   Operator              (Base.one)
+#     → NamedDimsArray    (id_operator)
+#       → AbstractArray   (via `_matricize`, currently a `reshape` view)
+#         → Matrix        (MatrixAlgebraKit.one!)
+#
+# The matrix-level `one!` mutates a `reshape` view of the underlying storage, so the
+# data propagates back up the layers automatically.
+
+# Operator layer: allocate a new operator with the same codomain/domain structure as
+# `op`, filled with the identity map. Codomain and domain names are preserved.
+function Base.one(op::AbstractNamedDimsOperator)
+    return id_operator(state(op), codomainnames(op), domainnames(op))
 end
 
-# Allocate-and-fill identity from a prototype operator. Same codomain (and matching
-# auto-named domain) as `a`, eltype taken from `a`.
-function Base.one(a::AbstractNamedDimsOperator)
-    raw_inds = collect(inds(state(a)))
-    K = length(codomainnames(a))
-    codomain_axes = ntuple(i -> raw_inds[i], K)
-    return MatrixAlgebraKit.one!(similar_operator(state(a), eltype(a), codomain_axes))
+# NamedDimsArray layer: `prototype` is shaped like `(codomain..., domain...)`. Allocate
+# a fresh same-shape named array, fill it with the matricized identity, and wrap as an
+# operator with the given codomain/domain names.
+function id_operator(prototype::AbstractNamedDimsArray, codomain_names, domain_names)
+    a = similar(prototype)
+    MatrixAlgebraKit.one!(_matricize(denamed(a), length(codomain_names)))
+    return operator(a, codomain_names, domain_names)
+end
+
+# AbstractArray layer: view `a` as a matrix with its first `K` axes flattened to rows
+# and the remaining axes flattened to columns. Dense-only — graded backends need a
+# sector-aware matricize.
+function _matricize(a::AbstractArray, K::Int)
+    co_dim = prod(ntuple(i -> size(a, i), K))
+    dom_dim = prod(ntuple(i -> size(a, K + i), ndims(a) - K))
+    return reshape(a, co_dim, dom_dim)
 end
