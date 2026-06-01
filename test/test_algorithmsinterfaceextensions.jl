@@ -115,7 +115,7 @@ end
         # `finalize_substate!` copies the substate's iterate back into the
         # parent state.
         substate = AI.initialize_state(problem, algorithm; iterate = [42.0])
-        AIE.finalize_substate!(problem, algorithm, state, substate)
+        AIE.finalize_substate!(problem, algorithm, substate, state)
         @test state.iterate == [42.0]
     end
 

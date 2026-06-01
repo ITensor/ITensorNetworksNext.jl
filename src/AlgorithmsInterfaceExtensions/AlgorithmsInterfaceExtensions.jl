@@ -58,7 +58,7 @@ end
 function AI.step!(problem::AI.Problem, algorithm::NestedAlgorithm, state::AI.State)
     subproblem, subalgorithm, substate = initialize_subsolve(problem, algorithm, state)
     AI.solve!(subproblem, subalgorithm, substate)
-    finalize_substate!(problem, algorithm, substate, state)
+    finalize_substate!(subproblem, subalgorithm, substate, state)
     return state
 end
 

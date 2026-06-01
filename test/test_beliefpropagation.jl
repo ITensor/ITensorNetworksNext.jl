@@ -229,7 +229,7 @@ end
 
             cache = ITensorNetworksNext.beliefpropagation(
                 tn, messages, partitions;
-                stopping_criterion = (; maxiter = 10, tol = 1.0e-10)
+                stopping_criterion = (; maxiter = 30, tol = 1.0e-10)
             )
 
             z_bp = exp(bethe_free_energy(tn, cache))
