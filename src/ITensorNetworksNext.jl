@@ -17,6 +17,7 @@ include("beliefpropagation/messagecache.jl")
 include("beliefpropagation/beliefpropagation.jl")
 include("beliefpropagation/partitioned.jl")
 
+# lib
 include("ITensorNetworksNextParallel/ITensorNetworksNextParallel.jl")
 
 end

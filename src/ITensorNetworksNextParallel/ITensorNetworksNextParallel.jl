@@ -1,39 +1,60 @@
 module ITensorNetworksNextParallel
 
+import ..ITensorNetworksNext.AlgorithmsInterfaceExtensions as AIE
 import AlgorithmsInterface as AI
-import ITensorNetworksNext.AlgorithmsInterfaceExtensions as AIE
 
-abstract type ParallelAlgorithm{Child} <: AIE.NestedAlgorithm{Child} end
-const IterativeParallelAlgorithm{Child <: ParallelAlgorithm} = AIE.NestedAlgorithm{Child}
+abstract type AbstractParallelizationStrategy end
 
-"""
-    get_subiterate(subproblem::AI.Problem, subalgorithm::AI.Algorithm, state::AI.State)
+function default_workers end
+function initialize_parallel_state end
 
-For a given `subproblem` and `subalgorithm` of a parent nested algorithm,
-derive (from the parent state `state`) the iterate to be used in the associated sub state.
-The returned value of this function is then pass to a remote call of `initialize_state`.
-"""
-get_subiterate(::AI.Problem, ::AI.Algorithm, state::AI.State) = state.iterate
-
-finalize_state!(::AI.Problem, ::AI.Algorithm, state::AI.State) = state
-
-function AI.is_finished!(
-        problem::AI.Problem,
-        algorithm::IterativeParallelAlgorithm,
-        state::AI.State
-    )
-    c = algorithm.stopping_criterion
-    st = state.stopping_criterion_state
-
-    isfinished = AI.is_finished!(problem, algorithm, state, c, st)
-
-    if isfinished
-        finalize_state!(problem, algorithm, state)
-    end
-
-    return isfinished
+@kwdef struct Parallelized{Strategy, Workers, Algorithm <: AI.Algorithm} <: AI.Algorithm
+    parent::Algorithm
+    strategy::Strategy
+    workers::Workers = default_workers(parent, strategy)
 end
 
-include("dagger.jl")
+function Base.getproperty(algorithm::Parallelized, name::Symbol)
+    if name in (:parent, :strategy, :workers)
+        return getfield(algorithm, name)
+    end
+    return getproperty(getfield(algorithm, :parent), name)
+end
+
+function AI.initialize_state(problem::AI.Problem, algorithm::Parallelized; kwargs...)
+    return initialize_parallel_state(
+        problem,
+        algorithm.parent,
+        algorithm.strategy;
+        kwargs...
+    )
+end
+
+# ====================================== Dagger.jl ======================================= #
+
+abstract type AbstractDaggerStrategy <: AbstractParallelizationStrategy end
+struct GenericDaggerStrategy <: AbstractDaggerStrategy end
+
+function initialize_parallel_state(
+        _problem,
+        _algorithm,
+        strategy::AbstractDaggerStrategy;
+        _kwargs...
+    )
+    throw(
+        ArgumentError(
+            "package Dagger.jl not loaded; please install and load Dagger.jl to use \
+            strategy of type $(typeof(strategy))."
+        )
+    )
+end
+
+function default_workers(algorithm, strategy::AbstractDaggerStrategy)
+    @warn(
+        "package Dagger.jl may not be loaded; please install and load Dagger.jl to use \
+        strategy of type `$(typeof(strategy))`"
+    )
+    throw(MethodError(default_workers, (algorithm, strategy)))
+end
 
 end # ITensorNetworksNextParallel
