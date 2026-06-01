@@ -5,6 +5,9 @@ const SymbolicNamedDimsArray{T, N, Parent <: SymbolicArray{T, N}, DimNames} =
 function symnameddims(symname, dims)
     return lazy(nameddims(SymbolicArray(symname, denamed.(dims)), name.(dims)))
 end
+function symnameddims(name, ndarray::AbstractNamedDimsArray)
+    return symnameddims(name, Tuple(inds(ndarray)))
+end
 symnameddims(name) = symnameddims(name, ())
 using AbstractTrees: AbstractTrees
 function AbstractTrees.printnode(io::IO, a::SymbolicNamedDimsArray)

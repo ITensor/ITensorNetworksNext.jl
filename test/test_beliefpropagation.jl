@@ -213,5 +213,28 @@ end
                 end
             end
         end
+        @testset "PartitionedBeliefPropagationSweep" begin
+            n = 4
+            dims = (n, n)
+            g = named_grid(dims; periodic = true)
+            tn = spin_ice_tensornetwork(g)
+
+            messages =
+                Dict(edge => rand(Tuple(linkinds(tn, edge))) for edge in all_edges(g))
+
+            partitions = [
+                [ij, ij .+ (0, 1), ij .+ (1, 0), ij .+ (1, 1)] for
+                    ij in [(1, 1), (1, 3), (3, 1), (3, 3)]
+            ]
+
+            cache = ITensorNetworksNext.beliefpropagation(
+                tn, messages, partitions;
+                stopping_criterion = (; maxiter = 30, tol = 1.0e-10)
+            )
+
+            z_bp = exp(bethe_free_energy(tn, cache))
+
+            @test z_bp ≈ 1.5^(n^2)
+        end
     end
 end

@@ -2,6 +2,37 @@ module AlgorithmsInterfaceExtensions
 
 import AlgorithmsInterface as AI
 
+@kwdef mutable struct GenericAlgorithmState{Iterate, StoppingCriterionState} <: AI.State
+    iterate::Iterate
+    iteration::Int = 0
+    stopping_criterion_state::StoppingCriterionState
+end
+
+function AI.initialize_state(
+        problem::AI.Problem,
+        algorithm::AI.Algorithm;
+        iterate,
+        iteration = 0
+    )
+    stopping_criterion_state = AI.initialize_state(
+        problem, algorithm, algorithm.stopping_criterion; iterate
+    )
+    return GenericAlgorithmState(; iterate, iteration, stopping_criterion_state)
+end
+
+function AI.initialize_state!(
+        problem::AI.Problem,
+        algorithm::AI.Algorithm,
+        state::AI.State;
+        iteration = 0
+    )
+    state.iteration = iteration
+    AI.initialize_state!(
+        problem, algorithm, algorithm.stopping_criterion, state.stopping_criterion_state
+    )
+    return state
+end
+
 # ============================ NestedAlgorithm =============================================
 
 abstract type NestedAlgorithm <: AI.Algorithm end
@@ -18,7 +49,7 @@ function initialize_subsolve(
 end
 
 function finalize_substate!(
-        problem::AI.Problem, algorithm::AI.Algorithm, state::AI.State, substate::AI.State
+        ::AI.Problem, ::AI.Algorithm, substate::AI.State, state::AI.State
     )
     state.iterate = substate.iterate
     return state
@@ -27,7 +58,7 @@ end
 function AI.step!(problem::AI.Problem, algorithm::NestedAlgorithm, state::AI.State)
     subproblem, subalgorithm, substate = initialize_subsolve(problem, algorithm, state)
     AI.solve!(subproblem, subalgorithm, substate)
-    finalize_substate!(problem, algorithm, state, substate)
+    finalize_substate!(subproblem, subalgorithm, substate, state)
     return state
 end
 
@@ -37,6 +68,12 @@ end
 # so the inner-loop iterate is shared without duplicating storage on the outer
 # state. Subtypes must store the inner state as a field named `substate`.
 abstract type NestedState <: AI.State end
+
+@kwdef mutable struct GenericNestedState{Substate, StoppingCriterionState} <: NestedState
+    substate::Substate
+    iteration::Int = 0
+    stopping_criterion_state::StoppingCriterionState
+end
 
 # Use `getfield` on the right-hand side so future edits to this forwarder
 # can't accidentally recurse through the overload.
