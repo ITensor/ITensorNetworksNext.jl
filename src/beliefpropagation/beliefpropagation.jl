@@ -95,14 +95,6 @@ end
     stopping_criterion::StoppingCriterion
 end
 
-@kwdef mutable struct BeliefPropagationState{
-        Substate <: AI.State, StoppingCriterionState <: AI.StoppingCriterionState,
-    } <: AIE.NestedState
-    substate::Substate
-    iteration::Int = 0
-    stopping_criterion_state::StoppingCriterionState
-end
-
 function AI.initialize_state(
         problem::BeliefPropagationProblem,
         algorithm::BeliefPropagationAlgorithm;
@@ -110,29 +102,18 @@ function AI.initialize_state(
     )
     subproblem = BeliefPropagationSweepProblem(problem.factors, algorithm.edges)
     substate = AI.initialize_state(subproblem, algorithm.subalgorithm; iterate)
+
     stopping_criterion_state = AI.initialize_state(
         problem, algorithm, algorithm.stopping_criterion; iterate
     )
-    return BeliefPropagationState(; iteration, stopping_criterion_state, substate)
-end
 
-function AI.initialize_state!(
-        problem::BeliefPropagationProblem,
-        algorithm::BeliefPropagationAlgorithm,
-        state::BeliefPropagationState;
-        iteration::Int = 0
-    )
-    state.iteration = iteration
-    AI.initialize_state!(
-        problem, algorithm, algorithm.stopping_criterion, state.stopping_criterion_state
-    )
-    return state
+    return AIE.GenericNestedState(; iteration, stopping_criterion_state, substate)
 end
 
 function AIE.initialize_subsolve(
         problem::BeliefPropagationProblem,
         algorithm::BeliefPropagationAlgorithm,
-        state::BeliefPropagationState
+        state::AIE.NestedState
     )
     subproblem = BeliefPropagationSweepProblem(problem.factors, algorithm.edges)
     return subproblem, algorithm.subalgorithm, state.substate
@@ -153,42 +134,10 @@ end
     stopping_criterion::StoppingCriterion
 end
 
-@kwdef mutable struct BeliefPropagationSweepState{
-        Iterate, StoppingCriterionState <: AI.StoppingCriterionState,
-    } <: AI.State
-    iterate::Iterate
-    iteration::Int = 0
-    stopping_criterion_state::StoppingCriterionState
-end
-
-function AI.initialize_state(
-        problem::BeliefPropagationSweepProblem,
-        algorithm::BeliefPropagationSweepAlgorithm;
-        iterate, iteration::Int = 0
-    )
-    stopping_criterion_state = AI.initialize_state(
-        problem, algorithm, algorithm.stopping_criterion; iterate
-    )
-    return BeliefPropagationSweepState(; iterate, iteration, stopping_criterion_state)
-end
-
-function AI.initialize_state!(
-        problem::BeliefPropagationSweepProblem,
-        algorithm::BeliefPropagationSweepAlgorithm,
-        state::BeliefPropagationSweepState;
-        iteration::Int = 0
-    )
-    state.iteration = iteration
-    AI.initialize_state!(
-        problem, algorithm, algorithm.stopping_criterion, state.stopping_criterion_state
-    )
-    return state
-end
-
 function AI.step!(
         problem::BeliefPropagationSweepProblem,
         algorithm::BeliefPropagationSweepAlgorithm,
-        state::BeliefPropagationSweepState
+        state::AI.State
     )
     edge = problem.edges[state.iteration]
     message_update!(
@@ -243,7 +192,6 @@ function message_update!(algorithm::SimpleMessageUpdate, cache, factors, edge)
     cache[edge] = new_message
     return cache
 end
-
 # === `iterate_diff` for `MessageCache` (used by `AIE.StopWhenConverged`) ===
 
 function AIE.iterate_diff(cache1::MessageCache, cache2::MessageCache)

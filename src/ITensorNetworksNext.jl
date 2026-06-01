@@ -15,6 +15,7 @@ include("contract_network.jl")
 
 include("beliefpropagation/messagecache.jl")
 include("beliefpropagation/beliefpropagation.jl")
+include("beliefpropagation/partitioned.jl")
 
 include("ITensorNetworksNextParallel/ITensorNetworksNextParallel.jl")
 
