@@ -74,7 +74,7 @@ function tensornetwork_edges(edgetype::Type, tensors)
     verts = collect(keys(tensors))
     return filter(
         !isnothing, map(combinations(verts, 2)) do (v1, v2)
-            if !isdisjoint(inds(tensors[v1]), inds(tensors[v2]))
+            if !isdisjoint(dimnames(tensors[v1]), dimnames(tensors[v2]))
                 return arrange_edge(edgetype(v1, v2))
             end
             return nothing
@@ -127,7 +127,7 @@ function Graphs.rem_edge!(tn::TensorNetwork, e)
     if !has_edge(underlying_graph(tn), e)
         return false
     end
-    if !isempty(linkinds(tn, e))
+    if !isempty(linknames(tn, e))
         throw(
             ArgumentError(
                 "cannot remove edge $e due to tensor indices existing on this edge."

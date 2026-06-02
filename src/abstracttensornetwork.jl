@@ -63,13 +63,20 @@ function Adapt.adapt_structure(to, tn::AbstractTensorNetwork)
 end
 
 linkinds(tn::AbstractGraph, edge::Pair) = linkinds(tn, edgetype(tn)(edge))
-linkinds(tn::AbstractGraph, edge::AbstractEdge) = inds(tn[src(edge)]) ∩ inds(tn[dst(edge)])
+# Pick the link indices from the `src` side, identified by name match with `dst`.
+# A range-strict intersection (`inds(src) ∩ inds(dst)`) would drop graded links
+# whose two endpoints carry dual-related ranges.
+function linkinds(tn::AbstractGraph, edge::AbstractEdge)
+    ln = linknames(tn, edge)
+    return [i for i in inds(tn[src(edge)]) if name(i) in ln]
+end
 
 function linkaxes(tn::AbstractGraph, edge::Pair)
     return linkaxes(tn, edgetype(tn)(edge))
 end
 function linkaxes(tn::AbstractGraph, edge::AbstractEdge)
-    return axes(tn[src(edge)]) ∩ axes(tn[dst(edge)])
+    ln = linknames(tn, edge)
+    return [ax for ax in axes(tn[src(edge)]) if name(ax) in ln]
 end
 function linknames(tn::AbstractGraph, edge::Pair)
     return linknames(tn, edgetype(tn)(edge))
@@ -143,7 +150,7 @@ function add_missing_edges!(tn::AbstractGraph, v)
     for v′ in vertices(tn)
         if v ≠ v′
             e = v => v′
-            if !isempty(linkinds(tn, e))
+            if !isempty(linknames(tn, e))
                 add_edge!(tn, e)
             end
         end
@@ -162,7 +169,7 @@ end
 function fix_edges!(tn::AbstractGraph, v)
     for e in incident_edges(tn, v)
         # Remove an edge if there is no index on that edge.
-        if isempty(linkinds(tn, e))
+        if isempty(linknames(tn, e))
             rem_edge!(tn, e)
         end
     end

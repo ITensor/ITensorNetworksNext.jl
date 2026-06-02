@@ -123,7 +123,7 @@ into a single value with belief-propagation dispatch.
 """
 function normnetwork(tn)
     linknames_map = Dict(
-        e => Dict(name(ind) => randname(name(ind)) for ind in linkinds(tn, e))
+        e => Dict(n => randname(n) for n in linknames(tn, e))
             for e in edges(tn)
     )
     merge!(linknames_map, Dict(reverse(e) => m for (e, m) in linknames_map))
