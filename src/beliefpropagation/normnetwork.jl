@@ -119,7 +119,7 @@ look up the same `ketname => braname` table) and is the source of truth for adap
 externally-supplied messages onto the double-layer network.
 
 Anticipates a future `NormNetwork(tn)` struct that bundles `norm_tn` and `linknames_map`
-into a single value with `beliefpropagation` dispatch.
+into a single value with belief-propagation dispatch.
 """
 function normnetwork(tn)
     linknames_map = Dict(
@@ -147,7 +147,7 @@ The norm network built by [`normnetwork`](@ref) is the source of truth for bra-l
 names. Each input operator message's codomain (bra) axes are renamed to match the
 norm-network's bra names before BP iterates; the converged messages are wrapped back as
 operators using those same bra names on output. `kwargs` are forwarded to
-[`beliefpropagation`](@ref).
+`beliefpropagation`.
 
 Anticipates a future `beliefpropagation(NormNetwork(tn), messages)` once a `NormNetwork`
 wrapper type lands; until then this is the canonical entry point for BP on the norm
