@@ -187,7 +187,7 @@ function insert_trivial_link!(tn, e)
     x = similar(tn[src(e)], (l,))
     x[1] = 1
     @preserve_graph tn[src(e)] = tn[src(e)] * x
-    @preserve_graph tn[dst(e)] = tn[dst(e)] * dag(x)
+    @preserve_graph tn[dst(e)] = tn[dst(e)] * conj(x)
     return tn
 end
 

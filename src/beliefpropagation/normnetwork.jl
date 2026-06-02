@@ -129,7 +129,7 @@ function normnetwork(tn)
     norm_tn = TensorNetwork(underlying_graph(tn)) do v
         t = tn[v]
         ket_to_bra = Dict(p for e in incident_edges(tn, v) for p in linknames_map[e])
-        return t * replacedimnames(n -> get(ket_to_bra, n, n), dag(t))
+        return t * replacedimnames(n -> get(ket_to_bra, n, n), conj(t))
     end
     return norm_tn, linknames_map
 end

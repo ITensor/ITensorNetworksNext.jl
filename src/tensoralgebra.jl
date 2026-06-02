@@ -21,22 +21,19 @@ using TensorAlgebra: TensorAlgebra, AbstractBlockPermutation, FusionStyle, biper
 #     for the same piracy reason, plus to hide the workaround for the ITensor
 #     `eltype(::Type) === Any` issue (peeling to the concrete storage so the
 #     stdlib `randn!` / `rand!` sees the runtime eltype).
-#   - `dag`, `dual` — no-op stubs for the tensor and axis involutions.
-
-# Tensor-algebra interface no-op stubs. Currently identity; backends (graded sectors,
-# complex tensors, etc.) will overload these for their semantics.
 #
-# `dag` is the involution on TENSORS (conjugate-transpose, sector-direction flip, …).
-# `dual` is the involution on AXES (vector space → dual vector space).
-dag(x) = x
-dual(x) = x
+# `Base.conj` is the bra-side involution (op A: data conj + arrow flip on every leg,
+# no transpose) used at both the tensor and axis layer. For non-graded backings the
+# default `Base.conj` is correct (elementwise data conj on tensors; identity on plain
+# axes). Graded backends overload `Base.conj` on their array and axis types to flip
+# sector arrows in addition to the data conj.
 
 # Allocate a square operator with the given `codomain` named axes. Domain axes are
-# derived as `dual.(codomain)` with fresh `randname`-generated names; backend / device
+# derived as `conj.(codomain)` with fresh `randname`-generated names; backend / device
 # inherited from `prototype` via `Base.similar`.
 function similar_operator(prototype, ::Type{T}, codomain) where {T}
     domain_names = randname.(name.(codomain))
-    domain_axes = setname.(dual.(codomain), domain_names)
+    domain_axes = setname.(conj.(codomain), domain_names)
     raw = similar(prototype, T, (codomain..., domain_axes...))
     return operator(raw, name.(codomain), domain_names)
 end
