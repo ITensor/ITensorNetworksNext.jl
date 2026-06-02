@@ -29,8 +29,6 @@ function MessageCache{T}(::UndefInitializer, vertices) where {T}
     return MessageCache{T, eltype(vertices)}(undef, vertices)
 end
 
-Base.keys(cache::MessageCache) = edges(cache)
-
 MessageCache(messages) = MessageCache{valtype(messages)}(messages)
 
 function MessageCache{T}(messages) where {T}
@@ -44,12 +42,15 @@ function MessageCache{T, V}(messages) where {T, V}
     edges = keys(messages)
     vertices = union(src.(edges), dst.(edges))
     cache = MessageCache{T, V}(undef, vertices)
+    add_edges!(cache.underlying_graph, edges)
     copyto!(cache, messages)
     return cache
 end
 
 messagecache(pairs) = MessageCache(Dict(pairs))
 messagecache(f, edges) = messagecache(edge => f(edge) for edge in edges)
+
+Dictionaries.isinsertable(::MessageCache) = true
 
 function Graphs.rem_edge!(c::MessageCache, edge)
     delete!(c.messages, to_graph_index(c, edge))
@@ -72,7 +73,12 @@ function NamedGraphs.similar_graph(::Type{<:MessageCache}, vertices)
     return MessageCache(undef, vertices)
 end
 
-function NamedGraphs.similar_graph(::MessageCache, ED::Type, vertices::Vertices)
+function NamedGraphs.similar_graph(cache::MessageCache, T::Type)
+    new_cache = similar_graph(cache, T, vertices(cache))
+    add_edges!(new_cache.underlying_graph, edges(cache))
+    return new_cache
+end
+function NamedGraphs.similar_graph(::MessageCache, ED::Type, vertices)
     return MessageCache{ED}(undef, collect(vertices))
 end
 
@@ -88,6 +94,12 @@ function DataGraphs.set_edge_data!(c::MessageCache, val, edge)
     has_edge(c, edge) || add_edge!(c.underlying_graph, edge)
     set!(c.messages, edge, val)
     return c
+end
+
+function DataGraphs.insert_edge_data!(cache::MessageCache, edge, val)
+    add_edge!(cache.underlying_graph, edge)
+    insert!(cache.messages, edge, val)
+    return cache
 end
 
 # ===================================== contraction ====================================== #

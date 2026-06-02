@@ -205,11 +205,7 @@ function NamedGraphs.similar_graph(
     )
     return T(undef, vertices)
 end
-function NamedGraphs.similar_graph(
-        ::TensorNetwork,
-        VD::Type,
-        vertices::NamedGraphs.Vertices
-    )
+function NamedGraphs.similar_graph(::TensorNetwork, VD::Type, vertices)
     return TensorNetwork{VD}(undef, collect(vertices))
 end
 
