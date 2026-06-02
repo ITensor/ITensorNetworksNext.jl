@@ -1,9 +1,9 @@
 using DataGraphs: underlying_graph
 using Graphs: edges, src
-using NamedDimsArrays:
-    codomainnames, domainnames, name, operator, randname, replacedimnames, state
+using NamedDimsArrays: codomainnames, domainnames, name, operator, randname,
+    replacedimnames, similar_operator, state
 using NamedGraphs.GraphsExtensions: all_edges, incident_edges
-using Random: Random
+using Random: Random, rand!, randn!
 
 # === Norm-network environment constructors ===
 #
@@ -19,9 +19,10 @@ using Random: Random
 
 Allocate a BP environment for the norm network ⟨tn|tn⟩ with **undefined** message data:
 one square operator message per directed edge of `tn` (both directions on every
-undirected edge). Each message's codomain is the link axes on that edge in `tn`; the
-domain has dual axes with fresh `randname`-generated names. Element type and backend are
-inherited from the factor tensors of `tn` via `Base.similar`.
+undirected edge). Each message's domain is the link axes on that edge in `tn` (the
+ket-side names); the codomain has `conj`'d axes with fresh `randname`-generated names
+(the bra-side names). Element type and backend are inherited from the factor tensors of
+`tn` via `Base.similar`.
 
 Used internally by [`norm_message_env`](@ref) and the filled environment constructors
 ([`identity_norm_message_env`](@ref), [`ones_norm_message_env`](@ref),
@@ -59,7 +60,7 @@ on ⟨tn|tn⟩.
 See also: [`ones_norm_message_env`](@ref), [`randn_norm_message_env`](@ref),
 [`rand_norm_message_env`](@ref), [`similar_norm_message_env`](@ref).
 """
-identity_norm_message_env(tn) = norm_message_env(one_operator, tn)
+identity_norm_message_env(tn) = norm_message_env(one, tn)
 
 """
     ones_norm_message_env(tn) -> MessageCache
@@ -84,7 +85,7 @@ See also: [`rand_norm_message_env`](@ref), [`identity_norm_message_env`](@ref),
 [`ones_norm_message_env`](@ref).
 """
 function randn_norm_message_env(rng::Random.AbstractRNG, tn)
-    return norm_message_env(msg -> randn_operator!(rng, msg), tn)
+    return norm_message_env(msg -> randn!(rng, msg), tn)
 end
 
 rand_norm_message_env(tn) = rand_norm_message_env(Random.default_rng(), tn)
@@ -99,7 +100,7 @@ See also: [`randn_norm_message_env`](@ref), [`identity_norm_message_env`](@ref),
 [`ones_norm_message_env`](@ref).
 """
 function rand_norm_message_env(rng::Random.AbstractRNG, tn)
-    return norm_message_env(msg -> rand_operator!(rng, msg), tn)
+    return norm_message_env(msg -> rand!(rng, msg), tn)
 end
 
 # === Double-layer construction and BP wrapper ===
@@ -143,7 +144,7 @@ starting from a pre-built operator `MessageCache` `messages` (e.g. from
 constructors).
 
 The norm network built by [`normnetwork`](@ref) is the source of truth for bra-link
-names. Each input operator message's domain (bra) axes are renamed to match the
+names. Each input operator message's codomain (bra) axes are renamed to match the
 norm-network's bra names before BP iterates; the converged messages are wrapped back as
 operators using those same bra names on output. `kwargs` are forwarded to
 [`beliefpropagation`](@ref).
@@ -155,15 +156,15 @@ network.
 function beliefpropagation_normnetwork(tn, messages; kwargs...)
     norm_tn, linknames_map = normnetwork(tn)
 
-    # Adapt input messages onto the norm network: rename each operator's domain (bra)
-    # axes to the bra names `linknames_map` chose, paired via the operator's own
-    # codomain → domain bijection.
+    # Adapt input messages onto the norm network: rename each operator's codomain
+    # (bra) axes to the bra names `linknames_map` chose, paired via the operator's
+    # own domain (ket) → codomain (bra) bijection.
     es = collect(keys(messages))
     raws = map(es) do e
         msg, ket_to_bra = messages[e], linknames_map[e]
         bra_rename = Dict(
             cur => ket_to_bra[kn] for
-                (kn, cur) in zip(codomainnames(msg), domainnames(msg))
+                (kn, cur) in zip(domainnames(msg), codomainnames(msg))
         )
         return replacedimnames(n -> get(bra_rename, n, n), state(msg))
     end
@@ -171,9 +172,9 @@ function beliefpropagation_normnetwork(tn, messages; kwargs...)
 
     cache = beliefpropagation(norm_tn, raw_messages; kwargs...)
 
-    # Re-wrap each converged message as an operator with codomain = ket names and
-    # domain = paired bra names from the map.
+    # Re-wrap each converged message as an operator with codomain = bra names and
+    # domain = ket names from the map.
     return messagecache(keys(cache)) do e
-        return operator(cache[e], keys(linknames_map[e]), values(linknames_map[e]))
+        return operator(cache[e], values(linknames_map[e]), keys(linknames_map[e]))
     end
 end

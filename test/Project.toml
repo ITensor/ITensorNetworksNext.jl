@@ -27,6 +27,14 @@ WrappedUnions = "325db55a-9c6c-5b90-b1a2-ec87e7a38c44"
 [sources.ITensorNetworksNext]
 path = ".."
 
+[sources.NamedDimsArrays]
+rev = "mf/gram-eigh-balanced"
+url = "https://github.com/ITensor/NamedDimsArrays.jl"
+
+[sources.TensorAlgebra]
+rev = "mf/gram-eigh-balanced"
+url = "https://github.com/ITensor/TensorAlgebra.jl"
+
 [compat]
 AbstractTrees = "0.4.5"
 AlgorithmsInterface = "0.1"
@@ -40,13 +48,13 @@ ITensorBase = "0.5"
 ITensorNetworksNext = "0.4"
 ITensorPkgSkeleton = "0.3.42"
 MatrixAlgebraKit = "0.6"
-NamedDimsArrays = "0.14, 0.15"
+NamedDimsArrays = "0.15.7"
 NamedGraphs = "0.11"
 QuadGK = "2.11.2"
 Random = "1.10"
 SafeTestsets = "0.1"
 Suppressor = "0.2.8"
-TensorAlgebra = "0.9.2"
+TensorAlgebra = "0.9.5"
 TensorOperations = "5.3.1"
 TermInterface = "2"
 Test = "1.10"
