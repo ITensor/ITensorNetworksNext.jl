@@ -97,7 +97,7 @@ function fix_links!(tn::AbstractTensorNetwork)
     tn_edges ⊆ arranged_edges(graph) ||
         error("The edges in the tensors do not match the graph structure.")
     for e in setdiff(arranged_edges(graph), tn_edges)
-        insert_trivial_link!(tn, e)
+        insertlink!(tn, e)
     end
     return tn
 end

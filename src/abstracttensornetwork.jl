@@ -177,20 +177,12 @@ function fix_edges!(tn::AbstractGraph, v)
     return tn
 end
 
-# Customization point.
-using NamedDimsArrays: AbstractNamedUnitRange, namedunitrange, nametype, randname
-function trivial_unitrange(type::Type{<:AbstractUnitRange})
-    return Base.oneto(one(eltype(type)))
-end
-function rand_trivial_namedunitrange(
-        ::Type{<:AbstractNamedUnitRange{<:Any, R, N}}
-    ) where {R, N}
-    return namedunitrange(trivial_unitrange(R), randname(N))
-end
-
-function insert_trivial_link!(tn, e)
+using NamedDimsArrays: denamedtype, named, nametype, randname
+using TensorAlgebra: trivialrange
+function insertlink!(tn, e)
     add_edge!(tn, e)
-    l = rand_trivial_namedunitrange(eltype(inds(tn[src(e)])))
+    T = eltype(inds(tn[src(e)]))
+    l = named(trivialrange(denamedtype(T)), randname(nametype(T)))
     x = fill!(similar(tn[src(e)], (l,)), one(eltype(tn[src(e)])))
     @preserve_graph tn[src(e)] = tn[src(e)] * x
     @preserve_graph tn[dst(e)] = tn[dst(e)] * conj(x)

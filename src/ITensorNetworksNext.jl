@@ -1,10 +1,5 @@
 module ITensorNetworksNext
 
-# Imported as a name only so the floor `[compat] TensorAlgebra = "0.9.5"`
-# (needed for the `gram_eigh_full` convention flip and the new
-# `TensorAlgebra.one` worker) isn't reported as a stale dependency by Aqua.
-using TensorAlgebra: TensorAlgebra
-
 if VERSION >= v"1.11.0-DEV.469"
     eval(
         Meta.parse(
