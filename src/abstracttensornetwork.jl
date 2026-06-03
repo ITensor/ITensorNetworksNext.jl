@@ -189,6 +189,25 @@ function insertlink!(tn, e)
     return tn
 end
 
+# Return a copy of `tn` with every link index (a dimname shared between the
+# two endpoints of an edge) renamed to a fresh `randname`. Physical names
+# (present on only one tensor) are left untouched. The motivating use case is
+# full-contraction `⟨ψ₁ | ψ₂⟩` of two copies of the same network: the two
+# sides need to share physical names but have disjoint link names.
+using NamedDimsArrays: replacedimnames
+function randlinknames(tn)
+    new_tn = copy(tn)
+    for e in edges(new_tn)
+        u, v = src(e), dst(e)
+        for n in intersect(dimnames(new_tn[u]), dimnames(new_tn[v]))
+            n′ = randname(n)
+            new_tn[u] = replacedimnames(new_tn[u], n => n′)
+            new_tn[v] = replacedimnames(new_tn[v], n => n′)
+        end
+    end
+    return new_tn
+end
+
 function Base.setindex!(tn::AbstractTensorNetwork, value, v)
     @preserve_graph tn[v] = value
     fix_edges!(tn, v)
