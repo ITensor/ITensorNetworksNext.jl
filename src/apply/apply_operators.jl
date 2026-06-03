@@ -253,18 +253,10 @@ function apply_gate_bp_nsite!(
     dest[v1] = prod([[Q_v1 * R_v1]; inv_gauges_v1])
     dest[v2] = prod([[Q_v2 * R_v2]; inv_gauges_v2])
 
-    fresh_12 = randname(name_v1)
-    fresh_21 = randname(name_v1)
-    # `name_v1` is the new link's ket-side name (shared with `dest[v1]` /
-    # `dest[v2]`); `fresh_{12,21}` are the matching bra-side names. Wrap as
-    # `operator(state, codomain=bra, domain=ket)` to match the
-    # convention used everywhere else in the BP code path.
-    # TODO: if `replacedimnames` preserved the operator wrapper (updating the
-    # codomain/domain `Bijection` accordingly), we could drop the outer
-    # `operator(...)` wrap here.
-    env[v1 => v2] =
-        operator(replacedimnames(S, name_v2 => fresh_12), (fresh_12,), (name_v1,))
-    env[v2 => v1] =
-        operator(replacedimnames(S, name_v2 => fresh_21), (fresh_21,), (name_v1,))
+    env[v1 => v2] = operator(S, (name_v2,), (name_v1,))
+    env[v2 => v1] = operator(
+        replacedimnames(S, name_v1 => name_v2, name_v2 => name_v1),
+        (name_v2,), (name_v1,)
+    )
     return dest
 end

@@ -1,6 +1,6 @@
 using DataGraphs: underlying_graph
-using Graphs: edges, src
-using NamedDimsArrays: codomainnames, domainnames, name, operator, randname,
+using Graphs: dst, edges, edgetype, src
+using NamedDimsArrays: codomainnames, denamed, domainnames, name, operator, randname,
     replacedimnames, similar_operator, state
 using NamedGraphs.GraphsExtensions: all_edges, incident_edges
 using Random: Random, rand!, randn!
@@ -19,10 +19,12 @@ using Random: Random, rand!, randn!
 
 Allocate a BP environment for the norm network ⟨tn|tn⟩ with **undefined** message data:
 one square operator message per directed edge of `tn` (both directions on every
-undirected edge). Each message's domain is the link axes on that edge in `tn` (the
-ket-side names); the codomain has `conj`'d axes with fresh `randname`-generated names
-(the bra-side names). Element type and backend are inherited from the factor tensors of
-`tn` via `Base.similar`.
+undirected edge). On each undirected edge the two directions share the same ket-side
+names (the link axes from `tn`) and the same fresh `randname`-generated bra-side names,
+with the codomain and domain swapped between the two directions — so `env[v1=>v2]` and
+`env[v2=>v1]` contract directly with each other (matching names, dual axes) for
+bond-marginal computations. Element type and backend are inherited from the factor
+tensors of `tn` via `Base.similar`.
 
 Used internally by [`norm_message_env`](@ref) and the filled environment constructors
 ([`identity_norm_message_env`](@ref), [`ones_norm_message_env`](@ref),
@@ -31,9 +33,25 @@ construct environments with custom message data, e.g. by mutating each entry aft
 allocation.
 """
 function similar_norm_message_env(tn)
-    return messagecache(all_edges(tn)) do e
-        return similar_operator(tn[src(e)], linkinds(tn, e))
+    pairs = []
+    for e in edges(tn)
+        v1, v2 = src(e), dst(e)
+        ket_axes = linkinds(tn, e)
+        ket_names = name.(ket_axes)
+        unnamed_axes = denamed.(ket_axes)
+        bra_names = randname.(ket_names)
+        push!(
+            pairs,
+            edgetype(tn)(v1, v2) =>
+                similar_operator(tn[v1], unnamed_axes, bra_names, ket_names)
+        )
+        push!(
+            pairs,
+            edgetype(tn)(v2, v1) =>
+                similar_operator(tn[v2], unnamed_axes, bra_names, ket_names)
+        )
     end
+    return messagecache(pairs)
 end
 
 """
