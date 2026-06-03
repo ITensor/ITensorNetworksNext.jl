@@ -189,11 +189,6 @@ function insertlink!(tn, e)
     return tn
 end
 
-# Return a copy of `tn` with every link index (a dimname shared between the
-# two endpoints of an edge) renamed to a fresh `randname`. Physical names
-# (present on only one tensor) are left untouched. The motivating use case is
-# full-contraction `⟨ψ₁ | ψ₂⟩` of two copies of the same network: the two
-# sides need to share physical names but have disjoint link names.
 using NamedDimsArrays: replacedimnames
 function randlinknames(tn)
     new_tn = copy(tn)
