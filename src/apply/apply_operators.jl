@@ -1,14 +1,12 @@
-import .AlgorithmsInterfaceExtensions as AIE
-import AlgorithmsInterface as AI
-import NamedDimsArrays as NDA
-import TensorAlgebra as TA
+using .AlgorithmsInterfaceExtensions: AlgorithmsInterfaceExtensions as AIE
+using AlgorithmsInterface: AlgorithmsInterface as AI
 using Base: @kwdef
 using Graphs: dst, src, vertices
 using LinearAlgebra: norm
-using NamedDimsArrays: AbstractNamedDimsArray, dimnames, domainnames, nameddims, operator,
-    randname, replacedimnames
+using NamedDimsArrays: NamedDimsArrays as NDA, AbstractNamedDimsArray, dimnames,
+    domainnames, nameddims, operator, randname, replacedimnames
 using NamedGraphs.GraphsExtensions: all_edges, boundary_edges
-using TensorAlgebra: gram_eigh_full, gram_eigh_full_with_pinv
+using TensorAlgebra: TensorAlgebra as TA, gram_eigh_full, gram_eigh_full_with_pinv
 
 # === Top-level user entry point ===
 

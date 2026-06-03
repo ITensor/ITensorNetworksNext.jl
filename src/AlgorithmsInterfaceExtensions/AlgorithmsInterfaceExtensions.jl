@@ -1,6 +1,6 @@
 module AlgorithmsInterfaceExtensions
 
-import AlgorithmsInterface as AI
+using AlgorithmsInterface: AlgorithmsInterface as AI
 
 # ============================ NestedAlgorithm =============================================
 

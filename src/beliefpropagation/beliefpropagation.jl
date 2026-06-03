@@ -1,6 +1,6 @@
-import .AlgorithmsInterfaceExtensions as AIE
-import AlgorithmsInterface as AI
-using .AlgorithmsInterfaceExtensions: StopWhenConverged, iterate_diff
+using .AlgorithmsInterfaceExtensions:
+    AlgorithmsInterfaceExtensions as AIE, StopWhenConverged, iterate_diff
+using AlgorithmsInterface: AlgorithmsInterface as AI
 using BackendSelection: @Algorithm_str, Algorithm
 using DataGraphs: edge_data
 using Graphs: AbstractEdge, edges, edgetype, has_edge, vertices
