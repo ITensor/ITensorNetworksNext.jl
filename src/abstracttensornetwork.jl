@@ -191,8 +191,7 @@ end
 function insert_trivial_link!(tn, e)
     add_edge!(tn, e)
     l = rand_trivial_namedunitrange(eltype(inds(tn[src(e)])))
-    x = similar(tn[src(e)], (l,))
-    x[1] = 1
+    x = fill!(similar(tn[src(e)], (l,)), one(eltype(tn[src(e)])))
     @preserve_graph tn[src(e)] = tn[src(e)] * x
     @preserve_graph tn[dst(e)] = tn[dst(e)] * conj(x)
     return tn
