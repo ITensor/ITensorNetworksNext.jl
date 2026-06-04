@@ -54,6 +54,22 @@ function select_beliefpropagation_stopping_criterion(;
     return criterion
 end
 
+"""
+    beliefpropagation(factors, messages; edges, stopping_criterion, message_update_algorithm) -> MessageCache
+
+Run belief propagation on the factor graph `factors`, starting from
+`messages` (a dictionary keyed by directed edges). Returns the converged
+`MessageCache`. `edges` is the sweep schedule (defaults to a forest-cover
+edge sequence). `stopping_criterion` is required and accepts a
+`NamedTuple` shorthand (`(; maxiter)`, `(; tol)`, `(; maxiter, tol)`) or
+an explicit `AlgorithmsInterface.StoppingCriterion`.
+`message_update_algorithm` controls how a single message is recomputed
+from its incoming neighbours.
+
+This API is expected to change once a `NormNetwork(state)` wrapper
+bundles the norm network and its env-name map; callers should write to
+the current shape but expect a deprecation when that lands.
+"""
 function beliefpropagation(
         factors, messages;
         edges = default_beliefpropagation_edges(factors),

@@ -10,7 +10,25 @@ using TensorAlgebra: TensorAlgebra as TA, gram_eigh_full, gram_eigh_full_with_pi
 
 # === Top-level user entry point ===
 
-# Apply a list of operators to a state given the environments.
+"""
+    apply_operators(operators, state, env; alg=nothing, kwargs...) -> (state, env)
+
+Apply each operator in `operators` (a sequence of single-tensor or two-tensor
+operators) to `state` in turn, updating `env` to reflect each application.
+`state` is an `AbstractTensorNetwork`, `env` is a per-edge environment cache
+(typically built by `identity_norm_message_env(state)` or one of the related
+`*_norm_message_env` constructors), and the returned `(state, env)` pair has
+the operators applied. `kwargs` are forwarded to the per-operator algorithm
+(`alg`); for the default BP simple-update algorithm these include `trunc`
+(forwarded to the SVD that splits a two-site gate back into single-site
+tensors) and `normalize`.
+
+This API is expected to change once a `NormNetwork(state)` wrapper bundles the
+state and its env-name map; callers should write to the current shape but
+expect a deprecation when that lands.
+
+See also [`apply_operator`](@ref).
+"""
 function apply_operators(operators, state, env; alg = nothing, kwargs...)
     algorithm = select_algorithm(
         apply_operators, alg, (operators, state, env); kwargs...
@@ -137,11 +155,23 @@ end
 
 abstract type ApplyOperatorAlgorithm <: AbstractAlgorithm end
 
-# Apply a single operator to the state, given the specified environments.
-# Returns an updated state along with updated environments where relevant.
-# Note that it isn't expected that environments are fully recomputed,
-# generally only minimal updates will be made (say to the edge where a 2-site
-# operator is applied).
+"""
+    apply_operator(operator, state, env; alg=nothing, kwargs...) -> (state, env)
+
+Apply a single `operator` to `state` and return an updated `(state, env)` pair.
+Environments are not fully recomputed; only the edges touched by `operator`
+are updated (for a two-site gate, the BP simple-update default writes new
+messages on the gate edge). For the BP simple-update default algorithm,
+`kwargs` accept `trunc` (forwarded to the SVD that splits the gate back into
+single-site tensors) and `normalize` (whether to rescale the post-gate state
+so the singular-value spectrum stays unit-norm).
+
+This API is expected to change once a `NormNetwork(state)` wrapper bundles the
+state and its env-name map; callers should write to the current shape but
+expect a deprecation when that lands.
+
+See also [`apply_operators`](@ref).
+"""
 function apply_operator(operator, state, env; alg = nothing, kwargs...)
     algorithm = select_algorithm(apply_operator, alg, (operator, state, env); kwargs...)
     return apply_operator(algorithm, operator, state, env)
