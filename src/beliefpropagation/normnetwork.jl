@@ -48,7 +48,7 @@ function similar_norm_message_env(tn)
         push!(
             pairs,
             edgetype(tn)(v2, v1) =>
-                similar_operator(tn[v2], unnamed_axes, bra_names, ket_names)
+                similar_operator(tn[v2], conj.(unnamed_axes), bra_names, ket_names)
         )
     end
     return messagecache(pairs)
