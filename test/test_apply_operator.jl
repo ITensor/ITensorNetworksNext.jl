@@ -157,20 +157,6 @@ function link_axis(::Val{:u1}, _)
     return Index(gradedrange([U1(0) => 1, U1(1) => 1, U1(-1) => 1, U1(2) => 1]))
 end
 
-# `≈`-against-`NDA.apply(gate, prod(state))` is the strong correctness check
-# but currently relies on broadcast aligning two same-name arrays with different
-# codomain/domain partitions, which hangs on the graded backend (separate NDA
-# follow-up). For `:u1`, exercise the BP simple-update path and assert that
-# `apply_operator` produces a `TensorNetwork` over the same vertex set as the
-# input state.
-function exact_apply_check(::Val{:nograded}, state, gated, expected)
-    return @test prod(gated) ≈ expected
-end
-function exact_apply_check(::Val{:u1}, state, gated, expected)
-    return @test gated isa TensorNetwork &&
-        Set(Graphs.vertices(gated)) == Set(Graphs.vertices(state))
-end
-
 @testset "apply_operator (symmetry = :$sym)" for sym in (:nograded, :u1)
     s = Val(sym)
     N, d = 4, 2
@@ -186,7 +172,7 @@ end
                 randn_operator((site_axes[2], site_axes[3])),
             )
             gated, _ = apply_operator(gate, state, env)
-            exact_apply_check(s, state, gated, NDA.apply(gate, prod(state)))
+            @test prod(gated) ≈ NDA.apply(gate, prod(state))
         end
     end
 
@@ -198,6 +184,6 @@ end
         g1 = randn_operator((site_axes[2], site_axes[3]))
         g2 = randn_operator((site_axes[3], site_axes[4]))
         gated, _ = apply_operators([g1, g2], state, env)
-        exact_apply_check(s, state, gated, NDA.apply(g2, NDA.apply(g1, prod(state))))
+        @test prod(gated) ≈ NDA.apply(g2, NDA.apply(g1, prod(state)))
     end
 end
