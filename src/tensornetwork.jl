@@ -197,7 +197,7 @@ end
 indsites(tn::TensorNetwork, ind) = tn.index_locations[name(ind)]
 
 # PERF: fast lookup compared to `AbstractTensorNetwork` fallback.
-has_ind(tn::TensorNetwork, ind) = haskey(tn.index_locations, name(ind))
+has_indname(tn::TensorNetwork, name) = haskey(tn.index_locations, name)
 
 function NamedGraphs.similar_graph(
         T::Type{<:TensorNetwork},

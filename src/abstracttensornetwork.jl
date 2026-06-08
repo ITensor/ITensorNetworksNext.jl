@@ -34,6 +34,12 @@ end
 # Overload if needed
 Graphs.is_directed(::Type{<:AbstractTensorNetwork}) = false
 
+# ==================================== NamedGraphs.jl ==================================== #
+
+function NamedGraphs.similar_graph(::AbstractTensorNetwork, VD::Type, vertices)
+    return TensorNetwork{VD}(undef, collect(vertices))
+end
+
 # ==================================== DataGraphs.jl ===================================== #
 
 function DataGraphs.underlying_graph(tn::AbstractTensorNetwork)
@@ -95,11 +101,13 @@ function indsites(tn::AbstractGraph, ind)
     return sites
 end
 
-function has_ind(tn::AbstractGraph, ind)
+function has_indname(tn::AbstractGraph, name)
     for v in vertices(tn)
-        if ind ∈ inds(tn[v])
+        if name ∈ dimnames(tn[v])
             return true
         end
     end
     return false
 end
+
+has_ind(tn::AbstractGraph, ind) = has_indname(tn, name(ind))
