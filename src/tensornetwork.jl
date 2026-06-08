@@ -8,7 +8,7 @@ using Dictionaries:
 using Graphs:
     AbstractSimpleGraph, SimpleGraph, edges, has_edge, rem_edge!, rem_vertex!, vertices
 using NamedDimsArrays:
-    NamedDimsArrays, AbstractNamedDimsArray, denamedtype, dim, dimnames, name, nametype
+    NamedDimsArrays, AbstractNamedDimsArray, denamedtype, dim, dimnames, dimnametype, name
 using NamedGraphs.GraphsExtensions:
     GraphsExtensions, arrange_edge, arranged_edges, vertextype
 using NamedGraphs.OrderedDictionaries:
@@ -38,19 +38,19 @@ function TensorNetwork{T}(undef::UndefInitializer, vertices) where {T}
 end
 
 function TensorNetwork{T, V}(undef::UndefInitializer, vertices) where {T, V}
-    return TensorNetwork{T, V, nametype(T)}(undef, vertices)
+    return TensorNetwork{T, V, dimnametype(T)}(undef, vertices)
 end
 
 TensorNetwork(tensors) = TensorNetwork{valtype(tensors)}(tensors)
 TensorNetwork{T}(tensors) where {T} = TensorNetwork{T, keytype(tensors)}(tensors)
 function TensorNetwork{T, V}(tensors) where {T, V}
-    I = nametype(T)
+    I = dimnametype(T)
     tn = TensorNetwork{T, V, I}(undef, keys(tensors))
     copyto!(tn, tensors)
     return tn
 end
 
-NamedDimsArrays.nametype(::Type{<:TensorNetwork{T, V, I}}) where {T, V, I} = I
+NamedDimsArrays.dimnametype(::Type{<:TensorNetwork{T, V, I}}) where {T, V, I} = I
 
 Graphs.vertices(tn::TensorNetwork) = vertices(tn.underlying_graph)
 

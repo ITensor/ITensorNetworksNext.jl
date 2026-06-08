@@ -7,8 +7,7 @@ using Graphs: Graphs, AbstractEdge, AbstractGraph, add_edge!, add_vertex!, dst, 
     edgetype, ne, neighbors, nv, rem_edge!, src, vertices
 using LinearAlgebra: LinearAlgebra
 using MacroTools: @capture
-using NamedDimsArrays:
-    AbstractNamedUnitRange, dimnames, inds, namedunitrange, nametype, randname
+using NamedDimsArrays: AbstractNamedUnitRange, dimnames, inds, namedunitrange, randname
 using NamedGraphs.GraphsExtensions: directed_graph, incident_edges, rem_edges!, vertextype
 using NamedGraphs.OrdinalIndexing: OrdinalSuffixedInteger
 using NamedGraphs: NamedGraphs, NamedGraph, not_implemented, similar_graph
