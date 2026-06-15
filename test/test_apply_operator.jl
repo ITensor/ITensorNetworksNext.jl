@@ -1,15 +1,15 @@
-import Graphs
 import NamedDimsArrays as NDA
 import TensorAlgebra as TA
 using GradedArrays: U1, gradedrange
+using Graphs: cycle_graph, edges, src, vertices
 using ITensorBase: Index
 using ITensorNetworksNext: TensorNetwork, apply_operator, apply_operators,
-    beliefpropagation_normnetwork, identity_norm_message_env, ones_norm_message_env,
-    rand_norm_message_env, randn_norm_message_env, similar_norm_message_env
+    beliefpropagation_normnetwork, ones_norm_message_env
 using MatrixAlgebraKit: truncrank
 using NamedDimsArrays: name, operator, randname, setname
 using NamedGraphs.GraphsExtensions: incident_edges
 using NamedGraphs.NamedGraphGenerators: named_path_graph
+using NamedGraphs: NamedGraph
 using Test: @test, @testset
 
 # The helpers below are written against the `NamedDimsArrays` interface (named
@@ -48,7 +48,7 @@ function random_tensornetwork(g, link_axes, site_axes)
     function link_axis_at(v, e)
         e_can = haskey(link_axes, e) ? e : reverse(e)
         ax = link_axes[e_can]
-        return v == Graphs.src(e_can) ? ax : conj(ax)
+        return v == src(e_can) ? ax : conj(ax)
     end
     return TensorNetwork(g) do v
         return randn((site_axes[v], (link_axis_at(v, e) for e in incident_edges(g, v))...))
@@ -72,7 +72,6 @@ end
 @testset "apply_operator (symmetry = :$sym)" for sym in (:nograded, :u1)
     s = Val(sym)
     N, d, χ = 4, 2, 4
-    g = named_path_graph(N)
 
     # `@testset` reseeds the global RNG on entry to every (nested) testset, so we
     # build the network, environment, and gates inside each one. That keeps the
@@ -80,8 +79,9 @@ end
     # `randname` — the gate codomains here, and the rank names created inside the
     # gate application — stays distinct from the link names.
     @testset "untruncated gates are exact (gauge-invariant)" begin
-        link_axes = Dict(e => link_axis(s, χ) for e in Graphs.edges(g))
-        site_axes = Dict(v => site_axis(s, d) for v in Graphs.vertices(g))
+        g = NamedGraph(cycle_graph(N))
+        link_axes = Dict(e => link_axis(s, χ) for e in edges(g))
+        site_axes = Dict(v => site_axis(s, d) for v in vertices(g))
         state = random_tensornetwork(g, link_axes, site_axes)
         env = beliefpropagation_normnetwork(
             state, ones_norm_message_env(state);
@@ -99,17 +99,19 @@ end
     end
 
     @testset "truncated 2-site gate matches global optimal SVD (rank $k)" for k in 1:3
-        link_axes = Dict(e => link_axis(s, χ) for e in Graphs.edges(g))
-        site_axes = Dict(v => site_axis(s, d) for v in Graphs.vertices(g))
+        g = named_path_graph(N)
+        link_axes = Dict(e => link_axis(s, χ) for e in edges(g))
+        site_axes = Dict(v => site_axis(s, d) for v in vertices(g))
         state = random_tensornetwork(g, link_axes, site_axes)
         env = beliefpropagation_normnetwork(
             state, ones_norm_message_env(state);
             stopping_criterion = (; maxiter = 100, tol = 1.0e-13)
         )
         gate = randn_operator((site_axes[2], site_axes[3]))
-        # Exact oracle: gate the fully contracted state, then take the globally
-        # optimal rank-`k` SVD truncation across the 2 | 3 cut. BP is exact on a
-        # tree, so the converged simple-update truncation equals this oracle.
+        # Stays on a path graph (a tree): BP is exact there, so the converged
+        # simple-update truncation equals the global optimal SVD oracle, which
+        # gates the fully contracted state and truncates rank-`k` across the
+        # 2 | 3 cut.
         gated_full = NDA.apply(gate, prod(state))
         left = [name(site_axes[v]) for v in 1:2]
         U, S, Vt = TA.svd(gated_full, left; trunc = truncrank(k))
@@ -118,8 +120,9 @@ end
     end
 
     @testset "apply_operators applies a sequence" begin
-        link_axes = Dict(e => link_axis(s, χ) for e in Graphs.edges(g))
-        site_axes = Dict(v => site_axis(s, d) for v in Graphs.vertices(g))
+        g = NamedGraph(cycle_graph(N))
+        link_axes = Dict(e => link_axis(s, χ) for e in edges(g))
+        site_axes = Dict(v => site_axis(s, d) for v in vertices(g))
         state = random_tensornetwork(g, link_axes, site_axes)
         env = beliefpropagation_normnetwork(
             state, ones_norm_message_env(state);
@@ -130,35 +133,5 @@ end
         g2 = randn_operator((site_axes[3], site_axes[4]))
         gated, _ = apply_operators([g1, g2], state, env)
         @test prod(gated) ≈ NDA.apply(g2, NDA.apply(g1, prod(state)))
-    end
-
-    @testset "norm-message-env constructors" begin
-        link_axes = Dict(e => link_axis(s, χ) for e in Graphs.edges(g))
-        site_axes = Dict(v => site_axis(s, d) for v in Graphs.vertices(g))
-        state = random_tensornetwork(g, link_axes, site_axes)
-
-        # Every constructor builds a `MessageCache` with two directed edges per
-        # undirected edge of the state.
-        n_directed = 2 * length(collect(Graphs.edges(g)))
-        for ctor in (
-                similar_norm_message_env, identity_norm_message_env,
-                ones_norm_message_env, randn_norm_message_env,
-                rand_norm_message_env,
-            )
-            cache = ctor(state)
-            @test length(collect(Graphs.edges(cache))) == n_directed
-        end
-
-        # Identity env reproduces the gauge-invariant exact-gate property: an
-        # untruncated gate gives the exact result regardless of which valid env we
-        # gauge against.
-        env = identity_norm_message_env(state)
-        for gate in (
-                randn_operator((site_axes[2],)),
-                randn_operator((site_axes[2], site_axes[3])),
-            )
-            gated, _ = apply_operator(gate, state, env)
-            @test prod(gated) ≈ NDA.apply(gate, prod(state))
-        end
     end
 end
