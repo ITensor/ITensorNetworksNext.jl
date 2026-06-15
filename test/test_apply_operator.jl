@@ -22,14 +22,22 @@ using Test: @test, @testset
 # suite over both backends is the regression coverage in INN proper.
 
 site_axis(::Val{:nograded}, d::Int) = Index(d)
-link_axis(::Val{:nograded}, _) = Index(4)
+link_axis(::Val{:nograded}, χ::Int) = Index(χ)
 function site_axis(::Val{:u1}, d::Int)
-    # Even-dim physical: symmetric half-integer charges so the on-site
-    # spectrum is closed under conj.
+    # Even-dim physical: symmetric charges so the on-site spectrum is closed
+    # under conj.
     return Index(gradedrange([U1(c) => 1 for c in (d - 1):-2:(-(d - 1))]))
 end
-function link_axis(::Val{:u1}, _)
-    return Index(gradedrange([U1(0) => 1, U1(1) => 1, U1(-1) => 1, U1(2) => 1]))
+function link_axis(::Val{:u1}, χ::Int)
+    # `χ` unit sectors carrying charges 0, ±1, ±2, ..., rich enough to contract
+    # with the site charges.
+    charges = [0]
+    c = 1
+    while length(charges) < χ
+        push!(charges, c, -c)
+        c += 1
+    end
+    return Index(gradedrange([U1(q) => 1 for q in charges[1:χ]]))
 end
 
 # Random tensor network on `g`: one named site axis per vertex (`site_axes`) and
@@ -63,7 +71,7 @@ end
 
 @testset "apply_operator (symmetry = :$sym)" for sym in (:nograded, :u1)
     s = Val(sym)
-    N, d = 4, 2
+    N, d, χ = 4, 2, 4
     g = named_path_graph(N)
 
     # `@testset` reseeds the global RNG on entry to every (nested) testset, so we
@@ -72,7 +80,7 @@ end
     # `randname` — the gate codomains here, and the rank names created inside the
     # gate application — stays distinct from the link names.
     @testset "untruncated gates are exact (gauge-invariant)" begin
-        link_axes = Dict(e => link_axis(s, e) for e in Graphs.edges(g))
+        link_axes = Dict(e => link_axis(s, χ) for e in Graphs.edges(g))
         site_axes = Dict(v => site_axis(s, d) for v in Graphs.vertices(g))
         state = random_tensornetwork(g, link_axes, site_axes)
         env = beliefpropagation_normnetwork(
@@ -91,7 +99,7 @@ end
     end
 
     @testset "truncated 2-site gate matches global optimal SVD (rank $k)" for k in 1:3
-        link_axes = Dict(e => link_axis(s, e) for e in Graphs.edges(g))
+        link_axes = Dict(e => link_axis(s, χ) for e in Graphs.edges(g))
         site_axes = Dict(v => site_axis(s, d) for v in Graphs.vertices(g))
         state = random_tensornetwork(g, link_axes, site_axes)
         env = beliefpropagation_normnetwork(
@@ -110,7 +118,7 @@ end
     end
 
     @testset "apply_operators applies a sequence" begin
-        link_axes = Dict(e => link_axis(s, e) for e in Graphs.edges(g))
+        link_axes = Dict(e => link_axis(s, χ) for e in Graphs.edges(g))
         site_axes = Dict(v => site_axis(s, d) for v in Graphs.vertices(g))
         state = random_tensornetwork(g, link_axes, site_axes)
         env = beliefpropagation_normnetwork(
@@ -125,7 +133,7 @@ end
     end
 
     @testset "norm-message-env constructors" begin
-        link_axes = Dict(e => link_axis(s, e) for e in Graphs.edges(g))
+        link_axes = Dict(e => link_axis(s, χ) for e in Graphs.edges(g))
         site_axes = Dict(v => site_axis(s, d) for v in Graphs.vertices(g))
         state = random_tensornetwork(g, link_axes, site_axes)
 
