@@ -37,6 +37,10 @@ TensorOperations = "6aa20fa7-93e2-5fca-9bc0-fbd0db3c71a2"
 rev = "mf/gram-eigh-balanced"
 url = "https://github.com/ITensor/NamedDimsArrays.jl"
 
+[sources.NamedGraphs]
+rev = "mf/named_cycle_graph"
+url = "https://github.com/ITensor/NamedGraphs.jl"
+
 [sources.TensorAlgebra]
 rev = "mf/gram-eigh-balanced"
 url = "https://github.com/ITensor/TensorAlgebra.jl"

@@ -1,15 +1,14 @@
 import NamedDimsArrays as NDA
 import TensorAlgebra as TA
 using GradedArrays: U1, gradedrange
-using Graphs: cycle_graph, edges, src, vertices
+using Graphs: edges, src, vertices
 using ITensorBase: Index
 using ITensorNetworksNext: TensorNetwork, apply_operator, apply_operators,
     beliefpropagation_normnetwork, ones_norm_message_env
 using MatrixAlgebraKit: truncrank
 using NamedDimsArrays: name, operator, randname, setname
 using NamedGraphs.GraphsExtensions: incident_edges
-using NamedGraphs.NamedGraphGenerators: named_path_graph
-using NamedGraphs: NamedGraph
+using NamedGraphs.NamedGraphGenerators: named_cycle_graph, named_path_graph
 using Test: @test, @testset
 
 # The helpers below are written against the `NamedDimsArrays` interface (named
@@ -79,7 +78,7 @@ end
     # `randname` — the gate codomains here, and the rank names created inside the
     # gate application — stays distinct from the link names.
     @testset "untruncated gates are exact (gauge-invariant)" begin
-        g = NamedGraph(cycle_graph(N))
+        g = named_cycle_graph(N)
         link_axes = Dict(e => link_axis(s, χ) for e in edges(g))
         site_axes = Dict(v => site_axis(s, d) for v in vertices(g))
         state = random_tensornetwork(g, link_axes, site_axes)
@@ -120,7 +119,7 @@ end
     end
 
     @testset "apply_operators applies a sequence" begin
-        g = NamedGraph(cycle_graph(N))
+        g = named_cycle_graph(N)
         link_axes = Dict(e => link_axis(s, χ) for e in edges(g))
         site_axes = Dict(v => site_axis(s, d) for v in vertices(g))
         state = random_tensornetwork(g, link_axes, site_axes)

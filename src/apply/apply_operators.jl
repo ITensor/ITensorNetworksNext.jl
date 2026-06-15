@@ -23,10 +23,6 @@ the operators applied. `kwargs` are forwarded to the per-operator algorithm
 (forwarded to the SVD that splits a two-site gate back into single-site
 tensors) and `normalize`.
 
-This API is expected to change once a `NormNetwork(state)` wrapper bundles the
-state and its env-name map; callers should write to the current shape but
-expect a deprecation when that lands.
-
 See also [`apply_operator`](@ref).
 """
 function apply_operators(operators, state, env; alg = nothing, kwargs...)
@@ -165,10 +161,6 @@ messages on the gate edge). For the BP simple-update default algorithm,
 `kwargs` accept `trunc` (forwarded to the SVD that splits the gate back into
 single-site tensors) and `normalize` (whether to rescale the post-gate state
 so the singular-value spectrum stays unit-norm).
-
-This API is expected to change once a `NormNetwork(state)` wrapper bundles the
-state and its env-name map; callers should write to the current shape but
-expect a deprecation when that lands.
 
 See also [`apply_operators`](@ref).
 """
