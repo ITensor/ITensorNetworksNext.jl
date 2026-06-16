@@ -5,7 +5,7 @@ using BackendSelection: @Algorithm_str, Algorithm
 using DataGraphs: edge_data
 using Graphs: AbstractEdge, edges, edgetype, has_edge, vertices
 using LinearAlgebra: norm, normalize
-using NamedDimsArrays: AbstractNamedDimsArray
+using NamedDimsArrays: AbstractNamedDimsArray, denamed
 using NamedGraphs.GraphsExtensions: add_edges!, boundary_edges, subgraph
 using NamedGraphs.PartitionedGraphs: quotientvertices
 
@@ -246,7 +246,7 @@ function message_update!(algorithm::SimpleMessageUpdate, cache, factors, edge)
     new_message = contract_network([messages; [factor]]; algorithm.contraction_alg)
 
     if algorithm.normalize
-        message_norm = sum(new_message)
+        message_norm = sum(denamed(new_message))
         if !iszero(message_norm)
             new_message /= message_norm
         end
