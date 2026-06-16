@@ -1,6 +1,6 @@
 module AlgorithmsInterfaceExtensions
 
-import AlgorithmsInterface as AI
+using AlgorithmsInterface: AlgorithmsInterface as AI
 
 # ============================ NestedAlgorithm =============================================
 
@@ -50,44 +50,6 @@ function Base.setproperty!(state::NestedState, name::Symbol, value)
 end
 function Base.propertynames(state::NestedState)
     return (fieldnames(typeof(state))..., :iterate)
-end
-
-# ============================ select_algorithm / default_algorithm ========================
-
-# Like `MatrixAlgebraKit.select_algorithm` / `default_algorithm`, but
-# selection-relevant inputs are packed into an `args` tuple so the value
-# and type domains stay disjoint: `(1.2,)` vs `Tuple{Float64}`. Strategy
-# types subtype `AbstractAlgorithm` so the passthrough overload is generic.
-abstract type AbstractAlgorithm end
-
-function default_algorithm(f, ::Type{Args}; kwargs...) where {Args <: Tuple}
-    return throw(MethodError(default_algorithm, (f, Args)))
-end
-function default_algorithm(f, args::Tuple; kwargs...)
-    return default_algorithm(f, typeof(args); kwargs...)
-end
-
-function select_algorithm(f, alg, args::Tuple; kwargs...)
-    return select_algorithm(f, alg, typeof(args); kwargs...)
-end
-function select_algorithm(f, ::Nothing, ::Type{Args}; kwargs...) where {Args <: Tuple}
-    return default_algorithm(f, Args; kwargs...)
-end
-function select_algorithm(f, alg::NamedTuple, ::Type{Args}; kwargs...) where {Args <: Tuple}
-    isempty(kwargs) || throw(
-        ArgumentError(
-            "Additional keyword arguments are not allowed when `alg` is a `NamedTuple`."
-        )
-    )
-    return default_algorithm(f, Args; alg...)
-end
-function select_algorithm(f, alg::AbstractAlgorithm, ::Type{<:Tuple}; kwargs...)
-    isempty(kwargs) || throw(
-        ArgumentError(
-            "Additional keyword arguments are not allowed when `alg` is an `AbstractAlgorithm` instance."
-        )
-    )
-    return alg
 end
 
 # ============================ StopWhenConverged ===========================================

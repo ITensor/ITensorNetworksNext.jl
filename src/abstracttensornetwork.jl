@@ -63,13 +63,20 @@ function Adapt.adapt_structure(to, tn::AbstractTensorNetwork)
 end
 
 linkinds(tn::AbstractGraph, edge::Pair) = linkinds(tn, edgetype(tn)(edge))
-linkinds(tn::AbstractGraph, edge::AbstractEdge) = inds(tn[src(edge)]) ∩ inds(tn[dst(edge)])
+# Pick the link indices from the `src` side, identified by name match with `dst`.
+# A range-strict intersection (`inds(src) ∩ inds(dst)`) would drop graded links
+# whose two endpoints carry dual-related ranges.
+function linkinds(tn::AbstractGraph, edge::AbstractEdge)
+    ln = linknames(tn, edge)
+    return [i for i in inds(tn[src(edge)]) if name(i) in ln]
+end
 
 function linkaxes(tn::AbstractGraph, edge::Pair)
     return linkaxes(tn, edgetype(tn)(edge))
 end
 function linkaxes(tn::AbstractGraph, edge::AbstractEdge)
-    return axes(tn[src(edge)]) ∩ axes(tn[dst(edge)])
+    ln = linknames(tn, edge)
+    return [ax for ax in axes(tn[src(edge)]) if name(ax) in ln]
 end
 function linknames(tn::AbstractGraph, edge::Pair)
     return linknames(tn, edgetype(tn)(edge))
@@ -143,7 +150,7 @@ function add_missing_edges!(tn::AbstractGraph, v)
     for v′ in vertices(tn)
         if v ≠ v′
             e = v => v′
-            if !isempty(linkinds(tn, e))
+            if !isempty(linknames(tn, e))
                 add_edge!(tn, e)
             end
         end
@@ -162,7 +169,7 @@ end
 function fix_edges!(tn::AbstractGraph, v)
     for e in incident_edges(tn, v)
         # Remove an edge if there is no index on that edge.
-        if isempty(linkinds(tn, e))
+        if isempty(linknames(tn, e))
             rem_edge!(tn, e)
         end
     end
@@ -170,27 +177,30 @@ function fix_edges!(tn::AbstractGraph, v)
     return tn
 end
 
-# Customization point.
-using NamedDimsArrays: AbstractNamedUnitRange, namedunitrange, nametype, randname
-function trivial_unitrange(type::Type{<:AbstractUnitRange})
-    return Base.oneto(one(eltype(type)))
-end
-function rand_trivial_namedunitrange(
-        ::Type{<:AbstractNamedUnitRange{<:Any, R, N}}
-    ) where {R, N}
-    return namedunitrange(trivial_unitrange(R), randname(N))
-end
-
-dag(x) = x
-
-function insert_trivial_link!(tn, e)
+using NamedDimsArrays: denamedtype, named, nametype, randname
+using TensorAlgebra: trivialrange
+function insertlink!(tn, e)
     add_edge!(tn, e)
-    l = rand_trivial_namedunitrange(eltype(inds(tn[src(e)])))
-    x = similar(tn[src(e)], (l,))
-    x[1] = 1
+    T = eltype(inds(tn[src(e)]))
+    l = named(trivialrange(denamedtype(T)), randname(nametype(T)))
+    x = fill!(similar(tn[src(e)], (l,)), one(eltype(tn[src(e)])))
     @preserve_graph tn[src(e)] = tn[src(e)] * x
-    @preserve_graph tn[dst(e)] = tn[dst(e)] * dag(x)
+    @preserve_graph tn[dst(e)] = tn[dst(e)] * conj(x)
     return tn
+end
+
+using NamedDimsArrays: replacedimnames
+function randlinknames(tn)
+    new_tn = copy(tn)
+    for e in edges(new_tn)
+        u, v = src(e), dst(e)
+        for n in intersect(dimnames(new_tn[u]), dimnames(new_tn[v]))
+            n′ = randname(n)
+            new_tn[u] = replacedimnames(new_tn[u], n => n′)
+            new_tn[v] = replacedimnames(new_tn[v], n => n′)
+        end
+    end
+    return new_tn
 end
 
 function Base.setindex!(tn::AbstractTensorNetwork, value, v)

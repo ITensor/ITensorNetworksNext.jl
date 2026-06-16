@@ -1,11 +1,14 @@
 module ITensorNetworksNext
 
-# Imported as a name only so that the `[compat] TensorAlgebra = "0.9.2"` floor
-# (needed for a `bipermutedimsopadd!` fix in `TensorAlgebra` 0.9.2 that affects
-# `NamedDimsArrays`-mediated tensor multiplication) isn't reported as a stale
-# dependency by Aqua.
-using TensorAlgebra: TensorAlgebra
+if VERSION >= v"1.11.0-DEV.469"
+    eval(
+        Meta.parse(
+            "public apply_operator, apply_operators, beliefpropagation_normnetwork, identity_norm_message_env, normnetwork, norm_message_env, ones_norm_message_env, rand_norm_message_env, randn_norm_message_env, similar_norm_message_env"
+        )
+    )
+end
 
+include("select_algorithm.jl")
 include("AlgorithmsInterfaceExtensions/AlgorithmsInterfaceExtensions.jl")
 include("LazyNamedDimsArrays/LazyNamedDimsArrays.jl")
 include("abstracttensornetwork.jl")
@@ -15,5 +18,8 @@ include("contract_network.jl")
 
 include("beliefpropagation/messagecache.jl")
 include("beliefpropagation/beliefpropagation.jl")
+include("beliefpropagation/normnetwork.jl")
+
+include("apply/apply_operators.jl")
 
 end
