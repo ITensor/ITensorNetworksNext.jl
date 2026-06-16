@@ -22,7 +22,7 @@ function randn_operator(domain_namedaxes)
     return operator(data, name.(codomain_namedaxes), name.(domain_namedaxes))
 end
 
-function random_state(g, site_axes; nlayers = 2, trunc = truncrank(4))
+function random_state(g, site_axes; nlayers, trunc)
     state = TensorNetwork(NamedGraph(collect(vertices(g)))) do v
         return randn((site_axes[v],))
     end
@@ -45,7 +45,7 @@ end
     @testset "untruncated gates are exact (gauge-invariant)" begin
         g = named_cycle_graph(N)
         site_axes = Dict(v => Index(site_range) for v in vertices(g))
-        state = random_state(g, site_axes)
+        state = random_state(g, site_axes; nlayers = 2, trunc = truncrank(4))
         env = beliefpropagation_normnetwork(
             state, ones_norm_message_env(state);
             stopping_criterion = (; maxiter = 100, tol = 1.0e-13)
@@ -62,7 +62,7 @@ end
     @testset "truncated 2-site gate matches global optimal SVD (rank $k)" for k in 1:3
         g = named_path_graph(N)
         site_axes = Dict(v => Index(site_range) for v in vertices(g))
-        state = random_state(g, site_axes)
+        state = random_state(g, site_axes; nlayers = 2, trunc = truncrank(4))
         env = beliefpropagation_normnetwork(
             state, ones_norm_message_env(state);
             stopping_criterion = (; maxiter = 100, tol = 1.0e-13)
@@ -78,7 +78,7 @@ end
     @testset "apply_operators applies a sequence" begin
         g = named_cycle_graph(N)
         site_axes = Dict(v => Index(site_range) for v in vertices(g))
-        state = random_state(g, site_axes)
+        state = random_state(g, site_axes; nlayers = 2, trunc = truncrank(4))
         env = beliefpropagation_normnetwork(
             state, ones_norm_message_env(state);
             stopping_criterion = (; maxiter = 100, tol = 1.0e-13)
