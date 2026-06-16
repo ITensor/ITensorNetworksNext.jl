@@ -25,10 +25,6 @@ TermInterface = "8ea1fca8-c5ef-4a55-8b96-4e9afe9c9a3c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 WrappedUnions = "325db55a-9c6c-5b90-b1a2-ec87e7a38c44"
 
-[sources.GradedArrays]
-rev = "mf/conj-axis"
-url = "https://github.com/ITensor/GradedArrays.jl"
-
 [sources.ITensorNetworksNext]
 path = ".."
 
@@ -40,7 +36,7 @@ BackendSelection = "0.1"
 DataGraphs = "0.4"
 DiagonalArrays = "0.3.23"
 Dictionaries = "0.4.5"
-GradedArrays = "0.9"
+GradedArrays = "0.9.2"
 Graphs = "1.13.1"
 ITensorBase = "0.5"
 ITensorNetworksNext = "0.4"
