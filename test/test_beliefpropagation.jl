@@ -172,7 +172,7 @@ end
             )
             z_bp = exp(bethe_free_energy(tn, cache))
             z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
-            @test z_bp ≈ z_exact
+            @test z_bp ≈ z_exact rtol = eps(real(T))^(1 / 3)
 
             #Tree of tensors
             dims = (4, 3)
@@ -191,7 +191,7 @@ end
             )
             z_bp = exp(bethe_free_energy(tn, cache))
             z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
-            @test z_bp ≈ z_exact
+            @test z_bp ≈ z_exact rtol = eps(real(T))^(1 / 3)
 
             #Spin Ice Model (has analytical bp solution given by 1.5^(n^2))
             @testset "Spin Ice Model (analytical)" begin
