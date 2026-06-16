@@ -232,7 +232,7 @@ function apply_gate_bp_nsite!(
     ψv = NDA.apply(op, state[v])
     if normalize
         gauges = [
-            gram_eigh_full(env[e])
+            conj(gram_eigh_full(env[e]))
                 for e in boundary_edges(state, vs; dir = :in)
         ]
         ψv /= norm(prod([[ψv]; gauges]))
@@ -252,8 +252,8 @@ function apply_gate_bp_nsite!(
         [gram_eigh_full_with_pinv(env[e]) for e in edges_in if dst(e) == v1]
     grams_v2 =
         [gram_eigh_full_with_pinv(env[e]) for e in edges_in if dst(e) == v2]
-    gauges_v1, inv_gauges_v1 = first.(grams_v1), last.(grams_v1)
-    gauges_v2, inv_gauges_v2 = first.(grams_v2), last.(grams_v2)
+    gauges_v1, inv_gauges_v1 = conj.(first.(grams_v1)), conj.(last.(grams_v1))
+    gauges_v2, inv_gauges_v2 = conj.(first.(grams_v2)), conj.(last.(grams_v2))
 
     ψ_v1 = prod([[state[v1]]; gauges_v1])
     ψ_v2 = prod([[state[v2]]; gauges_v2])
@@ -273,9 +273,9 @@ function apply_gate_bp_nsite!(
     dest[v1] = prod([[Q_v1 * R_v1]; inv_gauges_v1])
     dest[v2] = prod([[Q_v2 * R_v2]; inv_gauges_v2])
 
-    env[v1 => v2] = operator(S, (name_v2,), (name_v1,))
+    env[v1 => v2] = operator(conj(S), (name_v2,), (name_v1,))
     env[v2 => v1] = operator(
-        replacedimnames(S, name_v1 => name_v2, name_v2 => name_v1),
+        conj(replacedimnames(S, name_v1 => name_v2, name_v2 => name_v1)),
         (name_v2,), (name_v1,)
     )
     return dest
