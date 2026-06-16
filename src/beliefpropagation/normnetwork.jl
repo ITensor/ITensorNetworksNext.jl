@@ -40,15 +40,16 @@ function similar_norm_message_env(tn)
         ket_names = name.(ket_axes)
         unnamed_axes = denamed.(ket_axes)
         bra_names = randname.(ket_names)
+        # Message axes are dual to the link they contract against in the factor.
         push!(
             pairs,
             edgetype(tn)(v1, v2) =>
-                similar_operator(tn[v1], unnamed_axes, bra_names, ket_names)
+                similar_operator(tn[v1], conj.(unnamed_axes), bra_names, ket_names)
         )
         push!(
             pairs,
             edgetype(tn)(v2, v1) =>
-                similar_operator(tn[v2], conj.(unnamed_axes), bra_names, ket_names)
+                similar_operator(tn[v2], unnamed_axes, bra_names, ket_names)
         )
     end
     return messagecache(pairs)
