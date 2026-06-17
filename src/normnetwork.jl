@@ -4,19 +4,21 @@ using NamedDimsArrays: randname, replacedimnames, setname
 
 struct NormNetwork{T, V, I} <: AbstractTensorNetwork{T, V}
     tensornetwork::TensorNetwork{T, V, I}
-    index_map::Dictionary{I, I}
-    function NormNetwork(tn::TensorNetwork{T, V, I}) where {T, V, I}
-        index_map = Dictionary{I, I}()
+    namemap::Dictionary{I, I}
+    function NormNetwork(tn::TensorNetwork{T, V, I}, map::Dictionary{I, I}) where {T, V, I}
+        namemap = Dictionary{I, I}()
         for (name, vertices) in pairs(tn.index_locations)
             if length(vertices) == 2
-                insert!(index_map, name, randname(name))
+                insert!(namemap, name, map[name])
             end
         end
-        return new{T, V, I}(tn, index_map)
+        return new{T, V, I}(tn, namemap)
     end
 end
 
 Base.eltype(::Type{<:NormNetwork{T}}) where {T} = LazyNamedDimsArray{eltype(T), T}
+
+NormNetwork(tn::TensorNetwork) = NormNetwork(tn, map(randname, keys(tn.index_locations)))
 
 # ====================================== Graphs.jl ======================================= #
 
@@ -59,7 +61,7 @@ function namemap(nn::NormNetwork, name)
     if !has_indname(nn.tensornetwork, name)
         error("index name $name not found underlying tensor network.")
     end
-    return get(nn.index_map, name, name)
+    return get(nn.namemap, name, name)
 end
 indmap(nn::NormNetwork, ind) = setname(ind, namemap(nn, name(ind)))
 
