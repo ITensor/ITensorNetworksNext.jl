@@ -2,6 +2,13 @@ using Dictionaries: Dictionary
 using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArray, lazy
 using NamedDimsArrays: randname, replacedimnames, setname
 
+"""
+    struct NormNetwork{T, V, I} <: AbstractTensorNetwork{T, V}
+
+Lazy wrapper representing the norm `⟨tn|tn⟩` of `tn::TensorNetwork{T, V, I}`,
+together with a per-edge ket→bra name mapping that, for each index in the ket layer, defines 
+the name of the corresponding index in the bra layer.
+"""
 struct NormNetwork{T, V, I} <: AbstractTensorNetwork{T, V}
     tensornetwork::TensorNetwork{T, V, I}
     namemap::Dictionary{I, I}
@@ -68,4 +75,13 @@ indmap(nn::NormNetwork, ind) = setname(ind, namemap(nn, name(ind)))
 ket(nn::NormNetwork, vertex) = nn.tensornetwork[vertex]
 conjbra(nn::NormNetwork, vertex) = replacedimnames(n -> namemap(nn, n), ket(nn, vertex))
 
-lazy_norm(tn::TensorNetwork) = NormNetwork(tn)
+"""
+    normnetwork(tn::TensorNetwork, [namemap]) -> NormNetwork
+
+Build the double-layer norm network `⟨tn|tn⟩`, represented lazily as a `NomnNetwork` object.
+The optional second argument `namemap` should implement `namemap[ketdimname] = bradimname` for
+every link dimension name `ketdimnam` in `tn`. If this is not specified, then a name is 
+generated via the `NamedDimsArrays.randname` function.
+"""
+normnetwork(tn::TensorNetwork) = NormNetwork(tn)
+normnetwork(tn::TensorNetwork, namemap) = NormNetwork(tn, namemap)
