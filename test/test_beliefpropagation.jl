@@ -1,14 +1,12 @@
 import AlgorithmsInterface as AI
 using DataGraphs: edge_data, edge_data_type
-using DiagonalArrays: δ
 using Dictionaries: Dictionary, dictionary, set!
 using Graphs: AbstractGraph, dst, edges, has_edge, src, vertices
-using ITensorBase: ITensor, Index, noprime, prime
+using ITensorBase: ITensor, Index, inds, name, noprime, prime
 using ITensorNetworksNext: ITensorNetworksNext, MessageCache, StopWhenConverged,
     TensorNetwork, bethe_free_energy, edge_scalar, incoming_messages, linkinds,
     messagecache, region_scalar, subgraph, vertex_scalar, vertex_scalars
 using LinearAlgebra: LinearAlgebra
-using NamedDimsArrays: inds, name
 using NamedGraphs.GraphsExtensions: all_edges, arranged_edges, incident_edges, vertextype
 using NamedGraphs.NamedGraphGenerators: named_comb_tree, named_grid, named_path_graph
 using NamedGraphs: NamedEdge

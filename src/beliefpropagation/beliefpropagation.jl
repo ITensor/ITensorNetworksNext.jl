@@ -4,8 +4,8 @@ using AlgorithmsInterface: AlgorithmsInterface as AI
 using BackendSelection: @Algorithm_str, Algorithm
 using DataGraphs: edge_data
 using Graphs: AbstractEdge, edges, edgetype, has_edge, vertices
+using ITensorBase: AbstractITensor
 using LinearAlgebra: norm, normalize
-using NamedDimsArrays: AbstractNamedDimsArray
 using NamedGraphs.GraphsExtensions: add_edges!, boundary_edges, subgraph
 using NamedGraphs.PartitionedGraphs: quotientvertices
 

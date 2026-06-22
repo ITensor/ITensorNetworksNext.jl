@@ -1,4 +1,4 @@
-using NamedDimsArrays: denamed, dimnames, inds
+using ITensorBase: denamed, dimnames, inds
 using TermInterface: arguments, arity, operation
 
 # The time complexity of evaluating `f(args...)`.
@@ -14,22 +14,22 @@ function input_space_complexity(f, args...)
     return error("Not implemented.")
 end
 
-using NamedDimsArrays: AbstractNamedDimsArray
+using ITensorBase: AbstractITensor
 function time_complexity(
-        ::typeof(*), t1::AbstractNamedDimsArray, t2::AbstractNamedDimsArray
+        ::typeof(*), t1::AbstractITensor, t2::AbstractITensor
     )
     return prod(length ∘ denamed, (inds(t1) ∪ inds(t2)))
 end
 function time_complexity(
-        ::typeof(+), t1::AbstractNamedDimsArray, t2::AbstractNamedDimsArray
+        ::typeof(+), t1::AbstractITensor, t2::AbstractITensor
     )
     @assert issetequal(dimnames(t1), dimnames(t2))
     return prod(denamed, size(t1))
 end
-function time_complexity(::typeof(*), c::Number, t::AbstractNamedDimsArray)
+function time_complexity(::typeof(*), c::Number, t::AbstractITensor)
     return prod(denamed, size(t))
 end
-function time_complexity(::typeof(*), t::AbstractNamedDimsArray, c::Number)
+function time_complexity(::typeof(*), t::AbstractITensor, c::Number)
     return time_complexity(*, c, t)
 end
 

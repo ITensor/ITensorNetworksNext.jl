@@ -1,9 +1,7 @@
-using DiagonalArrays: δ
 using Graphs: edges, ne, nv, vertices
-using ITensorBase: Index
-using ITensorNetworksNext.TensorNetworkGenerators: delta_network, ising_network
+using ITensorBase: Index, inds
+using ITensorNetworksNext.TensorNetworkGenerators: delta, delta_network, ising_network
 using ITensorNetworksNext: contract_network
-using NamedDimsArrays: inds
 using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges
 using NamedGraphs.NamedGraphGenerators: named_grid
 using Test: @test, @testset
@@ -23,7 +21,7 @@ using Test: @test, @testset
         @test issetequal(arranged_edges(tn), arranged_edges(g))
         for v in vertices(tn)
             is = l.(incident_edges(g, v))
-            @test tn[v] == δ(Tuple(is))
+            @test tn[v] == delta(Float64, Tuple(is))
         end
     end
     @testset "Ising Network" begin
@@ -41,7 +39,7 @@ using Test: @test, @testset
             for v in vertices(tn)
                 is = l.(incident_edges(g, v))
                 @test issetequal(is, inds(tn[v]))
-                @test tn[v] ≠ δ(Tuple(is))
+                @test tn[v] ≠ delta(Float64, Tuple(is))
             end
             z = contract_network(tn)[]
             f = -log(z) / (β * nv(g))
@@ -62,7 +60,7 @@ using Test: @test, @testset
             for v in vertices(tn)
                 is = l.(incident_edges(g, v))
                 @test issetequal(is, inds(tn[v]))
-                @test tn[v] ≠ δ(Tuple(is))
+                @test tn[v] ≠ delta(Float64, Tuple(is))
             end
             z = contract_network(tn)[]
             f = -log(z) / (β * nv(g))
