@@ -26,7 +26,10 @@ function diagonaltensor(diag::AbstractVector, ax::Tuple{Vararg{AbstractUnitRange
     diagview(a) .= diag
     return a
 end
-function diagonaltensor(diag::AbstractVector, is::Tuple{Vararg{NamedUnitRange}})
+function diagonaltensor(
+        diag::AbstractVector,
+        is::Tuple{NamedUnitRange, Vararg{NamedUnitRange}}
+    )
     return nameddims(diagonaltensor(diag, denamed.(is)), name.(is))
 end
 
