@@ -1,13 +1,12 @@
 using Adapt: Adapt, adapt
-using BackendSelection: @Algorithm_str, Algorithm
 using DataGraphs: DataGraphs, AbstractDataGraph, AbstractVertexDataGraph, edge_data,
     set_vertex_data!, underlying_graph, underlying_graph_type, vertex_data
 using Dictionaries: Dictionary
 using Graphs: Graphs, AbstractEdge, AbstractGraph, add_edge!, add_vertex!, dst, edges,
     edgetype, ne, neighbors, nv, rem_edge!, src, vertices
+using ITensorBase: dimnames, inds
 using LinearAlgebra: LinearAlgebra
 using MacroTools: @capture
-using NamedDimsArrays: AbstractNamedUnitRange, dimnames, inds, namedunitrange, randname
 using NamedGraphs.GraphsExtensions: directed_graph, incident_edges, rem_edges!, vertextype
 using NamedGraphs.OrdinalIndexing: OrdinalSuffixedInteger
 using NamedGraphs: NamedGraphs, NamedGraph, not_implemented, similar_graph
@@ -50,13 +49,20 @@ end
 # ====================================== interface ======================================= #
 
 linkinds(tn::AbstractGraph, edge::Pair) = linkinds(tn, edgetype(tn)(edge))
-linkinds(tn::AbstractGraph, edge::AbstractEdge) = inds(tn[src(edge)]) ∩ inds(tn[dst(edge)])
+# Pick the link indices from the `src` side, identified by name match with `dst`.
+# A range-strict intersection (`inds(src) ∩ inds(dst)`) would drop graded links
+# whose two endpoints carry dual-related ranges.
+function linkinds(tn::AbstractGraph, edge::AbstractEdge)
+    ln = linknames(tn, edge)
+    return [i for i in inds(tn[src(edge)]) if name(i) in ln]
+end
 
 function linkaxes(tn::AbstractGraph, edge::Pair)
     return linkaxes(tn, edgetype(tn)(edge))
 end
 function linkaxes(tn::AbstractGraph, edge::AbstractEdge)
-    return axes(tn[src(edge)]) ∩ axes(tn[dst(edge)])
+    ln = linknames(tn, edge)
+    return [ax for ax in axes(tn[src(edge)]) if name(ax) in ln]
 end
 function linknames(tn::AbstractGraph, edge::Pair)
     return linknames(tn, edgetype(tn)(edge))

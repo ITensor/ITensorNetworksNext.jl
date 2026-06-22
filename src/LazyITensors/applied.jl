@@ -1,6 +1,5 @@
 using AbstractTrees: AbstractTrees
 using TermInterface: TermInterface, arguments, iscall, operation
-using TypeParameterAccessors: unspecify_type_parameters
 
 # Generic functionality for Applied types, like `Mul`, `Add`, etc.
 ismul(a) = iscall(a) && operation(a) ≡ *
@@ -20,9 +19,9 @@ function maketerm_applied(type, head, args, metadata)
     @assert head ≡ operation(term)
     return term
 end
-map_arguments_applied(f, a) = unspecify_type_parameters(typeof(a))(map(f, arguments(a)))
+map_arguments_applied(f, a) = Base.typename(typeof(a)).wrapper(map(f, arguments(a)))
 function hash_applied(a, h::UInt64)
-    h = hash(Symbol(unspecify_type_parameters(typeof(a))), h)
+    h = hash(Symbol(Base.typename(typeof(a)).wrapper), h)
     for arg in arguments(a)
         h = hash(arg, h)
     end

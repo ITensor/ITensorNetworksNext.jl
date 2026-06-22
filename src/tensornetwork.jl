@@ -1,4 +1,4 @@
-using .LazyNamedDimsArrays: Mul, lazy, materialize, optimize_evaluation_order
+using .LazyITensors: Mul, lazy, materialize, optimize_evaluation_order
 using Combinatorics: combinations
 using DataGraphs.DataGraphsPartitionedGraphsExt
 using DataGraphs: DataGraphs, AbstractDataGraph, DataGraph, edge_data, get_vertices_data,
@@ -7,8 +7,7 @@ using Dictionaries:
     Dictionaries, AbstractDictionary, Dictionary, Indices, dictionary, set!, unset!
 using Graphs:
     AbstractSimpleGraph, SimpleGraph, edges, has_edge, rem_edge!, rem_vertex!, vertices
-using NamedDimsArrays:
-    NamedDimsArrays, AbstractNamedDimsArray, denamedtype, dim, dimnames, dimnametype, name
+using ITensorBase: ITensorBase, AbstractITensor, denamedtype, dim, dimnames, dimnametype, name
 using NamedGraphs.GraphsExtensions:
     GraphsExtensions, arrange_edge, arranged_edges, vertextype
 using NamedGraphs.OrderedDictionaries:

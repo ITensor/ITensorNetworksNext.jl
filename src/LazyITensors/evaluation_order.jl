@@ -1,4 +1,4 @@
-using NamedDimsArrays: denamed, dimnames, inds
+using ITensorBase: denamed, dimnames, inds
 using TermInterface: arguments, arity, operation
 
 # The time complexity of evaluating `f(args...)`.
@@ -14,22 +14,22 @@ function input_space_complexity(f, args...)
     return error("Not implemented.")
 end
 
-using NamedDimsArrays: AbstractNamedDimsArray
+using ITensorBase: AbstractITensor
 function time_complexity(
-        ::typeof(*), t1::AbstractNamedDimsArray, t2::AbstractNamedDimsArray
+        ::typeof(*), t1::AbstractITensor, t2::AbstractITensor
     )
     return prod(length ∘ denamed, (inds(t1) ∪ inds(t2)))
 end
 function time_complexity(
-        ::typeof(+), t1::AbstractNamedDimsArray, t2::AbstractNamedDimsArray
+        ::typeof(+), t1::AbstractITensor, t2::AbstractITensor
     )
     @assert issetequal(dimnames(t1), dimnames(t2))
     return prod(denamed, size(t1))
 end
-function time_complexity(::typeof(*), c::Number, t::AbstractNamedDimsArray)
+function time_complexity(::typeof(*), c::Number, t::AbstractITensor)
     return prod(denamed, size(t))
 end
-function time_complexity(::typeof(*), t::AbstractNamedDimsArray, c::Number)
+function time_complexity(::typeof(*), t::AbstractITensor, c::Number)
     return time_complexity(*, c, t)
 end
 
@@ -85,15 +85,19 @@ function optimize_evaluation_order(
     return optimize_evaluation_order(alg, a)
 end
 
-using BackendSelection: @Algorithm_str, Algorithm
-default_optimize_evaluation_order_alg(a) = Algorithm"eager"()
+abstract type EvaluationOrderAlgorithm end
+struct Greedy <: EvaluationOrderAlgorithm end
+# `Optimal` finds the cost-optimal contraction order. The method is provided by
+# the TensorOperations extension.
+struct Optimal <: EvaluationOrderAlgorithm end
+default_optimize_evaluation_order_alg(a) = Greedy()
 
 function optimize_contraction_order(alg, a)
     return error("`alg = $alg` not supported.")
 end
 
 using Combinatorics: combinations
-function optimize_contraction_order(alg::Algorithm"eager", a)
+function optimize_contraction_order(alg::Greedy, a)
     @assert ismul(a)
     arity(a) in (1, 2) && return a
     a1, a2 = argmin(combinations(arguments(a), 2)) do (a1, a2)

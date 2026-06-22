@@ -1,8 +1,7 @@
 using ..ITensorNetworksNext
-using DiagonalArrays: DiagonalArray
 using Graphs: degree, dst, edges, src
+using ITensorBase: apply, name, operator, uniquename
 using LinearAlgebra: Diagonal, eigen
-using NamedDimsArrays: apply, denamed, inds, name, operator, randname
 using NamedGraphs.GraphsExtensions: vertextype
 
 function sqrt_ising_bond(β; J = one(β), h = zero(β), deg1::Integer, deg2::Integer)
@@ -29,17 +28,19 @@ function ising_network(
         sz_vertices = vertextype(g)[]
     )
     elt = typeof(β)
-    l̃ = Dict(e => randname(f(e)) for e in edges(g))
+    l̃ = Dict(e => uniquename(f(e)) for e in edges(g))
+
     fp(e) = get(() -> l̃[reverse(e)], l̃, e)
     tn = delta_network(fp, elt, g)
     for v in sz_vertices
-        a = DiagonalArray(elt[1, -1], denamed.(axes(tn[v])))
-        tn[v] = a[axes(tn[v])...]
+        tn[v] = diagonaltensor(elt[1, -1], axes(tn[v]))
     end
+
     for e in edges(g)
         v1 = src(e)
         v2 = dst(e)
         deg1 = degree(tn, v1)
+
         deg2 = degree(tn, v2)
         m = sqrt_ising_bond(β; J, h, deg1, deg2)
         t = operator(m, (name(fp(e)),), (name(f(e)),))

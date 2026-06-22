@@ -1,14 +1,16 @@
-using BackendSelection: @Algorithm_str, Algorithm
 using Graphs: edges, vertices
 using ITensorBase: Index
 using ITensorNetworksNext: contract_network, linkinds, siteinds, tensornetwork
+using ITensorNetworksNext.LazyITensors: Greedy, Optimal
+using ITensorNetworksNext:
+    Exact, LeftAssociative, TensorNetwork, contract_network, linkinds, siteinds, tensornetwork
 using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges
 using NamedGraphs.NamedGraphGenerators: named_grid
 using TensorOperations: TensorOperations
 using Test: @test, @testset
 
 @testset "contract_network" begin
-    orderalg = alg -> Algorithm"exact"(; order_alg = Algorithm(alg))
+    orderalg = order_alg -> Exact(; order_alg)
 
     @testset "Contract Vectors of ITensors" begin
         i, j, k = Index(2), Index(2), Index(5)
@@ -17,9 +19,9 @@ using Test: @test, @testset
         C = [5.0, 1.0][j]
         D = [-2.0, 3.0, 4.0, 5.0, 1.0][k]
 
-        ABCD_1 = contract_network([A, B, C, D]; alg = orderalg("left_associative"))
-        ABCD_2 = contract_network([A, B, C, D]; alg = orderalg("eager"))
-        ABCD_3 = contract_network([A, B, C, D]; alg = orderalg("optimal"))
+        ABCD_1 = contract_network([A, B, C, D]; alg = orderalg(LeftAssociative()))
+        ABCD_2 = contract_network([A, B, C, D]; alg = orderalg(Greedy()))
+        ABCD_3 = contract_network([A, B, C, D]; alg = orderalg(Optimal()))
         @test ABCD_1 == ABCD_2 == ABCD_3
     end
 
@@ -33,9 +35,9 @@ using Test: @test, @testset
             return randn(Tuple(is))
         end
 
-        z1 = contract_network(tn; alg = orderalg("left_associative"))[]
-        z2 = contract_network(tn; alg = orderalg("eager"))[]
-        z3 = contract_network(tn; alg = orderalg("optimal"))[]
+        z1 = contract_network(tn; alg = orderalg(LeftAssociative()))[]
+        z2 = contract_network(tn; alg = orderalg(Greedy()))[]
+        z3 = contract_network(tn; alg = orderalg(Optimal()))[]
 
         @test abs(z1 - z2) / abs(z1) <= 1.0e3 * eps(Float64)
         @test abs(z1 - z3) / abs(z1) <= 1.0e3 * eps(Float64)

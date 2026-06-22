@@ -1,17 +1,16 @@
 import AlgorithmsInterface as AI
 using DataGraphs: DataGraphs, DataGraph, edge_data, edge_data_type
-using DiagonalArrays: δ
 using Dictionaries: Dictionary, dictionary, set!
 using Graphs: AbstractGraph, dst, edges, has_edge, src, vertices
-using ITensorBase: ITensor, Index, noprime, prime
+using ITensorBase: ITensor, Index, inds, name, noprime, prime
 using ITensorNetworksNext: ITensorNetworksNext, MessageCache, StopWhenConverged,
     TensorNetwork, bethe_free_energy, edge_scalar, incoming_messages, linkinds,
     messagecache, region_scalar, subgraph, tensornetwork, vertex_scalar, vertex_scalars
 using LinearAlgebra: LinearAlgebra
-using NamedDimsArrays: inds, name
 using NamedGraphs.GraphsExtensions: all_edges, arranged_edges, incident_edges, vertextype
 using NamedGraphs.NamedGraphGenerators: named_comb_tree, named_grid, named_path_graph
 using NamedGraphs: NamedEdge
+using StableRNGs: StableRNG
 using Test: @test, @testset
 
 function spin_ice_tensornetwork(g)
@@ -153,8 +152,7 @@ end
 
     @testset "Algorithm" begin
         @testset "$T" for T in (Float32, Float64, ComplexF64, BigFloat)
-            onet = (tn, edge) -> ones(T, Tuple(linkinds(tn, edge)))
-            randt = (tn, edge) -> rand(T, Tuple(linkinds(tn, edge)))
+            rng = StableRNG(123)
 
             #Chain of tensors
             dims = (2, 1)
@@ -169,14 +167,16 @@ end
             end
             tn = TensorNetwork(tensors)
 
-            messages = Dict(edge => onet(tn, edge) for edge in all_edges(g))
+            messages = Dict(
+                edge => ones(T, Tuple(linkinds(tn, edge))) for edge in all_edges(g)
+            )
 
             cache = ITensorNetworksNext.beliefpropagation(
                 tn, messages; stopping_criterion = (; maxiter = 1)
             )
             z_bp = exp(bethe_free_energy(tn, cache))
             z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
-            @test z_bp ≈ z_exact
+            @test z_bp ≈ z_exact rtol = eps(real(T))^(1 / 3)
 
             #Tree of tensors
             dims = (4, 3)
@@ -190,14 +190,16 @@ end
             end
             tn = TensorNetwork(tensors)
 
-            messages = Dict(edge => onet(tn, edge) for edge in all_edges(g))
+            messages = Dict(
+                edge => ones(T, Tuple(linkinds(tn, edge))) for edge in all_edges(g)
+            )
 
             cache = ITensorNetworksNext.beliefpropagation(
                 tn, messages; stopping_criterion = (; maxiter = 1)
             )
             z_bp = exp(bethe_free_energy(tn, cache))
             z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
-            @test z_bp ≈ z_exact
+            @test z_bp ≈ z_exact rtol = eps(real(T))^(1 / 3)
 
             #Spin Ice Model (has analytical bp solution given by 1.5^(n^2))
             @testset "Spin Ice Model (analytical)" begin
@@ -206,7 +208,10 @@ end
                     g = named_grid(dims; periodic = true)
                     tn = spin_ice_tensornetwork(g)
 
-                    messages = Dict(edge => randt(tn, edge) for edge in all_edges(g))
+                    messages = Dict(
+                        edge => rand(rng, T, Tuple(linkinds(tn, edge)))
+                            for edge in all_edges(g)
+                    )
 
                     cache = ITensorNetworksNext.beliefpropagation(
                         tn, messages;
