@@ -1,6 +1,5 @@
 using Graphs: edges
-using ITensorBase: Index
-using ITensorNetworksNext.LazyITensors: Greedy, Optimal
+using ITensorBase: Greedy, Index, Optimal
 using ITensorNetworksNext:
     Exact, LeftAssociative, TensorNetwork, contract_network, linkinds, siteinds
 using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges
