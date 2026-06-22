@@ -1,5 +1,4 @@
 using ..ITensorNetworksNext: TensorNetwork
-using FunctionImplementations: zero!
 using Graphs: AbstractGraph
 using ITensorBase: NamedUnitRange, denamed, name, nameddims
 using NamedGraphs.GraphsExtensions: incident_edges
@@ -22,7 +21,7 @@ diagview(a::AbstractArray) = @view a[diagindices(a)]
 
 function diagonaltensor(diag::AbstractVector, ax::Tuple{Vararg{AbstractUnitRange}})
     a = similar(diag, ax)
-    zero!(a)
+    fill!(a, zero(eltype(a)))
     diagview(a) .= diag
     return a
 end

@@ -52,9 +52,9 @@ using WrappedUnions: unwrap
         @test AbstractTrees.children(l1) ≡ ()
         @test AbstractTrees.nodevalue(l1) ≡ a1
         @test sprint(show, l1) == sprint(show, a1)
-        # Show-string format depends on how `Index` names are displayed; not load-bearing.
-        @test_broken sprint(printnode, l1) == "[:i, :j]"
-        @test_broken sprint(print_tree, l1) == "[:i, :j]\n"
+        # The leaf format mirrors ITensorBase's display of a tensor's index names.
+        @test sprint(printnode, l1) == "{\"i\", \"j\"}"
+        @test sprint(print_tree, l1) == "{\"i\", \"j\"}\n"
 
         l = l1 * l2 * l3
         @test arguments(l) == [l1 * l2, l3]
@@ -69,14 +69,13 @@ using WrappedUnions: unwrap
         @test sorted_children(l) == [l1 * l2, l3]
         @test AbstractTrees.children(l) == [l1 * l2, l3]
         @test AbstractTrees.nodevalue(l) ≡ *
-        # Show-string format depends on how `Index` names are displayed; not load-bearing.
-        @test_broken sprint(show, l) == "(([:i, :j] * [:j, :k]) * [:k, :l])"
-        @test_broken sprint(printnode, l) == "(([:i, :j] * [:j, :k]) * [:k, :l])"
-        @test_broken sprint(print_tree, l) ==
-            "(([:i, :j] * [:j, :k]) * [:k, :l])\n" *
-            "├─ ([:i, :j] * [:j, :k])\n" *
-            "│  ├─ [:i, :j]\n│  └─ [:j, :k]\n" *
-            "└─ [:k, :l]\n"
+        @test sprint(show, l) == "(({\"i\", \"j\"} * {\"j\", \"k\"}) * {\"k\", \"l\"})"
+        @test sprint(printnode, l) == "(({\"i\", \"j\"} * {\"j\", \"k\"}) * {\"k\", \"l\"})"
+        @test sprint(print_tree, l) ==
+            "(({\"i\", \"j\"} * {\"j\", \"k\"}) * {\"k\", \"l\"})\n" *
+            "├─ ({\"i\", \"j\"} * {\"j\", \"k\"})\n" *
+            "│  ├─ {\"i\", \"j\"}\n│  └─ {\"j\", \"k\"}\n" *
+            "└─ {\"k\", \"l\"}\n"
     end
 
     @testset "symnameddims" begin
