@@ -31,26 +31,20 @@ function message_environment(f::Base.Callable, nn::NormNetwork)
 end
 
 function beliefpropagation(nn::NormNetwork, messages; kwargs...)
-    renamed_messages = map(keys(messages)) do edge
-        msg = messages[edge]
-
+    renamed_messages = map(messages) do msg
         if !any(name -> has_indname(KetView(nn), name), dimnames(msg))
             error(
-                "provided message on edge $edge does not have have any index \
+                "provided message on does not have have any index \
                 names in common with the tensor network contained in the norm."
             )
         end
 
-        return replacedimnames(msg) do name
-            if has_indname(KetView(nn), name)
-                return namemap(nn, name)
-            else
-                return name
-            end
-        end
+        bramap = Dict(codomainnames(msg) .=> Base.Fix1(namemap, nn).(domainnames(msg)))
+
+        return replacedimnames(name -> get(bramap, name, name), state(msg))
     end
 
-    cache = beliefpropagation(nn, renamed_messages; kwargs...)
+    cache = _beliefpropagation(nn, renamed_messages; kwargs...)
 
     # Re-wrap each converged message as an operator with codomain = bra names and
     # domain = ket names from the map.

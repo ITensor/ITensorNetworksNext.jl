@@ -1,6 +1,6 @@
 using Dictionaries: Dictionary
-using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArray, lazy
-using NamedDimsArrays: randname, replacedimnames, setname, similar_operator
+using ITensorBase: replacedimnames, setname, similar_operator, uniquename
+using ITensorNetworksNext.LazyITensors: LazyITensor, lazy
 
 """
     struct NormNetwork{T, V, I} <: AbstractTensorNetwork{T, V}
@@ -23,9 +23,9 @@ struct NormNetwork{T, V, I} <: AbstractTensorNetwork{T, V}
     end
 end
 
-Base.eltype(::Type{<:NormNetwork{T}}) where {T} = LazyNamedDimsArray{eltype(T), T}
+Base.eltype(::Type{<:NormNetwork{T}}) where {T} = LazyITensor{eltype(T), T}
 
-NormNetwork(tn::TensorNetwork) = NormNetwork(tn, map(randname, keys(tn.dimname_vertices)))
+NormNetwork(tn::TensorNetwork) = NormNetwork(tn, map(uniquename, keys(tn.dimname_vertices)))
 
 # ====================================== Graphs.jl ======================================= #
 
@@ -83,8 +83,8 @@ bra(nn::NormNetwork, vertex) = conj(conjbra(nn, vertex))
 
 Build the double-layer norm network `⟨tn|tn⟩`, represented lazily as a `NomnNetwork` object.
 The optional second argument `namemap` should implement `namemap[ketdimname] = bradimname` for
-every link dimension name `ketdimnam` in `tn`. If this is not specified, then a name is
-generated via the `NamedDimsArrays.randname` function.
+every link dimension name `ketdimname` in `tn`. If this is not specified, then a name is
+generated via the `ITensorBase.uniquename` function.
 """
 normnetwork(tn::TensorNetwork) = NormNetwork(tn)
 normnetwork(tn::TensorNetwork, namemap) = NormNetwork(tn, namemap)

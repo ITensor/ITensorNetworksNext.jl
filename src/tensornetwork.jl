@@ -7,7 +7,8 @@ using Dictionaries:
     Dictionaries, AbstractDictionary, Dictionary, Indices, dictionary, set!, unset!
 using Graphs:
     AbstractSimpleGraph, SimpleGraph, edges, has_edge, rem_edge!, rem_vertex!, vertices
-using ITensorBase: ITensorBase, AbstractITensor, denamedtype, dim, dimnames, dimnametype, name
+using ITensorBase:
+    ITensorBase, AbstractITensor, denamedtype, dim, dimnames, dimnametype, name
 using NamedGraphs.GraphsExtensions:
     GraphsExtensions, arrange_edge, arranged_edges, vertextype
 using NamedGraphs.OrderedDictionaries:
@@ -49,7 +50,7 @@ function TensorNetwork{T, V}(tensors) where {T, V}
     return tn
 end
 
-NamedDimsArrays.dimnametype(::Type{<:TensorNetwork{T, V, I}}) where {T, V, I} = I
+ITensorBase.dimnametype(::Type{<:TensorNetwork{T, V, I}}) where {T, V, I} = I
 
 Graphs.vertices(tn::TensorNetwork) = vertices(tn.underlying_graph)
 

@@ -50,8 +50,6 @@ end
 messagecache(pairs) = MessageCache(Dict(pairs))
 messagecache(f, edges) = messagecache(edge => f(edge) for edge in edges)
 
-Dictionaries.isinsertable(::MessageCache) = true
-
 function Graphs.rem_edge!(c::MessageCache, edge)
     delete!(c.messages, to_graph_index(c, edge))
     rem_edge!(c.underlying_graph, edge)
@@ -100,6 +98,24 @@ function DataGraphs.insert_edge_data!(cache::MessageCache, edge, val)
     add_edge!(cache.underlying_graph, edge)
     insert!(cache.messages, edge, val)
     return cache
+end
+
+# =================================== Dictionaries.jl ==================================== #
+
+Dictionaries.issettable(::MessageCache) = true
+Dictionaries.isinsertable(::MessageCache) = true
+
+function Base.map(f, cache::MessageCache)
+    new_cache = similar_graph(cache, Base.promote_op(f, valtype(cache)))
+    map!(f, new_cache, cache)
+    return new_cache
+end
+
+function Base.map!(f, dst::MessageCache, src)
+    for key in keys(src)
+        dst[key] = f(src[key])
+    end
+    return dst
 end
 
 # ===================================== contraction ====================================== #

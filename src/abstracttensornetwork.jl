@@ -4,12 +4,13 @@ using DataGraphs: DataGraphs, AbstractDataGraph, AbstractVertexDataGraph, edge_d
 using Dictionaries: Dictionary
 using Graphs: Graphs, AbstractEdge, AbstractGraph, add_edge!, add_vertex!, dst, edges,
     edgetype, ne, neighbors, nv, rem_edge!, src, vertices
-using ITensorBase: dimnames, inds
+using ITensorBase: denamedtype, dimnames, inds, name, named, nametype, prime, uniquename
 using LinearAlgebra: LinearAlgebra
 using MacroTools: @capture
 using NamedGraphs.GraphsExtensions: directed_graph, incident_edges, rem_edges!, vertextype
 using NamedGraphs.OrdinalIndexing: OrdinalSuffixedInteger
 using NamedGraphs: NamedGraphs, NamedGraph, not_implemented, similar_graph
+using TensorAlgebra: trivialrange
 
 abstract type AbstractTensorNetwork{T, V} <: AbstractVertexDataGraph{T, V} end
 
@@ -116,3 +117,17 @@ function has_indname(tn::AbstractGraph, name)
 end
 
 has_ind(tn::AbstractGraph, ind) = has_indname(tn, name(ind))
+
+function insertlink!(tn::AbstractGraph, e)
+    T = eltype(inds(tn[src(e)]))
+
+    linkind = named(trivialrange(denamedtype(T)), uniquename(nametype(T)))
+
+    x = similar(tn[src(e)], (linkind,))
+    fill!(x, true)
+
+    tn[src(e)] *= x
+    tn[dst(e)] *= conj(x)
+
+    return tn
+end
