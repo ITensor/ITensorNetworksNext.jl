@@ -10,7 +10,6 @@ end
 
 include("select_algorithm.jl")
 include("AlgorithmsInterfaceExtensions/AlgorithmsInterfaceExtensions.jl")
-include("LazyITensors/LazyITensors.jl")
 include("abstracttensornetwork.jl")
 include("tensornetwork.jl")
 include("TensorNetworkGenerators/TensorNetworkGenerators.jl")

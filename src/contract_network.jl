@@ -1,7 +1,7 @@
 using Base.Broadcast: materialize
 using Base: @kwdef
-using ITensorNetworksNext.LazyITensors: EvaluationOrderAlgorithm, Greedy, Mul, lazy,
-    optimize_evaluation_order, substitute, symnameddims
+using ITensorBase: EvaluationOrderAlgorithm, Greedy, Mul, lazy, optimize_evaluation_order,
+    substitute, symnameddims
 
 # `contract_network`
 @kwdef struct Exact{Order, OrderAlg}
