@@ -2,18 +2,13 @@ using AbstractTrees: AbstractTrees, print_tree, printnode
 using Base.Broadcast: materialize
 using ITensorBase: @names, ITensor, denamed, dimnames, inds, nameddims, namedoneto
 using ITensorNetworksNext.LazyITensors:
-    LazyITensor, LazyITensors, Mul, SymbolicITensor, ismul, lazy, substitute, symnameddims
+    LazyITensor, Mul, SymbolicITensor, ismul, lazy, substitute, symnameddims
 using TermInterface: arguments, arity, children, head, iscall, isexpr, maketerm, operation,
     sorted_arguments, sorted_children
 using Test: @test, @test_broken, @test_throws, @testset
 using WrappedUnions: unwrap
 
 @testset "LazyITensors" begin
-    function sprint_namespaced(x)
-        context = (:module => LazyITensors)
-        module_prefix = "ITensorNetworksNext.LazyITensors."
-        return replace(sprint(show, MIME"text/plain"(), x; context), module_prefix => "")
-    end
     @testset "Basics" begin
         i, j, k, l = namedoneto.(2, (:i, :j, :k, :l))
         a1 = randn(i, j)
@@ -57,10 +52,6 @@ using WrappedUnions: unwrap
         @test AbstractTrees.children(l1) ≡ ()
         @test AbstractTrees.nodevalue(l1) ≡ a1
         @test sprint(show, l1) == sprint(show, a1)
-        # TODO: Fix this test, it is basically correct but the type parameters
-        # print in a different way.
-        # @test sprint_namespaced(l1) ==
-        #     replace(sprint_namespaced(a1), "ITensor" => "LazyITensor")
         # Show-string format depends on how `Index` names are displayed; not load-bearing.
         @test_broken sprint(printnode, l1) == "[:i, :j]"
         @test_broken sprint(print_tree, l1) == "[:i, :j]\n"
@@ -80,9 +71,6 @@ using WrappedUnions: unwrap
         @test AbstractTrees.nodevalue(l) ≡ *
         # Show-string format depends on how `Index` names are displayed; not load-bearing.
         @test_broken sprint(show, l) == "(([:i, :j] * [:j, :k]) * [:k, :l])"
-        @test_broken sprint_namespaced(l) ==
-            "named(Base.OneTo(2), :i)×named(Base.OneTo(2), :l) " *
-            "LazyITensor{Symbol, …}:\n(([:i, :j] * [:j, :k]) * [:k, :l])"
         @test_broken sprint(printnode, l) == "(([:i, :j] * [:j, :k]) * [:k, :l])"
         @test_broken sprint(print_tree, l) ==
             "(([:i, :j] * [:j, :k]) * [:k, :l])\n" *
@@ -105,9 +93,6 @@ using WrappedUnions: unwrap
         @test arguments(ex) == [a1 * a2, a3]
         @test operation(ex) ≡ *
         @test sprint(show, ex) == "((a1 * a2) * a3)"
-        # Type-parameter truncation in the summary line is not load-bearing.
-        @test_broken sprint_namespaced(ex) ==
-            "0-dimensional LazyITensor{Symbol, …}:\n((a1 * a2) * a3)"
     end
 
     @testset "substitute" begin
