@@ -22,13 +22,13 @@ using SplitApplyCombine: mapview
 
 struct TensorNetwork{T, V, I} <: AbstractTensorNetwork{T, V}
     tensors::Dictionary{V, T}
-    index_locations::Dictionary{I, Set{V}}
+    dimname_vertices::Dictionary{I, Set{V}}
     underlying_graph::NamedGraph{V}
     function TensorNetwork{T, V, I}(::UndefInitializer, vertices) where {T, V, I}
         tensors = Dictionary{V, T}()
-        index_locations = Dictionary{I, Set{V}}()
+        dimname_vertices = Dictionary{I, Set{V}}()
         underlying_graph = NamedGraph(vertices)
-        return new{T, V, I}(tensors, index_locations, underlying_graph)
+        return new{T, V, I}(tensors, dimname_vertices, underlying_graph)
     end
 end
 
@@ -78,12 +78,12 @@ function Graphs.rem_vertex!(tn::TensorNetwork, vertex)
 
         # Delete the vertex from that `ind`s vertex list
         # (this index may still be one incident to one other vertex)
-        vertex_list = tn.index_locations[ind]
+        vertex_list = tn.dimname_vertices[ind]
         delete!(vertex_list, vertex)
 
         # If that index is now no longer associated with any vertices, it was dangling,
         # and that index should be deleted from the keys of reverse index mapping
-        isempty(vertex_list) && delete!(tn.index_locations, ind)
+        isempty(vertex_list) && delete!(tn.dimname_vertices, ind)
     end
 
     rem_vertex!(tn.underlying_graph, vertex)
@@ -94,7 +94,7 @@ end
 
 # Internal (unsafe)
 function delete_ind_edge!(tn, ind)
-    vertex_list = tn.index_locations[ind]
+    vertex_list = tn.dimname_vertices[ind]
 
     if length(vertex_list) == 2
         src, dst = vertex_list
@@ -106,10 +106,10 @@ end
 
 # Internal (unsafe)
 function delete_ind_vertex!(tn, ind, vertex)
-    vertex_list = tn.index_locations[ind]
+    vertex_list = tn.dimname_vertices[ind]
 
     delete!(vertex_list, vertex)
-    isempty(vertex_list) && delete!(tn.index_locations, ind)
+    isempty(vertex_list) && delete!(tn.dimname_vertices, ind)
 
     return tn
 end
@@ -152,7 +152,7 @@ function set!_tensornetwork(tn::TensorNetwork, vertex, tensor)
 
         # Now `ind` must be a new index that's not in `oldinds`
 
-        vertex_list = get!(tn.index_locations, ind, Set())
+        vertex_list = get!(tn.dimname_vertices, ind, Set())
         if length(vertex_list) > 1
             throw(
                 ArgumentError(
@@ -193,10 +193,10 @@ function Graphs.add_edge!(::TensorNetwork, _edge)
 end
 
 # PERF: fast lookup compared to `AbstractTensorNetwork` fallback.
-indsites(tn::TensorNetwork, ind) = tn.index_locations[name(ind)]
+indsites(tn::TensorNetwork, ind) = tn.dimname_vertices[name(ind)]
 
 # PERF: fast lookup compared to `AbstractTensorNetwork` fallback.
-has_indname(tn::TensorNetwork, name) = haskey(tn.index_locations, name)
+has_indname(tn::TensorNetwork, name) = haskey(tn.dimname_vertices, name)
 
 function NamedGraphs.similar_graph(
         T::Type{<:TensorNetwork},
@@ -219,3 +219,4 @@ function NamedGraphs.induced_subgraph_from_vertices(tn::TensorNetwork, subvertic
     copyto!(subgraph, tn, subvertices)
     return subgraph, subvertices
 end
+

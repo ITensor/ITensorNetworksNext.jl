@@ -14,7 +14,7 @@ struct NormNetwork{T, V, I} <: AbstractTensorNetwork{T, V}
     namemap::Dictionary{I, I}
     function NormNetwork(tn::TensorNetwork{T, V, I}, map::Dictionary{I, I}) where {T, V, I}
         namemap = Dictionary{I, I}()
-        for (name, vertices) in pairs(tn.index_locations)
+        for (name, vertices) in pairs(tn.dimname_vertices)
             if length(vertices) == 2
                 insert!(namemap, name, map[name])
             end
@@ -25,7 +25,7 @@ end
 
 Base.eltype(::Type{<:NormNetwork{T}}) where {T} = LazyNamedDimsArray{eltype(T), T}
 
-NormNetwork(tn::TensorNetwork) = NormNetwork(tn, map(randname, keys(tn.index_locations)))
+NormNetwork(tn::TensorNetwork) = NormNetwork(tn, map(randname, keys(tn.dimname_vertices)))
 
 # ====================================== Graphs.jl ======================================= #
 
