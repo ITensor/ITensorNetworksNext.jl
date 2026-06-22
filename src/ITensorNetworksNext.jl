@@ -14,6 +14,7 @@ include("LazyITensors/LazyITensors.jl")
 include("abstracttensornetwork.jl")
 include("tensornetwork.jl")
 include("normnetwork.jl")
+include("normnetworkview.jl")
 include("TensorNetworkGenerators/TensorNetworkGenerators.jl")
 include("contract_network.jl")
 

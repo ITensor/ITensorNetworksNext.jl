@@ -4,8 +4,7 @@ using GradedArrays: U1, gradedrange
 using Graphs: dst, edges, src, vertices
 using ITensorBase: Index, name, operator, setname, uniquename
 using ITensorNetworksNext: TensorNetwork, apply_operator, apply_operators,
-    beliefpropagation_normnetwork, identity_norm_message_env, insertlink!,
-    ones_norm_message_env
+    beliefpropagation, message_environment, tensornetwork, insertlink!
 using MatrixAlgebraKit: truncrank
 using NamedGraphs.NamedGraphGenerators: named_cycle_graph, named_path_graph
 using NamedGraphs: NamedGraph
@@ -24,13 +23,17 @@ function randn_operator(rng::AbstractRNG, elt::Type, domain_namedaxes)
 end
 
 function random_state(rng::AbstractRNG, elt::Type, g, site_axes; nlayers, trunc)
-    state = TensorNetwork(NamedGraph(collect(vertices(g)))) do v
+    linkinds = Dict(e => Index(1) for e in edges(g))
+
+    state = tensornetwork(vertices(g)) do v
         return randn(rng, elt, (site_axes[v],))
     end
-    for e in edges(g)
-        insertlink!(state, e)
+
+    for edge in edges(g)
+        insertlink!(state, edge)
     end
-    env = identity_norm_message_env(state)
+
+    env = message_environment(one, NormNetwork(state))
     for _ in 1:nlayers, e in edges(g)
         gate = randn_operator(rng, elt, (site_axes[src(e)], site_axes[dst(e)]))
         state, env = apply_operator(gate, state, env; trunc)
@@ -50,10 +53,15 @@ end
         g = named_cycle_graph(N)
         site_axes = Dict(v => Index(site_range) for v in vertices(g))
         state = random_state(rng, T, g, site_axes; nlayers = 2, trunc = truncrank(4))
-        env = beliefpropagation_normnetwork(
-            state, ones_norm_message_env(state);
+
+        nn = NormNetwork(state)
+
+        env = beliefpropagation(
+            nn,
+            message_environment(msg -> fill!(msg, true), nn);
             stopping_criterion = (; maxiter = 100, tol = 1.0e-13)
         )
+
         for gate in (
                 randn_operator(rng, T, (site_axes[2],)),
                 randn_operator(rng, T, (site_axes[2], site_axes[3])),
@@ -68,15 +76,21 @@ end
         g = named_path_graph(N)
         site_axes = Dict(v => Index(site_range) for v in vertices(g))
         state = random_state(rng, T, g, site_axes; nlayers = 2, trunc = truncrank(4))
-        env = beliefpropagation_normnetwork(
-            state, ones_norm_message_env(state);
+
+        nn = NormNetwork(state)
+
+        env = beliefpropagation(
+            nn,
+            message_environment(msg -> fill!(msg, true), nn);
             stopping_criterion = (; maxiter = 100, tol = 1.0e-13)
         )
+
         gate = randn_operator(rng, T, (site_axes[2], site_axes[3]))
         gated_full = ITB.apply(gate, prod(state))
         left = [name(site_axes[v]) for v in 1:2]
         U, S, Vt = TA.svd(gated_full, left; trunc = truncrank(k))
         gated, _ = apply_operator(gate, state, env; trunc = truncrank(k))
+
         @test prod(gated) ≈ U * S * Vt rtol = eps(real(T))^(1 / 3)
     end
 
@@ -85,8 +99,12 @@ end
         g = named_cycle_graph(N)
         site_axes = Dict(v => Index(site_range) for v in vertices(g))
         state = random_state(rng, T, g, site_axes; nlayers = 2, trunc = truncrank(4))
-        env = beliefpropagation_normnetwork(
-            state, ones_norm_message_env(state);
+
+        nn = NormNetwork(state)
+
+        env = beliefpropagation(
+            nn,
+            message_environment(msg -> fill!(msg, true), nn);
             stopping_criterion = (; maxiter = 100, tol = 1.0e-13)
         )
         g1 = randn_operator(rng, T, (site_axes[2], site_axes[3]))
