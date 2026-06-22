@@ -1,9 +1,9 @@
 module ITensorNetworksNextTensorOperationsExt
 
-using BackendSelection: @Algorithm_str, Algorithm
 using ITensorBase: denamed, inds
 using ITensorNetworksNext.LazyITensors.TermInterface: arguments
-using ITensorNetworksNext.LazyITensors: LazyITensors, ismul, substitute, symnameddims
+using ITensorNetworksNext.LazyITensors:
+    LazyITensors, Optimal, ismul, substitute, symnameddims
 using TensorOperations: TensorOperations, optimaltree
 
 function contraction_tree_to_expr(f, tree)
@@ -14,7 +14,7 @@ function contraction_tree_to_expr(f, tree)
     end
 end
 
-function LazyITensors.optimize_contraction_order(alg::Algorithm"optimal", a)
+function LazyITensors.optimize_contraction_order(alg::Optimal, a)
     @assert ismul(a)
     ts = arguments(a)
     inds_network = collect.(inds.(ts))

@@ -1,7 +1,6 @@
 using .AlgorithmsInterfaceExtensions:
     AlgorithmsInterfaceExtensions as AIE, StopWhenConverged, iterate_diff
 using AlgorithmsInterface: AlgorithmsInterface as AI
-using BackendSelection: @Algorithm_str, Algorithm
 using DataGraphs: edge_data
 using Graphs: AbstractEdge, edges, edgetype, has_edge, vertices
 using ITensorBase: AbstractITensor
@@ -236,14 +235,14 @@ end
 
 @kwdef struct SimpleMessageUpdate{ContractionAlg} <: MessageUpdateAlgorithm
     normalize::Bool = true
-    contraction_alg::ContractionAlg = Algorithm"exact"
+    contraction_alg::ContractionAlg = Exact()
 end
 
 function message_update!(algorithm::SimpleMessageUpdate, cache, factors, edge)
     messages = collect(incoming_messages(cache, edge))
     factor = factors[src(edge)]
 
-    new_message = contract_network([messages; [factor]]; algorithm.contraction_alg)
+    new_message = contract_network([messages; [factor]]; alg = algorithm.contraction_alg)
 
     if algorithm.normalize
         message_norm = sum(new_message)

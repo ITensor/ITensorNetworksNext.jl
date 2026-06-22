@@ -1,5 +1,4 @@
 using Adapt: Adapt, adapt
-using BackendSelection: @Algorithm_str, Algorithm
 using DataGraphs: DataGraphs, AbstractDataGraph, edge_data, set_vertex_data!,
     underlying_graph, underlying_graph_type, vertex_data
 using Dictionaries: Dictionary

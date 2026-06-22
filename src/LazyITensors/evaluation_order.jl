@@ -85,15 +85,19 @@ function optimize_evaluation_order(
     return optimize_evaluation_order(alg, a)
 end
 
-using BackendSelection: @Algorithm_str, Algorithm
-default_optimize_evaluation_order_alg(a) = Algorithm"eager"()
+abstract type EvaluationOrderAlgorithm end
+struct Greedy <: EvaluationOrderAlgorithm end
+# `Optimal` finds the cost-optimal contraction order. The method is provided by
+# the TensorOperations extension.
+struct Optimal <: EvaluationOrderAlgorithm end
+default_optimize_evaluation_order_alg(a) = Greedy()
 
 function optimize_contraction_order(alg, a)
     return error("`alg = $alg` not supported.")
 end
 
 using Combinatorics: combinations
-function optimize_contraction_order(alg::Algorithm"eager", a)
+function optimize_contraction_order(alg::Greedy, a)
     @assert ismul(a)
     arity(a) in (1, 2) && return a
     a1, a2 = argmin(combinations(arguments(a), 2)) do (a1, a2)
