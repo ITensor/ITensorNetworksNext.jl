@@ -1,13 +1,12 @@
-import NamedDimsArrays as NDA
+import ITensorBase as ITB
 import TensorAlgebra as TA
 using GradedArrays: U1, gradedrange
 using Graphs: dst, edges, src, vertices
-using ITensorBase: Index
+using ITensorBase: Index, name, operator, setname, uniquename
 using ITensorNetworksNext: TensorNetwork, apply_operator, apply_operators,
     beliefpropagation_normnetwork, identity_norm_message_env, insertlink!,
     ones_norm_message_env
 using MatrixAlgebraKit: truncrank
-using NamedDimsArrays: name, operator, randname, setname
 using NamedGraphs.NamedGraphGenerators: named_cycle_graph, named_path_graph
 using NamedGraphs: NamedGraph
 using Random: AbstractRNG
@@ -18,7 +17,7 @@ const spinone = Base.OneTo(3)
 const spinone_u1 = gradedrange([U1(2) => 1, U1(0) => 1, U1(-2) => 1])
 
 function randn_operator(rng::AbstractRNG, elt::Type, domain_namedaxes)
-    codomain_namedaxes = setname.(domain_namedaxes, randname.(name.(domain_namedaxes)))
+    codomain_namedaxes = setname.(domain_namedaxes, uniquename.(name.(domain_namedaxes)))
     dual_domain_namedaxes = setname.(conj.(domain_namedaxes), name.(domain_namedaxes))
     data = randn(rng, elt, (codomain_namedaxes..., dual_domain_namedaxes...))
     return operator(data, name.(codomain_namedaxes), name.(domain_namedaxes))
@@ -60,7 +59,7 @@ end
                 randn_operator(rng, T, (site_axes[2], site_axes[3])),
             )
             gated, _ = apply_operator(gate, state, env)
-            @test prod(gated) ≈ NDA.apply(gate, prod(state)) rtol = eps(real(T))^(1 / 3)
+            @test prod(gated) ≈ ITB.apply(gate, prod(state)) rtol = eps(real(T))^(1 / 3)
         end
     end
 
@@ -74,7 +73,7 @@ end
             stopping_criterion = (; maxiter = 100, tol = 1.0e-13)
         )
         gate = randn_operator(rng, T, (site_axes[2], site_axes[3]))
-        gated_full = NDA.apply(gate, prod(state))
+        gated_full = ITB.apply(gate, prod(state))
         left = [name(site_axes[v]) for v in 1:2]
         U, S, Vt = TA.svd(gated_full, left; trunc = truncrank(k))
         gated, _ = apply_operator(gate, state, env; trunc = truncrank(k))
@@ -93,7 +92,7 @@ end
         g1 = randn_operator(rng, T, (site_axes[2], site_axes[3]))
         g2 = randn_operator(rng, T, (site_axes[3], site_axes[4]))
         gated, _ = apply_operators([g1, g2], state, env)
-        @test prod(gated) ≈ NDA.apply(g2, NDA.apply(g1, prod(state))) rtol =
+        @test prod(gated) ≈ ITB.apply(g2, ITB.apply(g1, prod(state))) rtol =
             eps(real(T))^(1 / 3)
     end
 end

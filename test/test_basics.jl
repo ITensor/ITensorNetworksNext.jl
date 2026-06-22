@@ -1,8 +1,7 @@
 using Dictionaries: Indices
 using Graphs: dst, edges, has_edge, ne, nv, src, vertices
-using ITensorBase: Index
+using ITensorBase: Index, dimnames
 using ITensorNetworksNext: TensorNetwork, linkinds, siteinds
-using NamedDimsArrays: dimnames
 using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges
 using NamedGraphs.NamedGraphGenerators: named_grid
 using Test: @test, @testset

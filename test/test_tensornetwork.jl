@@ -2,7 +2,7 @@ using DataGraphs: assigned_edge_data, assigned_vertex_data, underlying_graph, ve
 using Graphs: add_edge!, add_vertex!, dst, edges, edgetype, has_edge, has_vertex,
     is_directed, ne, nv, rem_vertex!, src, vertices
 using ITensorBase: Index
-using ITensorNetworksNext.LazyNamedDimsArrays: LazyNamedDimsArray
+using ITensorNetworksNext.LazyITensors: LazyITensor
 using ITensorNetworksNext:
     TensorNetwork, fix_edges!, linkaxes, linkinds, linknames, siteaxes, siteinds, sitenames
 using NamedGraphs.GraphsExtensions: incident_edges, subgraph, vertextype
@@ -160,7 +160,7 @@ using Test: @test, @test_throws, @testset
         @testset "`tn[QuotientVertex(...)]` (default)" begin
             qv = only(collect(quotientvertices(tn)))
             data = tn[qv]
-            @test data isa LazyNamedDimsArray
+            @test data isa LazyITensor
         end
 
         @testset "`quotient_graph` (default partitioning)" begin
@@ -169,7 +169,7 @@ using Test: @test, @test_throws, @testset
             @test nv(qtn) == 1
             @test ne(qtn) == 0
             v = only(collect(vertices(qtn)))
-            @test qtn[v] isa LazyNamedDimsArray
+            @test qtn[v] isa LazyITensor
         end
 
         @testset "`quotient_graph_type`" begin
@@ -205,7 +205,7 @@ using Test: @test, @test_throws, @testset
         @testset "`tn[QuotientVertex(...)]` (partitioned)" begin
             ptn = partitionedgraph(tn, row_parts)
             for qv in quotientvertices(ptn)
-                @test ptn[qv] isa LazyNamedDimsArray
+                @test ptn[qv] isa LazyITensor
             end
         end
 
@@ -217,7 +217,7 @@ using Test: @test, @test_throws, @testset
             # The row-partitioned grid quotients to a path graph of length `dims[2]`.
             @test ne(qtn) == dims[2] - 1
             for v in vertices(qtn)
-                @test qtn[v] isa LazyNamedDimsArray
+                @test qtn[v] isa LazyITensor
             end
         end
 

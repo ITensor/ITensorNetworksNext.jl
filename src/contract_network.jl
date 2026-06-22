@@ -1,6 +1,6 @@
 using BackendSelection: @Algorithm_str, Algorithm
 using Base.Broadcast: materialize
-using ITensorNetworksNext.LazyNamedDimsArrays:
+using ITensorNetworksNext.LazyITensors:
     Mul, lazy, optimize_evaluation_order, substitute, symnameddims
 
 # This is related to `MatrixAlgebraKit.select_algorithm`.

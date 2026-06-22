@@ -1,11 +1,11 @@
-using .LazyNamedDimsArrays: Mul, lazy
+using .LazyITensors: Mul, lazy
 using Combinatorics: combinations
 using DataGraphs.DataGraphsPartitionedGraphsExt
 using DataGraphs: DataGraphs, AbstractDataGraph, DataGraph, edge_data, get_vertices_data,
     vertex_data, vertex_data_type
 using Dictionaries: AbstractDictionary, Indices, dictionary, set!, unset!
 using Graphs: AbstractSimpleGraph, rem_edge!, rem_vertex!
-using NamedDimsArrays: AbstractNamedDimsArray, dimnames
+using ITensorBase: AbstractITensor, dimnames
 using NamedGraphs.GraphsExtensions:
     GraphsExtensions, arrange_edge, arranged_edges, vertextype
 using NamedGraphs.PartitionedGraphs: AbstractPartitionedGraph, PartitionedGraphs,

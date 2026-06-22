@@ -5,9 +5,9 @@ using DataGraphs: DataGraphs, AbstractDataGraph, edge_data, set_vertex_data!,
 using Dictionaries: Dictionary
 using Graphs: Graphs, AbstractEdge, AbstractGraph, add_edge!, add_vertex!, dst, edges,
     edgetype, ne, neighbors, nv, rem_edge!, src, vertices
+using ITensorBase: dimnames, inds
 using LinearAlgebra: LinearAlgebra
 using MacroTools: @capture
-using NamedDimsArrays: dimnames, inds
 using NamedGraphs.GraphsExtensions: directed_graph, incident_edges, rem_edges!, vertextype
 using NamedGraphs.OrdinalIndexing: OrdinalSuffixedInteger
 using NamedGraphs: NamedGraphs, NamedGraph, not_implemented, similar_graph
@@ -177,25 +177,25 @@ function fix_edges!(tn::AbstractGraph, v)
     return tn
 end
 
-using NamedDimsArrays: denamedtype, named, nametype, randname
+using ITensorBase: denamedtype, named, nametype, uniquename
 using TensorAlgebra: trivialrange
 function insertlink!(tn, e)
     add_edge!(tn, e)
     T = eltype(inds(tn[src(e)]))
-    l = named(trivialrange(denamedtype(T)), randname(nametype(T)))
+    l = named(trivialrange(denamedtype(T)), uniquename(nametype(T)))
     x = fill!(similar(tn[src(e)], (l,)), one(eltype(tn[src(e)])))
     @preserve_graph tn[src(e)] = tn[src(e)] * x
     @preserve_graph tn[dst(e)] = tn[dst(e)] * conj(x)
     return tn
 end
 
-using NamedDimsArrays: replacedimnames
+using ITensorBase: replacedimnames
 function randlinknames(tn)
     new_tn = copy(tn)
     for e in edges(new_tn)
         u, v = src(e), dst(e)
         for n in intersect(dimnames(new_tn[u]), dimnames(new_tn[v]))
-            n′ = randname(n)
+            n′ = uniquename(n)
             new_tn[u] = replacedimnames(new_tn[u], n => n′)
             new_tn[v] = replacedimnames(new_tn[v], n => n′)
         end

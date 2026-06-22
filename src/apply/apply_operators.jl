@@ -2,9 +2,9 @@ using .AlgorithmsInterfaceExtensions: AlgorithmsInterfaceExtensions as AIE
 using AlgorithmsInterface: AlgorithmsInterface as AI
 using Base: @kwdef
 using Graphs: dst, src, vertices
+using ITensorBase:
+    ITensorBase as ITB, AbstractITensor, dimnames, domainnames, operator, replacedimnames
 using LinearAlgebra: norm
-using NamedDimsArrays: NamedDimsArrays as NDA, AbstractNamedDimsArray, dimnames,
-    domainnames, nameddims, operator, randname, replacedimnames
 using NamedGraphs.GraphsExtensions: all_edges, boundary_edges
 using TensorAlgebra: TensorAlgebra as TA, gram_eigh_full, gram_eigh_full_with_pinv
 
@@ -205,7 +205,7 @@ end
 # === BP simple-update implementation ===
 
 function apply_gate_bp!(
-        dest::AbstractTensorNetwork, op::AbstractNamedDimsArray,
+        dest::AbstractTensorNetwork, op::AbstractITensor,
         state::AbstractTensorNetwork, env; kwargs...
     )
     op_in = domainnames(op)
@@ -217,19 +217,19 @@ function apply_gate_bp!(
 end
 
 function apply_gate_bp_nsite!(
-        ::Val{N}, dest::AbstractTensorNetwork, op::AbstractNamedDimsArray,
+        ::Val{N}, dest::AbstractTensorNetwork, op::AbstractITensor,
         state::AbstractTensorNetwork, env, vs; kwargs...
     ) where {N}
     return throw(ArgumentError("$N-site gate decomposition not implemented"))
 end
 
 function apply_gate_bp_nsite!(
-        ::Val{1}, dest::AbstractTensorNetwork, op::AbstractNamedDimsArray,
+        ::Val{1}, dest::AbstractTensorNetwork, op::AbstractITensor,
         state::AbstractTensorNetwork, env, vs;
         normalize, kwargs...
     )
     v = only(vs)
-    ψv = NDA.apply(op, state[v])
+    ψv = ITB.apply(op, state[v])
     if normalize
         gauges = [
             conj(gram_eigh_full(env[e]))
@@ -242,7 +242,7 @@ function apply_gate_bp_nsite!(
 end
 
 function apply_gate_bp_nsite!(
-        ::Val{2}, dest::AbstractTensorNetwork, op::AbstractNamedDimsArray,
+        ::Val{2}, dest::AbstractTensorNetwork, op::AbstractITensor,
         state::AbstractTensorNetwork, env, vs;
         trunc, normalize
     )
@@ -260,7 +260,7 @@ function apply_gate_bp_nsite!(
 
     Q_v1, R_v1 = TA.qr(ψ_v1, setdiff(dimnames(ψ_v1), dimnames(ψ_v2), dimnames(op)))
     Q_v2, R_v2 = TA.qr(ψ_v2, setdiff(dimnames(ψ_v2), dimnames(ψ_v1), dimnames(op)))
-    op_R_v1v2 = NDA.apply(op, R_v1 * R_v2)
+    op_R_v1v2 = ITB.apply(op, R_v1 * R_v2)
     U_v1, S, U_v2 = TA.svd(op_R_v1v2, setdiff(dimnames(R_v1), dimnames(R_v2)); trunc)
     if normalize
         S = S / norm(S)
