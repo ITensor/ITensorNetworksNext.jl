@@ -1,6 +1,6 @@
 name = "ITensorNetworksNext"
 uuid = "302f2e75-49f0-4526-aef7-d8ba550cb06c"
-version = "0.7.1"
+version = "0.7.2"
 authors = ["ITensor developers <support@itensor.org> and contributors"]
 
 [workspace]
@@ -14,6 +14,7 @@ DataGraphs = "b5a273c3-7e6c-41f6-98bd-8d7f1525a36a"
 Dictionaries = "85a47980-9c8c-11e8-2b9f-f7ca1fa99fb4"
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
 ITensorBase = "4795dd04-0d67-49bb-8f44-b89c448a1dc7"
+KrylovKit = "0b1a1467-8014-51b9-945f-bf0ae24f4b77"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
 MatrixAlgebraKit = "6c742aac-3347-4629-af66-fc926824e5e4"
@@ -31,6 +32,7 @@ DataGraphs = "0.4"
 Dictionaries = "0.4.5"
 Graphs = "1.13.1"
 ITensorBase = "0.8"
+KrylovKit = "0.10"
 LinearAlgebra = "1.10"
 MacroTools = "0.5.16"
 MatrixAlgebraKit = "0.6"
