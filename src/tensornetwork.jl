@@ -217,4 +217,3 @@ function NamedGraphs.induced_subgraph_from_vertices(tn::TensorNetwork, subvertic
     copyto!(subgraph, tn, subvertices)
     return subgraph, subvertices
 end
-
