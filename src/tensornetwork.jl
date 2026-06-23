@@ -16,8 +16,13 @@ using NamedGraphs:
 
 function _TensorNetwork end
 
-struct TensorNetwork{V, VD, UG <: AbstractGraph{V}, Tensors <: AbstractDictionary{V, VD}} <:
-    AbstractTensorNetwork{V, VD}
+struct ITensorNetwork{
+        V,
+        VD,
+        UG <: AbstractGraph{V},
+        Tensors <: AbstractDictionary{V, VD},
+    } <:
+    AbstractITensorNetwork{V, VD}
     underlying_graph::UG
     tensors::Tensors
     global @inline function _TensorNetwork(
@@ -28,22 +33,22 @@ struct TensorNetwork{V, VD, UG <: AbstractGraph{V}, Tensors <: AbstractDictionar
     end
 end
 # This assumes the tensor connectivity matches the graph structure.
-function TensorNetwork(graph::AbstractGraph, tensors)
-    return TensorNetwork(graph, Dictionary(keys(tensors), values(tensors)))
+function ITensorNetwork(graph::AbstractGraph, tensors)
+    return ITensorNetwork(graph, Dictionary(keys(tensors), values(tensors)))
 end
-function TensorNetwork(graph::AbstractGraph, tensors::AbstractDictionary)
+function ITensorNetwork(graph::AbstractGraph, tensors::AbstractDictionary)
     tn = _TensorNetwork(graph, tensors)
     fix_links!(tn)
     return tn
 end
 
-function TensorNetwork{V, VD, UG, Tensors}(
+function ITensorNetwork{V, VD, UG, Tensors}(
         graph::UG
     ) where {V, VD, UG <: AbstractGraph{V}, Tensors}
     return _TensorNetwork(graph, Tensors())
 end
 
-function Graphs.rem_vertex!(tn::TensorNetwork, v)
+function Graphs.rem_vertex!(tn::ITensorNetwork, v)
     delete!(tn.tensors, v)
     rem_vertex!(tn.underlying_graph, v)
     return tn
@@ -51,16 +56,16 @@ end
 
 # DataGraphs interface
 
-DataGraphs.underlying_graph(tn::TensorNetwork) = tn.underlying_graph
+DataGraphs.underlying_graph(tn::ITensorNetwork) = tn.underlying_graph
 
-DataGraphs.is_vertex_assigned(tn::TensorNetwork, v) = haskey(tn.tensors, v)
-DataGraphs.is_edge_assigned(tn::TensorNetwork, e) = false
+DataGraphs.is_vertex_assigned(tn::ITensorNetwork, v) = haskey(tn.tensors, v)
+DataGraphs.is_edge_assigned(tn::ITensorNetwork, e) = false
 
-DataGraphs.get_vertex_data(tn::TensorNetwork, v) = tn.tensors[v]
+DataGraphs.get_vertex_data(tn::ITensorNetwork, v) = tn.tensors[v]
 
-DataGraphs.set_vertex_data!(tn::TensorNetwork, val, v) = set!(tn.tensors, v, val)
+DataGraphs.set_vertex_data!(tn::ITensorNetwork, val, v) = set!(tn.tensors, v, val)
 
-function DataGraphs.underlying_graph_type(type::Type{<:TensorNetwork})
+function DataGraphs.underlying_graph_type(type::Type{<:ITensorNetwork})
     return fieldtype(type, :underlying_graph)
 end
 
@@ -82,13 +87,13 @@ function tensornetwork_edges(edgetype::Type, tensors)
 end
 tensornetwork_edges(tensors) = tensornetwork_edges(NamedEdge, tensors)
 
-function TensorNetwork(f::Base.Callable, graph::AbstractGraph)
-    return TensorNetwork(graph, Dictionary(map(f, vertices(graph))))
+function ITensorNetwork(f::Base.Callable, graph::AbstractGraph)
+    return ITensorNetwork(graph, Dictionary(map(f, vertices(graph))))
 end
 
 # Insert trivial links for missing edges, and also check
 # the vertices and edges are consistent between the graph and tensors.
-function fix_links!(tn::AbstractTensorNetwork)
+function fix_links!(tn::AbstractITensorNetwork)
     graph = underlying_graph(tn)
     tensors = vertex_data(tn)
     @assert issetequal(vertices(graph), keys(tensors)) "Graph vertices and tensor keys must match."
@@ -102,27 +107,27 @@ function fix_links!(tn::AbstractTensorNetwork)
 end
 
 # Determine the graph structure from the tensors.
-function TensorNetwork(tensors)
+function ITensorNetwork(tensors)
     graph = NamedGraph(keys(tensors))
     add_edges!(graph, tensornetwork_edges(tensors))
     return _TensorNetwork(graph, tensors)
 end
 
-function Base.copy(tn::TensorNetwork)
-    return TensorNetwork(copy(underlying_graph(tn)), copy(vertex_data(tn)))
+function Base.copy(tn::ITensorNetwork)
+    return ITensorNetwork(copy(underlying_graph(tn)), copy(vertex_data(tn)))
 end
-TensorNetwork(tn::TensorNetwork) = copy(tn)
-TensorNetwork{V}(tn::TensorNetwork{V}) where {V} = copy(tn)
-function TensorNetwork{V}(tn::TensorNetwork) where {V}
+ITensorNetwork(tn::ITensorNetwork) = copy(tn)
+ITensorNetwork{V}(tn::ITensorNetwork{V}) where {V} = copy(tn)
+function ITensorNetwork{V}(tn::ITensorNetwork) where {V}
     g = convert_vertextype(V, underlying_graph(tn))
     d = dictionary(V(k) => tn[k] for k in vertices(tn))
-    return TensorNetwork(g, d)
+    return ITensorNetwork(g, d)
 end
 
-NamedGraphs.convert_vertextype(::Type{V}, tn::TensorNetwork{V}) where {V} = tn
-NamedGraphs.convert_vertextype(V::Type, tn::TensorNetwork) = TensorNetwork{V}(tn)
+NamedGraphs.convert_vertextype(::Type{V}, tn::ITensorNetwork{V}) where {V} = tn
+NamedGraphs.convert_vertextype(V::Type, tn::ITensorNetwork) = ITensorNetwork{V}(tn)
 
-function Graphs.rem_edge!(tn::TensorNetwork, e)
+function Graphs.rem_edge!(tn::ITensorNetwork, e)
     if !has_edge(underlying_graph(tn), e)
         return false
     end
@@ -138,7 +143,7 @@ function Graphs.rem_edge!(tn::TensorNetwork, e)
 end
 
 function NamedGraphs.similar_graph(
-        type::Type{<:TensorNetwork},
+        type::Type{<:ITensorNetwork},
         vertices = vertextype(type)[]
     )
     DT = fieldtype(type, :tensors)
@@ -149,7 +154,7 @@ function NamedGraphs.similar_graph(
     return _TensorNetwork(underlying_graph, empty_dict)
 end
 function NamedGraphs.similar_graph(
-        graph::TensorNetwork,
+        graph::ITensorNetwork,
         VD::Type,
         ::Type{<:Nothing},
         vertices
@@ -162,7 +167,7 @@ function NamedGraphs.similar_graph(
     return _TensorNetwork(new_underlying_graph, empty_dict)
 end
 
-function NamedGraphs.induced_subgraph_from_vertices(graph::TensorNetwork, subvertices)
+function NamedGraphs.induced_subgraph_from_vertices(graph::ITensorNetwork, subvertices)
     return induced_subgraph_tensornetwork(graph, subvertices)
 end
 
@@ -170,7 +175,7 @@ function induced_subgraph_tensornetwork(graph, subvertices)
     underlying_subgraph, vlist =
         Graphs.induced_subgraph(underlying_graph(graph), subvertices)
 
-    subgraph = TensorNetwork(underlying_subgraph) do vertex
+    subgraph = ITensorNetwork(underlying_subgraph) do vertex
         return graph[vertex]
     end
 
@@ -178,52 +183,52 @@ function induced_subgraph_tensornetwork(graph, subvertices)
 end
 
 ## PartitionedGraphs
-function PartitionedGraphs.partitioned_vertices(tn::TensorNetwork)
+function PartitionedGraphs.partitioned_vertices(tn::ITensorNetwork)
     return partitioned_vertices(tn.underlying_graph)
 end
 
-function PartitionedGraphs.quotient_graph(tn::TensorNetwork)
+function PartitionedGraphs.quotient_graph(tn::ITensorNetwork)
     ug = quotient_graph(underlying_graph(tn))
 
     inds = Indices(parent_graph_indices(QuotientVertices(tn)))
     data = map(v -> tn[QuotientVertex(v)], inds)
 
-    return TensorNetwork(ug, data)
+    return ITensorNetwork(ug, data)
 end
 # TODO: This method should not be required with a better interface with a better
 # DataGraphsPartitionedGraphsExt interface.
-function PartitionedGraphs.quotient_graph_type(type::Type{<:TensorNetwork})
+function PartitionedGraphs.quotient_graph_type(type::Type{<:ITensorNetwork})
     UG = quotient_graph_type(underlying_graph_type(type))
     VD = Vector{vertex_data_type(type)}
     V = vertextype(UG)
-    return TensorNetwork{V, VD, UG, Dictionary{V, VD}}
+    return ITensorNetwork{V, VD, UG, Dictionary{V, VD}}
 end
 
 # Partition the underlying graph of the tensor network; does not affect the data.
-function PartitionedGraphs.partitionedgraph(tn::TensorNetwork, parts)
+function PartitionedGraphs.partitionedgraph(tn::ITensorNetwork, parts)
     pg = partitionedgraph(underlying_graph(tn), parts)
-    return TensorNetwork(pg, copy(vertex_data(tn)))
+    return ITensorNetwork(pg, copy(vertex_data(tn)))
 end
 
-PartitionedGraphs.departition(tn::TensorNetwork) = tn
+PartitionedGraphs.departition(tn::ITensorNetwork) = tn
 function PartitionedGraphs.departition(
-        tn::TensorNetwork{<:Any, <:Any, <:AbstractPartitionedGraph}
+        tn::ITensorNetwork{<:Any, <:Any, <:AbstractPartitionedGraph}
     )
-    return TensorNetwork(departition(underlying_graph(tn)), vertex_data(tn))
+    return ITensorNetwork(departition(underlying_graph(tn)), vertex_data(tn))
 end
 
-NamedGraphs.to_graph_index(::TensorNetwork, vertex::QuotientVertex) = vertex
+NamedGraphs.to_graph_index(::ITensorNetwork, vertex::QuotientVertex) = vertex
 # When getting data according the quotient vertices, take a lazy contraction.
-function DataGraphs.get_index_data(tn::TensorNetwork, vertex::QuotientVertex)
+function DataGraphs.get_index_data(tn::ITensorNetwork, vertex::QuotientVertex)
     data = collect(map(v -> tn[v], vertices(tn, vertex)))
     return mapreduce(lazy, *, data)
 end
-function DataGraphs.is_graph_index_assigned(tn::TensorNetwork, vertex::QuotientVertex)
+function DataGraphs.is_graph_index_assigned(tn::ITensorNetwork, vertex::QuotientVertex)
     return isassigned(tn, Vertices(vertices(tn, vertex)))
 end
 
-function PartitionedGraphs.quotientview(tn::TensorNetwork)
+function PartitionedGraphs.quotientview(tn::ITensorNetwork)
     qview = QuotientView(underlying_graph(tn))
     tensors = map(qv -> vertex_data(tn)[Indices(qv)], Indices(quotientvertices(tn)))
-    return TensorNetwork(qview, tensors)
+    return ITensorNetwork(qview, tensors)
 end

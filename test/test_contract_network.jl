@@ -1,7 +1,7 @@
 using Graphs: edges
 using ITensorBase: Greedy, Index, Optimal
 using ITensorNetworksNext:
-    Exact, LeftAssociative, TensorNetwork, contract_network, linkinds, siteinds
+    Exact, ITensorNetwork, LeftAssociative, contract_network, linkinds, siteinds
 using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges
 using NamedGraphs.NamedGraphGenerators: named_grid
 using TensorOperations: TensorOperations
@@ -28,7 +28,7 @@ using Test: @test, @testset
         g = named_grid(dims)
         l = Dict(e => Index(2) for e in edges(g))
         l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
-        tn = TensorNetwork(g) do v
+        tn = ITensorNetwork(g) do v
             is = map(e -> l[e], incident_edges(g, v))
             return randn(Tuple(is))
         end

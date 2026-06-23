@@ -3,7 +3,7 @@ using Graphs: add_edge!, add_vertex!, dst, edges, edgetype, has_edge, has_vertex
     is_directed, ne, nv, rem_vertex!, src, vertices
 using ITensorBase: Index, LazyITensor
 using ITensorNetworksNext:
-    TensorNetwork, fix_edges!, linkaxes, linkinds, linknames, siteaxes, siteinds, sitenames
+    ITensorNetwork, fix_edges!, linkaxes, linkinds, linknames, siteaxes, siteinds, sitenames
 using NamedGraphs.GraphsExtensions: incident_edges, subgraph, vertextype
 using NamedGraphs.NamedGraphGenerators: named_grid, named_path_graph
 using NamedGraphs.PartitionedGraphs: AbstractPartitionedGraph, QuotientVertex, departition,
@@ -12,11 +12,11 @@ using NamedGraphs.PartitionedGraphs: AbstractPartitionedGraph, QuotientVertex, d
 using NamedGraphs: convert_vertextype, similar_graph
 using Test: @test, @test_throws, @testset
 
-@testset "`TensorNetwork`" begin
+@testset "`ITensorNetwork`" begin
     @testset "Basics" begin
         g = named_grid((2, 2))
         s = Dict(v => Index(2) for v in vertices(g))
-        tn = TensorNetwork(g) do v
+        tn = ITensorNetwork(g) do v
             return randn(s[v])
         end
 
@@ -26,7 +26,7 @@ using Test: @test, @test_throws, @testset
         @test issetequal(keys(tn), vertices(tn))
         # `eltype` matches the eltype of the vertex data.
         @test eltype(tn) === eltype(vertex_data(tn))
-        # `is_directed` is `false` for AbstractTensorNetwork.
+        # `is_directed` is `false` for AbstractITensorNetwork.
         @test !is_directed(typeof(tn))
 
         # `show` MIME and default both succeed and mention vertices/edges.
@@ -60,7 +60,7 @@ using Test: @test, @test_throws, @testset
         l = Dict(e => Index(2) for e in edges(g))
         l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
         s = Dict(v => Index(2) for v in vertices(g))
-        tn = TensorNetwork(g) do v
+        tn = ITensorNetwork(g) do v
             is = map(e -> l[e], incident_edges(g, v))
             return randn((s[v], is...))
         end
@@ -84,14 +84,14 @@ using Test: @test, @test_throws, @testset
         g = named_grid((3,))
         l = Dict(e => Index(2) for e in edges(g))
         l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
-        tn = TensorNetwork(g) do v
+        tn = ITensorNetwork(g) do v
             is = map(e -> l[e], incident_edges(g, v))
             return randn(Tuple(is))
         end
 
         sub_vs = [(1,), (2,)]
         subtn = subgraph(tn, sub_vs)
-        @test subtn isa TensorNetwork
+        @test subtn isa ITensorNetwork
         @test issetequal(vertices(subtn), sub_vs)
         @test has_edge(subtn, (1,) => (2,))
     end
@@ -100,12 +100,12 @@ using Test: @test, @test_throws, @testset
         dims = (3, 3)
         g = named_grid(dims)
         s = Dict(v => Index(2) for v in vertices(g))
-        tn = TensorNetwork(g) do v
+        tn = ITensorNetwork(g) do v
             return randn(s[v])
         end
 
         stn = similar_graph(tn)
-        @test stn isa TensorNetwork
+        @test stn isa ITensorNetwork
         @test vertices(stn) == vertices(tn)
         @test edges(stn) == edges(tn)
         @test isempty(assigned_vertex_data(stn))
@@ -127,7 +127,7 @@ using Test: @test, @test_throws, @testset
         @test stn isa typeof(tn)
 
         ctn = convert_vertextype(Tuple{Float64, Float64}, tn)
-        @test ctn isa TensorNetwork
+        @test ctn isa ITensorNetwork
         @test vertextype(ctn) == Tuple{Float64, Float64}
         @test collect(vertex_data(ctn)) == collect(vertex_data(tn))
     end
@@ -136,7 +136,7 @@ using Test: @test, @test_throws, @testset
         dims = (3, 3)
         g = named_grid(dims)
         s = Dict(v => Index(2) for v in vertices(g))
-        tn = TensorNetwork(g) do v
+        tn = ITensorNetwork(g) do v
             return randn(s[v])
         end
 
@@ -164,7 +164,7 @@ using Test: @test, @test_throws, @testset
 
         @testset "`quotient_graph` (default partitioning)" begin
             qtn = quotient_graph(tn)
-            @test qtn isa TensorNetwork
+            @test qtn isa ITensorNetwork
             @test nv(qtn) == 1
             @test ne(qtn) == 0
             v = only(collect(vertices(qtn)))
@@ -173,14 +173,14 @@ using Test: @test, @test_throws, @testset
 
         @testset "`quotient_graph_type`" begin
             QT = quotient_graph_type(typeof(tn))
-            @test QT <: TensorNetwork
+            @test QT <: ITensorNetwork
             qtn = quotient_graph(tn)
             @test vertextype(qtn) === vertextype(QT)
         end
 
         @testset "`partitionedgraph(tn, parts)`" begin
             ptn = partitionedgraph(tn, row_parts)
-            @test ptn isa TensorNetwork
+            @test ptn isa ITensorNetwork
             # The set of underlying vertices/edges is preserved.
             @test issetequal(vertices(ptn), vertices(tn))
             @test issetequal(edges(ptn), edges(tn))
@@ -211,7 +211,7 @@ using Test: @test, @test_throws, @testset
         @testset "`quotient_graph` of partitioned tn" begin
             ptn = partitionedgraph(tn, row_parts)
             qtn = quotient_graph(ptn)
-            @test qtn isa TensorNetwork
+            @test qtn isa ITensorNetwork
             @test nv(qtn) == dims[2]
             # The row-partitioned grid quotients to a path graph of length `dims[2]`.
             @test ne(qtn) == dims[2] - 1
@@ -227,7 +227,7 @@ using Test: @test, @test_throws, @testset
             # `departition` on a partitioned tn unwraps one layer of partitioning.
             ptn = partitionedgraph(tn, row_parts)
             dtn = departition(ptn)
-            @test dtn isa TensorNetwork
+            @test dtn isa ITensorNetwork
             @test issetequal(vertices(dtn), vertices(tn))
             @test issetequal(edges(dtn), edges(tn))
         end

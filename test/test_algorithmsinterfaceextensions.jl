@@ -1,5 +1,6 @@
-import AlgorithmsInterface as AI
-import ITensorNetworksNext.AlgorithmsInterfaceExtensions as AIE
+using AlgorithmsInterface: AlgorithmsInterface as AI
+using ITensorNetworksNext.AlgorithmsInterfaceExtensions:
+    AlgorithmsInterfaceExtensions as AIE
 using Test: @test, @test_throws, @testset
 
 # Concrete `NestedAlgorithm` subtype: holds a flat list of child algorithms

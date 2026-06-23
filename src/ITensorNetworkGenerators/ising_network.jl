@@ -18,7 +18,7 @@ end
 """
     ising_network(f, β::Number, g::AbstractGraph)
 
-Construct a TensorNetwork on the graph `g` with inverse temperature `β` that has Ising
+Construct a ITensorNetwork on the graph `g` with inverse temperature `β` that has Ising
 partition function tensors on each vertex. Link dimensions are defined using the function
 `f(e)` that should take an edge `e` as an input and should output the link index on that
 edge.

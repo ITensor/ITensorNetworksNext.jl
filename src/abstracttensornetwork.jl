@@ -11,13 +11,13 @@ using NamedGraphs.GraphsExtensions: directed_graph, incident_edges, rem_edges!, 
 using NamedGraphs.OrdinalIndexing: OrdinalSuffixedInteger
 using NamedGraphs: NamedGraphs, NamedGraph, not_implemented, similar_graph
 
-abstract type AbstractTensorNetwork{V, VD} <: AbstractDataGraph{V, VD, Nothing} end
+abstract type AbstractITensorNetwork{V, VD} <: AbstractDataGraph{V, VD, Nothing} end
 
 # Need to be careful about removing edges from tensor networks in case there is a bond
-Graphs.rem_edge!(::AbstractTensorNetwork, edge) = not_implemented()
+Graphs.rem_edge!(::AbstractITensorNetwork, edge) = not_implemented()
 
 # Graphs.jl overloads
-function Graphs.weights(graph::AbstractTensorNetwork)
+function Graphs.weights(graph::AbstractITensorNetwork)
     V = vertextype(graph)
     es = Tuple.(edges(graph))
     ws = Dictionary{Tuple{V, V}, Float64}(es, undef)
@@ -29,28 +29,28 @@ function Graphs.weights(graph::AbstractTensorNetwork)
 end
 
 # Copy
-Base.copy(::AbstractTensorNetwork) = not_implemented()
+Base.copy(::AbstractITensorNetwork) = not_implemented()
 
 # Iteration
-Base.iterate(tn::AbstractTensorNetwork, args...) = iterate(vertex_data(tn), args...)
-Base.keys(tn::AbstractTensorNetwork) = vertices(tn)
+Base.iterate(tn::AbstractITensorNetwork, args...) = iterate(vertex_data(tn), args...)
+Base.keys(tn::AbstractITensorNetwork) = vertices(tn)
 
 # TODO: This contrasts with the `DataGraphs.AbstractDataGraph` definition,
 # where it is defined as the `vertextype`. Does that cause problems or should it be changed?
-Base.eltype(tn::AbstractTensorNetwork) = eltype(vertex_data(tn))
+Base.eltype(tn::AbstractITensorNetwork) = eltype(vertex_data(tn))
 
 # Overload if needed
-Graphs.is_directed(::Type{<:AbstractTensorNetwork}) = false
+Graphs.is_directed(::Type{<:AbstractITensorNetwork}) = false
 
-DataGraphs.underlying_graph(::AbstractTensorNetwork) = not_implemented()
-function NamedGraphs.vertex_positions(tn::AbstractTensorNetwork)
+DataGraphs.underlying_graph(::AbstractITensorNetwork) = not_implemented()
+function NamedGraphs.vertex_positions(tn::AbstractITensorNetwork)
     return NamedGraphs.vertex_positions(underlying_graph(tn))
 end
-function NamedGraphs.ordered_vertices(tn::AbstractTensorNetwork)
+function NamedGraphs.ordered_vertices(tn::AbstractITensorNetwork)
     return NamedGraphs.ordered_vertices(underlying_graph(tn))
 end
 
-function Adapt.adapt_structure(to, tn::AbstractTensorNetwork)
+function Adapt.adapt_structure(to, tn::AbstractITensorNetwork)
     # TODO: Define and use:
     #
     # @preserve_graph map_vertex_data(adapt(to), tn)
@@ -135,14 +135,14 @@ macro preserve_graph(expr)
     return :(setindex_preserve_graph!($(esc(array)), $(esc(value)), $(esc.(indices)...)))
 end
 
-# Update the graph of the TensorNetwork `tn` to include
+# Update the graph of the ITensorNetwork `tn` to include
 # edges that should exist based on the tensor connectivity.
 function add_missing_edges!(tn::AbstractGraph)
     foreach(v -> add_missing_edges!(tn, v), vertices(tn))
     return tn
 end
 
-# Update the graph of the TensorNetwork `tn` to include
+# Update the graph of the ITensorNetwork `tn` to include
 # edges that should be incident to the vertex `v`
 # based on the tensor connectivity.
 function add_missing_edges!(tn::AbstractGraph, v)
@@ -157,13 +157,13 @@ function add_missing_edges!(tn::AbstractGraph, v)
     return tn
 end
 
-# Fix the edges of the TensorNetwork `tn` to match
+# Fix the edges of the ITensorNetwork `tn` to match
 # the tensor connectivity.
 function fix_edges!(tn::AbstractGraph)
     foreach(v -> fix_edges!(tn, v), vertices(tn))
     return tn
 end
-# Fix the edges of the TensorNetwork `tn` to match
+# Fix the edges of the ITensorNetwork `tn` to match
 # the tensor connectivity at vertex `v`.
 function fix_edges!(tn::AbstractGraph, v)
     for e in incident_edges(tn, v)
@@ -176,12 +176,12 @@ function fix_edges!(tn::AbstractGraph, v)
     return tn
 end
 
-using ITensorBase: denamedtype, named, nametype, uniquename
+using ITensorBase: named, nametype, uniquename, unnamedtype
 using TensorAlgebra: trivialrange
 function insertlink!(tn, e)
     add_edge!(tn, e)
     T = eltype(inds(tn[src(e)]))
-    l = named(trivialrange(denamedtype(T)), uniquename(nametype(T)))
+    l = named(trivialrange(unnamedtype(T)), uniquename(nametype(T)))
     x = fill!(similar(tn[src(e)], (l,)), one(eltype(tn[src(e)])))
     @preserve_graph tn[src(e)] = tn[src(e)] * x
     @preserve_graph tn[dst(e)] = tn[dst(e)] * conj(x)
@@ -202,28 +202,32 @@ function randlinknames(tn)
     return new_tn
 end
 
-function Base.setindex!(tn::AbstractTensorNetwork, value, v)
+function Base.setindex!(tn::AbstractITensorNetwork, value, v)
     @preserve_graph tn[v] = value
     fix_edges!(tn, v)
     return tn
 end
 # Fix ambiguity error.
-function Base.setindex!(graph::AbstractTensorNetwork, value, vertex::OrdinalSuffixedInteger)
+function Base.setindex!(
+        graph::AbstractITensorNetwork,
+        value,
+        vertex::OrdinalSuffixedInteger
+    )
     graph[vertices(graph)[vertex]] = value
     return graph
 end
-Base.setindex!(tn::AbstractTensorNetwork, value, edge::AbstractEdge) = not_implemented()
-Base.setindex!(tn::AbstractTensorNetwork, value, edge::Pair) = not_implemented()
+Base.setindex!(tn::AbstractITensorNetwork, value, edge::AbstractEdge) = not_implemented()
+Base.setindex!(tn::AbstractITensorNetwork, value, edge::Pair) = not_implemented()
 # Fix ambiguity error.
 function Base.setindex!(
-        tn::AbstractTensorNetwork,
+        tn::AbstractITensorNetwork,
         value,
         edge::Pair{<:OrdinalSuffixedInteger, <:OrdinalSuffixedInteger}
     )
     return not_implemented()
 end
 
-function Base.show(io::IO, mime::MIME"text/plain", graph::AbstractTensorNetwork)
+function Base.show(io::IO, mime::MIME"text/plain", graph::AbstractITensorNetwork)
     println(io, "$(typeof(graph)) with $(nv(graph)) vertices:")
     show(io, mime, vertices(graph))
     println(io, "\n")
@@ -238,4 +242,4 @@ function Base.show(io::IO, mime::MIME"text/plain", graph::AbstractTensorNetwork)
     return nothing
 end
 
-Base.show(io::IO, graph::AbstractTensorNetwork) = show(io, MIME"text/plain"(), graph)
+Base.show(io::IO, graph::AbstractITensorNetwork) = show(io, MIME"text/plain"(), graph)
