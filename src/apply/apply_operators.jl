@@ -15,7 +15,7 @@ using TensorAlgebra: TensorAlgebra as TA, gram_eigh_full, gram_eigh_full_with_pi
 
 Apply each operator in `operators` (a sequence of single-tensor or two-tensor
 operators) to `state` in turn, updating `env` to reflect each application.
-`state` is an `AbstractTensorNetwork`, `env` is a per-edge environment cache
+`state` is an `AbstractITensorNetwork`, `env` is a per-edge environment cache
 (typically built by `identity_norm_message_env(state)` or one of the related
 `*_norm_message_env` constructors), and the returned `(state, env)` pair has
 the operators applied. `kwargs` are forwarded to the per-operator algorithm
@@ -205,8 +205,8 @@ end
 # === BP simple-update implementation ===
 
 function apply_gate_bp!(
-        dest::AbstractTensorNetwork, op::AbstractITensor,
-        state::AbstractTensorNetwork, env; kwargs...
+        dest::AbstractITensorNetwork, op::AbstractITensor,
+        state::AbstractITensorNetwork, env; kwargs...
     )
     op_in = domainnames(op)
     vs = [v for v in vertices(state) if !isempty(intersect(op_in, sitenames(state, v)))]
@@ -217,15 +217,15 @@ function apply_gate_bp!(
 end
 
 function apply_gate_bp_nsite!(
-        ::Val{N}, dest::AbstractTensorNetwork, op::AbstractITensor,
-        state::AbstractTensorNetwork, env, vs; kwargs...
+        ::Val{N}, dest::AbstractITensorNetwork, op::AbstractITensor,
+        state::AbstractITensorNetwork, env, vs; kwargs...
     ) where {N}
     return throw(ArgumentError("$N-site gate decomposition not implemented"))
 end
 
 function apply_gate_bp_nsite!(
-        ::Val{1}, dest::AbstractTensorNetwork, op::AbstractITensor,
-        state::AbstractTensorNetwork, env, vs;
+        ::Val{1}, dest::AbstractITensorNetwork, op::AbstractITensor,
+        state::AbstractITensorNetwork, env, vs;
         normalize, kwargs...
     )
     v = only(vs)
@@ -242,8 +242,8 @@ function apply_gate_bp_nsite!(
 end
 
 function apply_gate_bp_nsite!(
-        ::Val{2}, dest::AbstractTensorNetwork, op::AbstractITensor,
-        state::AbstractTensorNetwork, env, vs;
+        ::Val{2}, dest::AbstractITensorNetwork, op::AbstractITensor,
+        state::AbstractITensorNetwork, env, vs;
         trunc, normalize
     )
     v1, v2 = vs

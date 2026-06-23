@@ -1,5 +1,5 @@
 # Reference
 
 ```@autodocs
-Modules = [ITensorNetworksNext, ITensorNetworksNext.TensorNetworkGenerators]
+Modules = [ITensorNetworksNext, ITensorNetworksNext.ITensorNetworkGenerators]
 ```

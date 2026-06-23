@@ -12,14 +12,14 @@ using NamedGraphs.OrdinalIndexing: OrdinalSuffixedInteger
 using NamedGraphs: NamedGraphs, NamedGraph, not_implemented, similar_graph
 using TensorAlgebra: trivialrange
 
-abstract type AbstractTensorNetwork{T, V} <: AbstractVertexDataGraph{T, V} end
+abstract type AbstractITensorNetwork{T, V} <: AbstractVertexDataGraph{T, V} end
 
 # ====================================== Graphs.jl ======================================= #
 
 # Need to be careful about removing edges from tensor networks in case there is a bond
-Graphs.rem_edge!(::AbstractTensorNetwork, _edge) = not_implemented()
+Graphs.rem_edge!(::AbstractITensorNetwork, _edge) = not_implemented()
 
-function Graphs.weights(graph::AbstractTensorNetwork)
+function Graphs.weights(graph::AbstractITensorNetwork)
     V = vertextype(graph)
     es = Tuple.(edges(graph))
     ws = Dictionary{Tuple{V, V}, Float64}(es, undef)
@@ -31,17 +31,17 @@ function Graphs.weights(graph::AbstractTensorNetwork)
 end
 
 # Overload if needed
-Graphs.is_directed(::Type{<:AbstractTensorNetwork}) = false
+Graphs.is_directed(::Type{<:AbstractITensorNetwork}) = false
 
 # ==================================== NamedGraphs.jl ==================================== #
 
-function NamedGraphs.similar_graph(::AbstractTensorNetwork, VD::Type, vertices)
-    return TensorNetwork{VD}(undef, collect(vertices))
+function NamedGraphs.similar_graph(::AbstractITensorNetwork, VD::Type, vertices)
+    return ITensorNetwork{VD}(undef, collect(vertices))
 end
 
 # ==================================== DataGraphs.jl ===================================== #
 
-function DataGraphs.underlying_graph(tn::AbstractTensorNetwork)
+function DataGraphs.underlying_graph(tn::AbstractITensorNetwork)
     ug = NamedGraph(vertices(tn))
     add_edges!(ug, edges(tn))
     return ug

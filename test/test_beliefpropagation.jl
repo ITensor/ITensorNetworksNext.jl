@@ -4,7 +4,7 @@ using Dictionaries: Dictionary, dictionary, set!
 using Graphs: AbstractGraph, dst, edges, has_edge, src, vertices
 using ITensorBase: ITensor, Index, inds, name, noprime, prime
 using ITensorNetworksNext: ITensorNetworksNext, MessageCache, StopWhenConverged,
-    TensorNetwork, bethe_free_energy, edge_scalar, incoming_messages, linkinds,
+    ITensorNetwork, bethe_free_energy, edge_scalar, incoming_messages, linkinds,
     messagecache, region_scalar, subgraph, tensornetwork, vertex_scalar, vertex_scalars
 using LinearAlgebra: LinearAlgebra
 using NamedGraphs.GraphsExtensions: all_edges, arranged_edges, incident_edges, vertextype
@@ -32,7 +32,7 @@ function spin_ice_tensornetwork(g)
         t = t_data[linkinds...]
         set!(ts, v, t)
     end
-    return TensorNetwork(ts)
+    return ITensorNetwork(ts)
 end
 
 @testset "Belief propagation" begin
@@ -165,7 +165,7 @@ end
                 is = map(edge -> g[edge], incident_edges(g, vertex))
                 return randn(T, Tuple(is))
             end
-            tn = TensorNetwork(tensors)
+            tn = ITensorNetwork(tensors)
 
             messages = Dict(
                 edge => ones(T, Tuple(linkinds(tn, edge))) for edge in all_edges(g)
@@ -188,7 +188,7 @@ end
                 is = map(edge -> g[edge], incident_edges(g, vertex))
                 return randn(T, Tuple(is))
             end
-            tn = TensorNetwork(tensors)
+            tn = ITensorNetwork(tensors)
 
             messages = Dict(
                 edge => ones(T, Tuple(linkinds(tn, edge))) for edge in all_edges(g)

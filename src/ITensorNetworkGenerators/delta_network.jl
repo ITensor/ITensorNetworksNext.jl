@@ -37,7 +37,7 @@ delta(elt::Type, is) = diagonaltensor(ones(elt, minimum(length ∘ denamed, is))
 """
     delta_network(f, elt::Type = Float64, g::AbstractGraph)
 
-Construct a TensorNetwork on the graph `g` with element type `elt` that has delta tensors
+Construct a ITensorNetwork on the graph `g` with element type `elt` that has delta tensors
 on each vertex. Link dimensions are defined using the function `f(e)` that should take an
 edge `e` as an input and should output the link index on that edge.
 """

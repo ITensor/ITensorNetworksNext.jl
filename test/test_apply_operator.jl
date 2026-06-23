@@ -3,7 +3,7 @@ import TensorAlgebra as TA
 using GradedArrays: U1, gradedrange
 using Graphs: dst, edges, src, vertices
 using ITensorBase: Index, name, named, operator, setname, uniquename
-using ITensorNetworksNext: NormNetwork, TensorNetwork, apply_operator, apply_operators,
+using ITensorNetworksNext: NormNetwork, ITensorNetwork, apply_operator, apply_operators,
     beliefpropagation, insertlink!, message_environment, tensornetwork
 using MatrixAlgebraKit: truncrank
 using NamedGraphs.NamedGraphGenerators: named_cycle_graph, named_path_graph

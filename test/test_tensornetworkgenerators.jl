@@ -1,7 +1,7 @@
 using DataGraphs: DataGraph
 using Graphs: edges, ne, nv, vertices
 using ITensorBase: Index, inds
-using ITensorNetworksNext.TensorNetworkGenerators: delta, delta_network, ising_network
+using ITensorNetworksNext.ITensorNetworkGenerators: delta, delta_network, ising_network
 using ITensorNetworksNext: contract_network
 using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges
 using NamedGraphs.NamedGraphGenerators: named_grid
@@ -9,7 +9,7 @@ using Test: @test, @testset
 
 !@isdefined(TestUtils) && include("utils.jl")
 
-@testset "TensorNetworkGenerators" begin
+@testset "ITensorNetworkGenerators" begin
     @testset "Delta Network" begin
         dims = (3, 3)
         g = named_grid(dims)

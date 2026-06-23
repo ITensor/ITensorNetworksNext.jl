@@ -3,16 +3,16 @@ using ITensorBase: LazyITensor, lazy, replacedimnames, setname, similar_operator
 using ITensorNetworksNext
 
 """
-    struct NormNetwork{T, V, I} <: AbstractTensorNetwork{T, V}
+    struct NormNetwork{T, V, I} <: AbstractITensorNetwork{T, V}
 
-Lazy wrapper representing the norm `⟨tn|tn⟩` of `tn::TensorNetwork{T, V, I}`,
+Lazy wrapper representing the norm `⟨tn|tn⟩` of `tn::ITensorNetwork{T, V, I}`,
 together with a per-edge ket→bra name mapping that, for each index in the ket layer, defines
 the name of the corresponding index in the bra layer.
 """
-struct NormNetwork{T, V, I} <: AbstractTensorNetwork{T, V}
-    tensornetwork::TensorNetwork{T, V, I}
+struct NormNetwork{T, V, I} <: AbstractITensorNetwork{T, V}
+    tensornetwork::ITensorNetwork{T, V, I}
     namemap::Dictionary{I, I}
-    function NormNetwork(tn::TensorNetwork{T, V, I}, map::Dictionary{I, I}) where {T, V, I}
+    function NormNetwork(tn::ITensorNetwork{T, V, I}, map::Dictionary{I, I}) where {T, V, I}
         namemap = Dictionary{I, I}()
         for (name, vertices) in pairs(tn.dimname_vertices)
             if length(vertices) == 2
@@ -25,7 +25,7 @@ end
 
 Base.eltype(::Type{<:NormNetwork{T}}) where {T} = LazyITensor{eltype(T), T}
 
-NormNetwork(tn::TensorNetwork) = NormNetwork(tn, map(uniquename, keys(tn.dimname_vertices)))
+NormNetwork(tn::ITensorNetwork) = NormNetwork(tn, map(uniquename, keys(tn.dimname_vertices)))
 
 # ====================================== Graphs.jl ======================================= #
 
@@ -79,12 +79,12 @@ conjbra(nn::NormNetwork, vertex) = replacedimnames(n -> namemap(nn, n), ket(nn, 
 bra(nn::NormNetwork, vertex) = conj(conjbra(nn, vertex))
 
 """
-    normnetwork(tn::TensorNetwork, [namemap]) -> NormNetwork
+    normnetwork(tn::ITensorNetwork, [namemap]) -> NormNetwork
 
 Build the double-layer norm network `⟨tn|tn⟩`, represented lazily as a `NomnNetwork` object.
 The optional second argument `namemap` should implement `namemap[ketdimname] = bradimname` for
 every link dimension name `ketdimname` in `tn`. If this is not specified, then a name is
 generated via the `ITensorBase.uniquename` function.
 """
-normnetwork(tn::TensorNetwork) = NormNetwork(tn)
-normnetwork(tn::TensorNetwork, namemap) = NormNetwork(tn, namemap)
+normnetwork(tn::ITensorNetwork) = NormNetwork(tn)
+normnetwork(tn::ITensorNetwork, namemap) = NormNetwork(tn, namemap)

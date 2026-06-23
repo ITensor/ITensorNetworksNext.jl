@@ -3,7 +3,7 @@ using DataGraphs:
 using Graphs: add_edge!, add_vertex!, dst, edges, edgetype, has_edge, has_vertex,
     is_directed, ne, nv, rem_edge!, rem_vertex!, src, vertices
 using ITensorBase: Index, LazyITensor, inds
-using ITensorNetworksNext: TensorNetwork, has_ind, linkaxes, linkinds, linknames, siteaxes,
+using ITensorNetworksNext: ITensorNetwork, has_ind, linkaxes, linkinds, linknames, siteaxes,
     siteinds, sitenames, tensornetwork
 using NamedGraphs.GraphsExtensions: incident_edges, subgraph, vertextype
 using NamedGraphs.NamedGraphGenerators: named_grid, named_path_graph
@@ -13,7 +13,7 @@ using NamedGraphs.PartitionedGraphs: AbstractPartitionedGraph, QuotientVertex, d
 using NamedGraphs: convert_vertextype, similar_graph
 using Test: @test, @test_throws, @testset
 
-@testset "`TensorNetwork`" begin
+@testset "`ITensorNetwork`" begin
     @testset "Basics" begin
         g = named_grid((2, 2))
         tn = tensornetwork(vertices(g)) do _
@@ -26,7 +26,7 @@ using Test: @test, @test_throws, @testset
         @test issetequal(keys(tn), vertices(tn))
         # `eltype` matches the eltype of the vertex data.
         @test eltype(tn) === eltype(vertex_data(tn))
-        # `is_directed` is `false` for AbstractTensorNetwork.
+        # `is_directed` is `false` for AbstractITensorNetwork.
         @test !is_directed(typeof(tn))
 
         # `show` MIME and default both succeed and mention vertices/edges.
@@ -135,7 +135,7 @@ using Test: @test, @test_throws, @testset
 
         sub_vs = [(1,), (2,)]
         subtn = subgraph(tn, sub_vs)
-        @test subtn isa TensorNetwork
+        @test subtn isa ITensorNetwork
         @test issetequal(vertices(subtn), sub_vs)
         @test has_edge(subtn, (1,) => (2,))
     end
@@ -149,7 +149,7 @@ using Test: @test, @test_throws, @testset
         end
 
         stn = similar_graph(tn)
-        @test stn isa TensorNetwork
+        @test stn isa ITensorNetwork
         @test vertices(stn) == vertices(tn)
         @test edges(stn) == edges(tn)
         @test isempty(assigned_vertex_data(stn))
@@ -171,7 +171,7 @@ using Test: @test, @test_throws, @testset
         @test stn isa typeof(tn)
 
         ctn = convert_vertextype(Tuple{Float64, Float64}, tn)
-        @test ctn isa TensorNetwork
+        @test ctn isa ITensorNetwork
         @test vertextype(ctn) == Tuple{Float64, Float64}
         @test collect(vertex_data(ctn)) == collect(vertex_data(tn))
     end

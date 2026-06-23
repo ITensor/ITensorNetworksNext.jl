@@ -1,8 +1,8 @@
-struct KetView{T, V, I} <: AbstractTensorNetwork{T, V}
+struct KetView{T, V, I} <: AbstractITensorNetwork{T, V}
     parent::NormNetwork{T, V, I}
 end
 
-struct BraView{T, V, I} <: AbstractTensorNetwork{T, V}
+struct BraView{T, V, I} <: AbstractITensorNetwork{T, V}
     parent::NormNetwork{T, V, I}
 end
 

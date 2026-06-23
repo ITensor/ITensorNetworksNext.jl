@@ -18,11 +18,11 @@ using NamedGraphs: NamedGraphs, NamedEdge, NamedGraph, PositionGraphView, Vertic
     parent_graph_indices, vertextype
 using SplitApplyCombine: mapview
 
-struct TensorNetwork{T, V, I} <: AbstractTensorNetwork{T, V}
+struct ITensorNetwork{T, V, I} <: AbstractITensorNetwork{T, V}
     tensors::Dictionary{V, T}
     dimname_vertices::Dictionary{I, Set{V}}
     underlying_graph::NamedGraph{V}
-    function TensorNetwork{T, V, I}(::UndefInitializer, vertices) where {T, V, I}
+    function ITensorNetwork{T, V, I}(::UndefInitializer, vertices) where {T, V, I}
         tensors = Dictionary{V, T}()
         dimname_vertices = Dictionary{I, Set{V}}()
         underlying_graph = NamedGraph(vertices)
@@ -30,43 +30,43 @@ struct TensorNetwork{T, V, I} <: AbstractTensorNetwork{T, V}
     end
 end
 
-function TensorNetwork{T}(undef::UndefInitializer, vertices) where {T}
-    return TensorNetwork{T, eltype(vertices)}(undef, vertices)
+function ITensorNetwork{T}(undef::UndefInitializer, vertices) where {T}
+    return ITensorNetwork{T, eltype(vertices)}(undef, vertices)
 end
 
-function TensorNetwork{T, V}(undef::UndefInitializer, vertices) where {T, V}
-    return TensorNetwork{T, V, dimnametype(T)}(undef, vertices)
+function ITensorNetwork{T, V}(undef::UndefInitializer, vertices) where {T, V}
+    return ITensorNetwork{T, V, dimnametype(T)}(undef, vertices)
 end
 
-TensorNetwork(tensors) = TensorNetwork{valtype(tensors)}(tensors)
-TensorNetwork{T}(tensors) where {T} = TensorNetwork{T, keytype(tensors)}(tensors)
-function TensorNetwork{T, V}(tensors) where {T, V}
+ITensorNetwork(tensors) = ITensorNetwork{valtype(tensors)}(tensors)
+ITensorNetwork{T}(tensors) where {T} = ITensorNetwork{T, keytype(tensors)}(tensors)
+function ITensorNetwork{T, V}(tensors) where {T, V}
     I = dimnametype(T)
-    tn = TensorNetwork{T, V, I}(undef, keys(tensors))
+    tn = ITensorNetwork{T, V, I}(undef, keys(tensors))
     copyto!(tn, tensors)
     return tn
 end
 
-ITensorBase.dimnametype(::Type{<:TensorNetwork{T, V, I}}) where {T, V, I} = I
+ITensorBase.dimnametype(::Type{<:ITensorNetwork{T, V, I}}) where {T, V, I} = I
 
-Graphs.vertices(tn::TensorNetwork) = vertices(tn.underlying_graph)
+Graphs.vertices(tn::ITensorNetwork) = vertices(tn.underlying_graph)
 
-function NamedGraphs.vertex_positions(graph::TensorNetwork)
+function NamedGraphs.vertex_positions(graph::ITensorNetwork)
     return index_positions(vertices(graph))
 end
-function NamedGraphs.ordered_vertices(graph::TensorNetwork)
+function NamedGraphs.ordered_vertices(graph::ITensorNetwork)
     return ordered_indices(vertices(graph))
 end
 
-NamedGraphs.position_graph(graph::TensorNetwork) = position_graph(graph.underlying_graph)
+NamedGraphs.position_graph(graph::ITensorNetwork) = position_graph(graph.underlying_graph)
 
-function Base.copy(tn::TensorNetwork{T}) where {T}
-    tn_dst = TensorNetwork{T}(undef, vertices(tn))
+function Base.copy(tn::ITensorNetwork{T}) where {T}
+    tn_dst = ITensorNetwork{T}(undef, vertices(tn))
     copyto!(tn_dst, tn)
     return tn_dst
 end
 
-function Graphs.rem_vertex!(tn::TensorNetwork, vertex)
+function Graphs.rem_vertex!(tn::ITensorNetwork, vertex)
     tensor = tn.tensors[vertex]
 
     for ind in dimnames(tensor)
@@ -112,30 +112,30 @@ function delete_ind_vertex!(tn, ind, vertex)
     return tn
 end
 
-tensornetwork(f, vertices) = TensorNetwork(Dict(v => f(v) for v in vertices))
+tensornetwork(f, vertices) = ITensorNetwork(Dict(v => f(v) for v in vertices))
 
-Graphs.is_directed(::Type{<:TensorNetwork}) = false
+Graphs.is_directed(::Type{<:ITensorNetwork}) = false
 
 # ====================================== DataGraphs ====================================== #
 
-DataGraphs.is_vertex_assigned(tn::TensorNetwork, vertex) = isassigned(tn.tensors, vertex)
-DataGraphs.is_edge_assigned(::TensorNetwork, _edge) = false
+DataGraphs.is_vertex_assigned(tn::ITensorNetwork, vertex) = isassigned(tn.tensors, vertex)
+DataGraphs.is_edge_assigned(::ITensorNetwork, _edge) = false
 
-DataGraphs.get_vertex_data(tn::TensorNetwork, v) = tn.tensors[v]
+DataGraphs.get_vertex_data(tn::ITensorNetwork, v) = tn.tensors[v]
 
-function DataGraphs.insert_vertex_data!(tn::TensorNetwork, vertex, tensor)
+function DataGraphs.insert_vertex_data!(tn::ITensorNetwork, vertex, tensor)
     add_vertex!(tn.underlying_graph, vertex)
     set!_tensornetwork(tn, vertex, tensor)
     return tn
 end
 
-function DataGraphs.set_vertex_data!(tn::TensorNetwork, tensor, vertex)
+function DataGraphs.set_vertex_data!(tn::ITensorNetwork, tensor, vertex)
     set!_tensornetwork(tn, vertex, tensor)
     return tn
 end
 
 # "upsert"
-function set!_tensornetwork(tn::TensorNetwork, vertex, tensor)
+function set!_tensornetwork(tn::ITensorNetwork, vertex, tensor)
     newinds = dimnames(tensor)
 
     oldinds = get(mapview(dimnames, tn.tensors), vertex, Set())
@@ -172,47 +172,47 @@ function set!_tensornetwork(tn::TensorNetwork, vertex, tensor)
     return tn
 end
 
-Dictionaries.isinsertable(::TensorNetwork) = true
+Dictionaries.isinsertable(::ITensorNetwork) = true
 
-function DataGraphs.underlying_graph_type(type::Type{<:TensorNetwork{T, V}}) where {T, V}
+function DataGraphs.underlying_graph_type(type::Type{<:ITensorNetwork{T, V}}) where {T, V}
     return fieldtype(type, :underlying_graph)
 end
 
-function Graphs.rem_edge!(::TensorNetwork, _edge)
+function Graphs.rem_edge!(::ITensorNetwork, _edge)
     return throw(
-        ErrorException("removing edges from the `TensorNetwork` type is not supported.")
+        ErrorException("removing edges from the `ITensorNetwork` type is not supported.")
     )
 end
 
-function Graphs.add_edge!(::TensorNetwork, _edge)
+function Graphs.add_edge!(::ITensorNetwork, _edge)
     return throw(
-        ErrorException("Adding edges to the `TensorNetwork` type is not supported.")
+        ErrorException("Adding edges to the `ITensorNetwork` type is not supported.")
     )
 end
 
-# PERF: fast lookup compared to `AbstractTensorNetwork` fallback.
-indsites(tn::TensorNetwork, ind) = tn.dimname_vertices[name(ind)]
+# PERF: fast lookup compared to `AbstractITensorNetwork` fallback.
+indsites(tn::ITensorNetwork, ind) = tn.dimname_vertices[name(ind)]
 
-# PERF: fast lookup compared to `AbstractTensorNetwork` fallback.
-has_indname(tn::TensorNetwork, name) = haskey(tn.dimname_vertices, name)
+# PERF: fast lookup compared to `AbstractITensorNetwork` fallback.
+has_indname(tn::ITensorNetwork, name) = haskey(tn.dimname_vertices, name)
 
 function NamedGraphs.similar_graph(
-        T::Type{<:TensorNetwork},
+        T::Type{<:ITensorNetwork},
         vertices = vertextype(T)[]
     )
     return T(undef, vertices)
 end
-function NamedGraphs.similar_graph(::TensorNetwork, VD::Type, vertices)
-    return TensorNetwork{VD}(undef, collect(vertices))
+function NamedGraphs.similar_graph(::ITensorNetwork, VD::Type, vertices)
+    return ITensorNetwork{VD}(undef, collect(vertices))
 end
 
-function NamedGraphs.convert_vertextype(V::Type, tn_src::TensorNetwork{T}) where {T}
-    tn_dst = TensorNetwork{eltype(tn_src), V}(undef, vertices(tn_src))
+function NamedGraphs.convert_vertextype(V::Type, tn_src::ITensorNetwork{T}) where {T}
+    tn_dst = ITensorNetwork{eltype(tn_src), V}(undef, vertices(tn_src))
     copyto!(tn_dst, tn_src)
     return tn_dst
 end
 
-function NamedGraphs.induced_subgraph_from_vertices(tn::TensorNetwork, subvertices)
+function NamedGraphs.induced_subgraph_from_vertices(tn::ITensorNetwork, subvertices)
     subgraph = similar_graph(tn, subvertices)
     copyto!(subgraph, tn, subvertices)
     return subgraph, subvertices
