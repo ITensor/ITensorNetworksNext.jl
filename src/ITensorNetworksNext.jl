@@ -12,7 +12,7 @@ include("select_algorithm.jl")
 include("AlgorithmsInterfaceExtensions/AlgorithmsInterfaceExtensions.jl")
 include("abstracttensornetwork.jl")
 include("tensornetwork.jl")
-include("TensorNetworkGenerators/TensorNetworkGenerators.jl")
+include("ITensorNetworkGenerators/ITensorNetworkGenerators.jl")
 include("contract_network.jl")
 
 include("beliefpropagation/messagecache.jl")

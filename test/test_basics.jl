@@ -1,17 +1,17 @@
 using Dictionaries: Indices
 using Graphs: dst, edges, has_edge, ne, nv, src, vertices
 using ITensorBase: Index, dimnames
-using ITensorNetworksNext: TensorNetwork, linkinds, siteinds
+using ITensorNetworksNext: ITensorNetwork, linkinds, siteinds
 using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges
 using NamedGraphs.NamedGraphGenerators: named_grid
 using Test: @test, @testset
 
 @testset "ITensorNetworksNext" begin
-    @testset "Construct TensorNetwork product state" begin
+    @testset "Construct ITensorNetwork product state" begin
         dims = (3, 3)
         g = named_grid(dims)
         s = Dict(v => Index(2) for v in vertices(g))
-        tn = TensorNetwork(g) do v
+        tn = ITensorNetwork(g) do v
             return randn(s[v])
         end
         @test nv(tn) == 9
@@ -32,12 +32,12 @@ using Test: @test, @testset
             @test isone(length(only(linkinds(tn, e))))
         end
     end
-    @testset "Construct TensorNetwork partition function" begin
+    @testset "Construct ITensorNetwork partition function" begin
         dims = (3, 3)
         g = named_grid(dims)
         l = Dict(e => Index(2) for e in edges(g))
         l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
-        tn = TensorNetwork(g) do v
+        tn = ITensorNetwork(g) do v
             is = map(e -> l[e], incident_edges(g, v))
             return randn(Tuple(is))
         end

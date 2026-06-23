@@ -5,8 +5,9 @@ using Graphs: dst, src, vertices
 using ITensorBase:
     ITensorBase as ITB, AbstractITensor, dimnames, domainnames, operator, replacedimnames
 using LinearAlgebra: norm
+using MatrixAlgebraKit: qr_compact, svd_trunc
 using NamedGraphs.GraphsExtensions: all_edges, boundary_edges
-using TensorAlgebra: TensorAlgebra as TA, gram_eigh_full, gram_eigh_full_with_pinv
+using TensorAlgebra.MatrixAlgebra: gram_eigh_full, gram_eigh_full_with_pinv
 
 # === Top-level user entry point ===
 
@@ -15,7 +16,7 @@ using TensorAlgebra: TensorAlgebra as TA, gram_eigh_full, gram_eigh_full_with_pi
 
 Apply each operator in `operators` (a sequence of single-tensor or two-tensor
 operators) to `state` in turn, updating `env` to reflect each application.
-`state` is an `AbstractTensorNetwork`, `env` is a per-edge environment cache
+`state` is an `AbstractITensorNetwork`, `env` is a per-edge environment cache
 (typically built by `identity_norm_message_env(state)` or one of the related
 `*_norm_message_env` constructors), and the returned `(state, env)` pair has
 the operators applied. `kwargs` are forwarded to the per-operator algorithm
@@ -205,8 +206,8 @@ end
 # === BP simple-update implementation ===
 
 function apply_gate_bp!(
-        dest::AbstractTensorNetwork, op::AbstractITensor,
-        state::AbstractTensorNetwork, env; kwargs...
+        dest::AbstractITensorNetwork, op::AbstractITensor,
+        state::AbstractITensorNetwork, env; kwargs...
     )
     op_in = domainnames(op)
     vs = [v for v in vertices(state) if !isempty(intersect(op_in, sitenames(state, v)))]
@@ -217,15 +218,15 @@ function apply_gate_bp!(
 end
 
 function apply_gate_bp_nsite!(
-        ::Val{N}, dest::AbstractTensorNetwork, op::AbstractITensor,
-        state::AbstractTensorNetwork, env, vs; kwargs...
+        ::Val{N}, dest::AbstractITensorNetwork, op::AbstractITensor,
+        state::AbstractITensorNetwork, env, vs; kwargs...
     ) where {N}
     return throw(ArgumentError("$N-site gate decomposition not implemented"))
 end
 
 function apply_gate_bp_nsite!(
-        ::Val{1}, dest::AbstractTensorNetwork, op::AbstractITensor,
-        state::AbstractTensorNetwork, env, vs;
+        ::Val{1}, dest::AbstractITensorNetwork, op::AbstractITensor,
+        state::AbstractITensorNetwork, env, vs;
         normalize, kwargs...
     )
     v = only(vs)
@@ -242,8 +243,8 @@ function apply_gate_bp_nsite!(
 end
 
 function apply_gate_bp_nsite!(
-        ::Val{2}, dest::AbstractTensorNetwork, op::AbstractITensor,
-        state::AbstractTensorNetwork, env, vs;
+        ::Val{2}, dest::AbstractITensorNetwork, op::AbstractITensor,
+        state::AbstractITensorNetwork, env, vs;
         trunc, normalize
     )
     v1, v2 = vs
@@ -258,10 +259,10 @@ function apply_gate_bp_nsite!(
     ψ_v1 = prod([[state[v1]]; gauges_v1])
     ψ_v2 = prod([[state[v2]]; gauges_v2])
 
-    Q_v1, R_v1 = TA.qr(ψ_v1, setdiff(dimnames(ψ_v1), dimnames(ψ_v2), dimnames(op)))
-    Q_v2, R_v2 = TA.qr(ψ_v2, setdiff(dimnames(ψ_v2), dimnames(ψ_v1), dimnames(op)))
+    Q_v1, R_v1 = qr_compact(ψ_v1, setdiff(dimnames(ψ_v1), dimnames(ψ_v2), dimnames(op)))
+    Q_v2, R_v2 = qr_compact(ψ_v2, setdiff(dimnames(ψ_v2), dimnames(ψ_v1), dimnames(op)))
     op_R_v1v2 = ITB.apply(op, R_v1 * R_v2)
-    U_v1, S, U_v2 = TA.svd(op_R_v1v2, setdiff(dimnames(R_v1), dimnames(R_v2)); trunc)
+    U_v1, S, U_v2 = svd_trunc(op_R_v1v2, setdiff(dimnames(R_v1), dimnames(R_v2)); trunc)
     if normalize
         S = S / norm(S)
     end

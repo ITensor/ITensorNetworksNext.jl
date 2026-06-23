@@ -1,4 +1,4 @@
-module TensorNetworkGenerators
+module ITensorNetworkGenerators
 
 export delta_network, ising_network
 

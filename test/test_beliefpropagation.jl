@@ -1,10 +1,10 @@
-import AlgorithmsInterface as AI
+using AlgorithmsInterface: AlgorithmsInterface as AI
 using DataGraphs: edge_data, edge_data_type
 using Dictionaries: Dictionary, dictionary, set!
 using Graphs: AbstractGraph, dst, edges, has_edge, src, vertices
 using ITensorBase: ITensor, Index, inds, name, noprime, prime
-using ITensorNetworksNext: ITensorNetworksNext, MessageCache, StopWhenConverged,
-    TensorNetwork, bethe_free_energy, edge_scalar, incoming_messages, linkinds,
+using ITensorNetworksNext: ITensorNetworksNext, ITensorNetwork, MessageCache,
+    StopWhenConverged, bethe_free_energy, edge_scalar, incoming_messages, linkinds,
     messagecache, region_scalar, subgraph, vertex_scalar, vertex_scalars
 using LinearAlgebra: LinearAlgebra
 using NamedGraphs.GraphsExtensions: all_edges, arranged_edges, incident_edges, vertextype
@@ -34,7 +34,7 @@ function spin_ice_tensornetwork(g)
         t = t_data[linkinds...]
         set!(ts, v, t)
     end
-    return TensorNetwork(g, ts)
+    return ITensorNetwork(g, ts)
 end
 
 @testset "Belief propagation" begin
@@ -45,7 +45,7 @@ end
             l = Dict(e => Index(2) for e in edges(g))
             l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
 
-            tn = TensorNetwork(g) do v
+            tn = ITensorNetwork(g) do v
                 is = map(e -> l[e], incident_edges(g, v))
                 return randn(Tuple(is))
             end
@@ -85,7 +85,7 @@ end
             g = named_path_graph(3)
             l = Dict(e => Index(2) for e in edges(g))
             l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
-            tn = TensorNetwork(g) do v
+            tn = ITensorNetwork(g) do v
                 is = map(e -> l[e], incident_edges(g, v))
                 return randn(ComplexF32, Tuple(is))
             end
@@ -118,7 +118,7 @@ end
             g = named_grid((3,))
             l = Dict(e => Index(2) for e in edges(g))
             l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
-            tn = TensorNetwork(g) do v
+            tn = ITensorNetwork(g) do v
                 is = map(e -> l[e], incident_edges(g, v))
                 return randn(Tuple(is))
             end
@@ -134,7 +134,7 @@ end
             g = named_grid((2,))
             l = Dict(e => Index(2) for e in edges(g))
             l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
-            tn = TensorNetwork(g) do v
+            tn = ITensorNetwork(g) do v
                 is = map(e -> l[e], incident_edges(g, v))
                 return randn(Tuple(is))
             end
@@ -158,7 +158,7 @@ end
             l = Dict(e => Index(2) for e in edges(g))
             l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
 
-            tn = TensorNetwork(g) do v
+            tn = ITensorNetwork(g) do v
                 is = map(e -> l[e], incident_edges(g, v))
                 return randn(rng, T, Tuple(is))
             end
@@ -179,7 +179,7 @@ end
             g = named_comb_tree(dims)
             l = Dict(e => Index(3) for e in edges(g))
             l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
-            tn = TensorNetwork(g) do v
+            tn = ITensorNetwork(g) do v
                 is = map(e -> l[e], incident_edges(g, v))
                 return randn(rng, T, Tuple(is))
             end

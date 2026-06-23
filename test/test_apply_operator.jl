@@ -1,12 +1,10 @@
-import ITensorBase as ITB
-import TensorAlgebra as TA
 using GradedArrays: U1, gradedrange
 using Graphs: dst, edges, src, vertices
-using ITensorBase: Index, name, operator, setname, uniquename
-using ITensorNetworksNext: TensorNetwork, apply_operator, apply_operators,
+using ITensorBase: ITensorBase as ITB, Index, name, operator, setname, uniquename
+using ITensorNetworksNext: ITensorNetwork, apply_operator, apply_operators,
     beliefpropagation_normnetwork, identity_norm_message_env, insertlink!,
     ones_norm_message_env
-using MatrixAlgebraKit: truncrank
+using MatrixAlgebraKit: svd_trunc, truncrank
 using NamedGraphs.NamedGraphGenerators: named_cycle_graph, named_path_graph
 using NamedGraphs: NamedGraph
 using Random: AbstractRNG
@@ -24,7 +22,7 @@ function randn_operator(rng::AbstractRNG, elt::Type, domain_namedaxes)
 end
 
 function random_state(rng::AbstractRNG, elt::Type, g, site_axes; nlayers, trunc)
-    state = TensorNetwork(NamedGraph(collect(vertices(g)))) do v
+    state = ITensorNetwork(NamedGraph(collect(vertices(g)))) do v
         return randn(rng, elt, (site_axes[v],))
     end
     for e in edges(g)
@@ -75,7 +73,7 @@ end
         gate = randn_operator(rng, T, (site_axes[2], site_axes[3]))
         gated_full = ITB.apply(gate, prod(state))
         left = [name(site_axes[v]) for v in 1:2]
-        U, S, Vt = TA.svd(gated_full, left; trunc = truncrank(k))
+        U, S, Vt = svd_trunc(gated_full, left; trunc = truncrank(k))
         gated, _ = apply_operator(gate, state, env; trunc = truncrank(k))
         @test prod(gated) ≈ U * S * Vt rtol = eps(real(T))^(1 / 3)
     end

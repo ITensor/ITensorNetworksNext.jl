@@ -1,7 +1,7 @@
 using DataGraphs: underlying_graph
 using Graphs: dst, edges, edgetype, src
-using ITensorBase: codomainnames, denamed, domainnames, name, operator, replacedimnames,
-    similar_operator, state, uniquename
+using ITensorBase: codomainnames, domainnames, name, operator, replacedimnames,
+    similar_operator, state, uniquename, unnamed
 using NamedGraphs.GraphsExtensions: all_edges, incident_edges
 using Random: Random, rand!, randn!
 
@@ -38,7 +38,7 @@ function similar_norm_message_env(tn)
         v1, v2 = src(e), dst(e)
         ket_axes = linkinds(tn, e)
         ket_names = name.(ket_axes)
-        unnamed_axes = denamed.(ket_axes)
+        unnamed_axes = unnamed.(ket_axes)
         bra_names = uniquename.(ket_names)
         # Message axes are dual to the link they contract against in the factor.
         push!(
@@ -146,7 +146,7 @@ function normnetwork(tn)
             for e in edges(tn)
     )
     merge!(linknames_map, Dict(reverse(e) => m for (e, m) in linknames_map))
-    norm_tn = TensorNetwork(underlying_graph(tn)) do v
+    norm_tn = ITensorNetwork(underlying_graph(tn)) do v
         t = tn[v]
         ket_to_bra = Dict(p for e in incident_edges(tn, v) for p in linknames_map[e])
         return t * replacedimnames(n -> get(ket_to_bra, n, n), conj(t))
