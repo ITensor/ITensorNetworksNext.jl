@@ -3,7 +3,6 @@ using DataGraphs: DataGraphs, AbstractDataGraph, AbstractEdgeDataGraph, edge_dat
     vertex_data_type
 using Dictionaries: Dictionary, delete!, getindices, set!
 using Graphs: AbstractGraph, connected_components, is_directed, is_tree
-using ITensorNetworksNext.LazyITensors: LazyITensor, lazy, parenttype
 using NamedGraphs.GraphsExtensions: IsDirected, boundary_edges, default_root_vertex,
     directed_graph, forest_cover, in_incident_edges, post_order_dfs_edges, undirected_graph,
     vertextype

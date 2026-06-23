@@ -1,6 +1,6 @@
 using Dictionaries: Dictionary
-using ITensorBase: replacedimnames, setname, similar_operator, uniquename
-using ITensorNetworksNext.LazyITensors: LazyITensor, lazy
+using ITensorBase: LazyITensor, lazy, replacedimnames, setname, similar_operator, uniquename
+using ITensorNetworksNext
 
 """
     struct NormNetwork{T, V, I} <: AbstractTensorNetwork{T, V}

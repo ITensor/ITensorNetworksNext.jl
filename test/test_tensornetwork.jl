@@ -2,8 +2,7 @@ using DataGraphs:
     DataGraph, assigned_edge_data, assigned_vertex_data, underlying_graph, vertex_data
 using Graphs: add_edge!, add_vertex!, dst, edges, edgetype, has_edge, has_vertex,
     is_directed, ne, nv, rem_edge!, rem_vertex!, src, vertices
-using ITensorBase: Index
-using ITensorNetworksNext.LazyITensors: LazyITensor, inds
+using ITensorBase: Index, LazyITensor, inds
 using ITensorNetworksNext: TensorNetwork, has_ind, linkaxes, linkinds, linknames, siteaxes,
     siteinds, sitenames, tensornetwork
 using NamedGraphs.GraphsExtensions: incident_edges, subgraph, vertextype
