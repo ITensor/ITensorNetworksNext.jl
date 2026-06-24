@@ -23,14 +23,6 @@ SimpleTraits = "699a6c99-e7fa-54fc-8d76-47d257e15c1d"
 SplitApplyCombine = "03a91e81-4c3e-53e1-a0a4-9c0c8f19dd66"
 TensorAlgebra = "68bd88dc-f39d-4e12-b2ca-f046b68fcc6a"
 
-[sources.ITensorBase]
-rev = "mf/tensoralgebra-0.11"
-url = "https://github.com/ITensor/ITensorBase.jl"
-
-[sources.TensorAlgebra]
-rev = "mf/v0.11"
-url = "https://github.com/ITensor/TensorAlgebra.jl"
-
 [compat]
 Adapt = "4.3"
 AlgorithmsInterface = "0.1"
