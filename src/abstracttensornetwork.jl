@@ -111,7 +111,6 @@ function setindex_preserve_graph!(tn::AbstractGraph, value, vertex)
     return tn
 end
 
-# TODO: Move to `BaseExtensions` module.
 function is_setindex!_expr(expr::Expr)
     return is_assignment_expr(expr) && is_getindex_expr(first(expr.args))
 end
