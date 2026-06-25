@@ -1,5 +1,5 @@
 using Graphs: dst, edges, edgetype, src
-using ITensorBase: codomainnames, denamed, domainnames, name, operator, replacedimnames,
+using ITensorBase: codomainnames, unnamed, domainnames, name, operator, replacedimnames,
     similar_operator, state, uniquename
 using NamedGraphs.GraphsExtensions: all_edges, incident_edges
 using SplitApplyCombine: mapmany
@@ -14,7 +14,7 @@ function message_environment(::UndefInitializer, nn::NormNetwork)
 
             brainds = linkinds(braview, edge)
             branames = name.(brainds)
-            braaxis = denamed.(brainds)
+            braaxis = unnamed.(brainds)
 
             # Message axis is conj to the tensor it points to.
             message = similar_operator(ketview[vertex], braaxis, branames, ketnames)

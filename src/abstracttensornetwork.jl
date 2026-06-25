@@ -4,7 +4,7 @@ using DataGraphs: DataGraphs, AbstractDataGraph, AbstractVertexDataGraph, edge_d
 using Dictionaries: Dictionary
 using Graphs: Graphs, AbstractEdge, AbstractGraph, add_edge!, add_vertex!, dst, edges,
     edgetype, ne, neighbors, nv, rem_edge!, src, vertices
-using ITensorBase: denamedtype, dimnames, inds, name, named, nametype, prime, uniquename
+using ITensorBase: unnamedtype, dimnames, inds, name, named, nametype, prime, uniquename
 using LinearAlgebra: LinearAlgebra
 using MacroTools: @capture
 using NamedGraphs.GraphsExtensions: directed_graph, incident_edges, rem_edges!, vertextype
@@ -121,7 +121,7 @@ has_ind(tn::AbstractGraph, ind) = has_dimname(tn, name(ind))
 function insertlink!(tn::AbstractGraph, e)
     T = eltype(inds(tn[src(e)]))
 
-    linkind = named(trivialrange(denamedtype(T)), uniquename(nametype(T)))
+    linkind = named(trivialrange(unnamedtype(T)), uniquename(nametype(T)))
 
     x = similar(tn[src(e)], (linkind,))
     fill!(x, true)
