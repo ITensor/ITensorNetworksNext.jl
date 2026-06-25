@@ -194,7 +194,7 @@ end
 indsites(tn::ITensorNetwork, ind) = tn.dimname_vertices[name(ind)]
 
 # PERF: fast lookup compared to `AbstractITensorNetwork` fallback.
-has_indname(tn::ITensorNetwork, name) = haskey(tn.dimname_vertices, name)
+has_dimname(tn::ITensorNetwork, name) = haskey(tn.dimname_vertices, name)
 
 function NamedGraphs.similar_graph(
         T::Type{<:ITensorNetwork},

@@ -107,7 +107,7 @@ function indsites(tn::AbstractGraph, ind)
     return sites
 end
 
-function has_indname(tn::AbstractGraph, name)
+function has_dimname(tn::AbstractGraph, name)
     for v in vertices(tn)
         if name ∈ dimnames(tn[v])
             return true
@@ -116,7 +116,7 @@ function has_indname(tn::AbstractGraph, name)
     return false
 end
 
-has_ind(tn::AbstractGraph, ind) = has_indname(tn, name(ind))
+has_ind(tn::AbstractGraph, ind) = has_dimname(tn, name(ind))
 
 function insertlink!(tn::AbstractGraph, e)
     T = eltype(inds(tn[src(e)]))

@@ -65,7 +65,7 @@ Dictionaries.isinsertable(::NormNetwork) = false
 tensornetwork(nn::NormNetwork) = nn.tensornetwork
 
 function namemap(nn::NormNetwork, name)
-    if !has_indname(nn.tensornetwork, name)
+    if !has_dimname(nn.tensornetwork, name)
         error("index name $name not found underlying tensor network.")
     end
     return get(nn.namemap, name, name)

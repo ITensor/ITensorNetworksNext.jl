@@ -32,7 +32,7 @@ end
 
 function beliefpropagation(nn::NormNetwork, messages; kwargs...)
     renamed_messages = map(messages) do msg
-        if !any(name -> has_indname(KetView(nn), name), dimnames(msg))
+        if !any(name -> has_dimname(KetView(nn), name), dimnames(msg))
             error(
                 "provided message on does not have have any index \
                 names in common with the tensor network contained in the norm."
