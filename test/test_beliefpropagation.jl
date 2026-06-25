@@ -3,8 +3,8 @@ using DataGraphs: DataGraphs, DataGraph, edge_data, edge_data_type
 using Dictionaries: Dictionary, dictionary, set!
 using Graphs: AbstractGraph, dst, edges, has_edge, src, vertices
 using ITensorBase: ITensor, Index, inds, name, noprime, prime
-using ITensorNetworksNext: ITensorNetworksNext, MessageCache, StopWhenConverged,
-    ITensorNetwork, bethe_free_energy, edge_scalar, incoming_messages, linkinds,
+using ITensorNetworksNext: ITensorNetworksNext, ITensorNetwork, MessageCache,
+    StopWhenConverged, bethe_free_energy, edge_scalar, incoming_messages, linkinds,
     messagecache, region_scalar, subgraph, tensornetwork, vertex_scalar, vertex_scalars
 using LinearAlgebra: LinearAlgebra
 using NamedGraphs.GraphsExtensions: all_edges, arranged_edges, incident_edges, vertextype

@@ -5,7 +5,7 @@ using DataGraphs: DataGraphs, AbstractDataGraph, DataGraph, edge_data, get_verti
 using Dictionaries: Dictionaries, AbstractDictionary, Indices, dictionary, set!, unset!
 using Graphs: AbstractSimpleGraph, rem_edge!, rem_vertex!
 using ITensorBase:
-    ITensorBase, AbstractITensor, unnamedtype, dim, dimnames, dimnametype, name
+    ITensorBase, AbstractITensor, dim, dimnames, dimnametype, name, unnamedtype
 using NamedGraphs.GraphsExtensions:
     GraphsExtensions, arrange_edge, arranged_edges, vertextype
 using NamedGraphs.OrderedDictionaries:

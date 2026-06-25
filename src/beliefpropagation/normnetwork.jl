@@ -1,6 +1,6 @@
 using Graphs: dst, edges, edgetype, src
-using ITensorBase: codomainnames, unnamed, domainnames, name, operator, replacedimnames,
-    similar_operator, state, uniquename
+using ITensorBase: codomainnames, domainnames, name, operator, replacedimnames,
+    similar_operator, state, uniquename, unnamed
 using NamedGraphs.GraphsExtensions: all_edges, incident_edges
 using SplitApplyCombine: mapmany
 

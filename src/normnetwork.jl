@@ -25,7 +25,9 @@ end
 
 Base.eltype(::Type{<:NormNetwork{T}}) where {T} = LazyITensor{eltype(T), T}
 
-NormNetwork(tn::ITensorNetwork) = NormNetwork(tn, map(uniquename, keys(tn.dimname_vertices)))
+function NormNetwork(tn::ITensorNetwork)
+    return NormNetwork(tn, map(uniquename, keys(tn.dimname_vertices)))
+end
 
 # ====================================== Graphs.jl ======================================= #
 

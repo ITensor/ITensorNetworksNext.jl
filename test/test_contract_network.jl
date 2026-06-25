@@ -1,8 +1,7 @@
 using Graphs: edges, vertices
-using ITensorNetworksNext: contract_network, linkinds, siteinds, tensornetwork
 using ITensorBase: Greedy, Index, Optimal
-using ITensorNetworksNext:
-    Exact, LeftAssociative, ITensorNetwork, contract_network, linkinds, siteinds, tensornetwork
+using ITensorNetworksNext: Exact, ITensorNetwork, LeftAssociative, contract_network,
+    linkinds, siteinds, tensornetwork
 using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges
 using NamedGraphs.NamedGraphGenerators: named_grid
 using TensorOperations: TensorOperations
