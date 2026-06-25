@@ -23,7 +23,7 @@ struct NormNetwork{T, V, I} <: AbstractITensorNetwork{T, V}
     end
 end
 
-Base.eltype(::Type{<:NormNetwork{T}}) where {T} = LazyITensor{eltype(T), T}
+Base.eltype(::Type{<:NormNetwork{T, V, I}}) where {T, V, I} = LazyITensor{I, T}
 
 function NormNetwork(tn::ITensorNetwork)
     return NormNetwork(tn, map(uniquename, keys(tn.dimname_vertices)))
@@ -36,13 +36,8 @@ Graphs.vertices(nn::NormNetwork) = vertices(nn.tensornetwork)
 
 # ==================================== NamedGraphs.jl ==================================== #
 
-function NamedGraphs.vertex_positions(nn::NormNetwork)
-    return index_positions(vertices(nn))
-end
-function NamedGraphs.ordered_vertices(nn::NormNetwork)
-    return ordered_indices(vertices(nn))
-end
-
+NamedGraphs.vertex_positions(nn::NormNetwork) = vertex_positions(nn.tensornetwork)
+NamedGraphs.ordered_vertices(nn::NormNetwork) = ordered_vertices(nn.tensornetwork)
 NamedGraphs.position_graph(nn::NormNetwork) = position_graph(nn.tensornetwork)
 
 # ==================================== DataGraphs.jl ===================================== #

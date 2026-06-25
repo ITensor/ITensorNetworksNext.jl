@@ -1,3 +1,8 @@
+using Graphs: Graphs, edges, vertices
+using DataGraphs: DataGraphs, get_vertex_data, is_vertex_assigned
+using Dictionaries: Dictionaries, isinsertable, issettable
+using NamedGraphs: NamedGraphs, ordered_vertices, position_graph, vertex_positions
+
 struct KetView{T, V, I} <: AbstractITensorNetwork{T, V}
     parent::NormNetwork{T, V, I}
 end
@@ -10,8 +15,8 @@ end
 
 for View in (:KetView, :BraView)
     @eval begin
-        Graphs.edges(nnv::$View) = edges(nnv.parent.tensornetwork)
-        Graphs.vertices(nnv::$View) = vertices(nnv.parent.tensornetwork)
+        Graphs.edges(nnv::$View) = edges(nnv.parent)
+        Graphs.vertices(nnv::$View) = vertices(nnv.parent)
     end
 end
 
@@ -20,13 +25,13 @@ end
 for View in (:KetView, :BraView)
     @eval begin
         function NamedGraphs.vertex_positions(nnv::$View)
-            return index_positions(vertices(nnv))
+            return vertex_positions(nnv.parent)
         end
         function NamedGraphs.ordered_vertices(nnv::$View)
-            return ordered_indices(vertices(nnv))
+            return ordered_vertices(nnv.parent)
         end
 
-        NamedGraphs.position_graph(nnv::$View) = position_graph(nnv.parent.tensornetwork)
+        NamedGraphs.position_graph(nnv::$View) = position_graph(nnv.parent)
     end
 end
 
@@ -48,6 +53,6 @@ end
 for View in (:KetView, :BraView)
     @eval begin
         Dictionaries.issettable(nnv::$View) = issettable(nnv.parent)
-        Dictionaries.isinsertable(::$View) = isinsertable(nnv.parent)
+        Dictionaries.isinsertable(nnv::$View) = isinsertable(nnv.parent)
     end
 end
