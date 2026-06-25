@@ -21,7 +21,6 @@ include("beliefpropagation/normnetwork.jl")
 
 include("apply/apply_operators.jl")
 
-include("nameddimsarrays_extensions.jl")
 include("tensornetworkoperator.jl")
 include("quadraticformnetwork.jl")
 include("orthogonalize.jl")

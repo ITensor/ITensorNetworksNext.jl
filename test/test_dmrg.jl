@@ -1,9 +1,8 @@
 using Graphs: add_edge!, edges, vertices
-using ITensorBase: Index
-using ITensorNetworksNext: TensorNetwork, TensorNetworkOperator, dmrg, insertlink!
+using ITensorBase: Index, name, nameddims, setname, uniquename
+using ITensorNetworksNext: ITensorNetwork, TensorNetworkOperator, dmrg, insertlink!
 using LinearAlgebra: eigen
 using MatrixAlgebraKit: truncrank
-using NamedDimsArrays: name, nameddims, randname, setname
 using NamedGraphs.NamedGraphGenerators: named_path_graph
 using NamedGraphs: NamedGraph
 using StableRNGs: StableRNG
@@ -34,7 +33,7 @@ function tfim_path_operator(N, sites, sitemap; J, h)
     verts = collect(1:N)
     bond_edges = [(verts[i], verts[i + 1]) for i in 1:(N - 1)]
     bonds = Dict(
-        e => setname(Index(Base.OneTo(3)), randname(name(sites[verts[1]])))
+        e => setname(Index(Base.OneTo(3)), uniquename(name(sites[verts[1]])))
             for e in bond_edges
     )
     W = ising_mpo_tensor(; J, h)
@@ -58,7 +57,7 @@ function tfim_path_operator(N, sites, sitemap; J, h)
             W, (name(bonds[bond_edges[left]]), name(bonds[bond_edges[right]]), k, b)
         )
     end
-    tn = TensorNetwork(g) do v
+    tn = ITensorNetwork(g) do v
         return tensor(v)
     end
     return TensorNetworkOperator(tn, sitemap)
@@ -83,7 +82,7 @@ function tfim_star_operator(sites, sitemap; J, h)
         add_edge!(g, 1, v)
     end
     bonds = Dict(
-        v => setname(Index(Base.OneTo(3)), randname(name(sites[1]))) for v in leaves
+        v => setname(Index(Base.OneTo(3)), uniquename(name(sites[1]))) for v in leaves
     )
     # Center tensor: one bond per leaf, with `-hX` once and `-JZ`/`I` on each leaf channel.
     center = zeros(3, 3, 3, 2, 2)
@@ -105,7 +104,7 @@ function tfim_star_operator(sites, sitemap; J, h)
     end
     tensors =
         Dict(1 => nameddims(center, center_names), (v => leaf_tensor(v) for v in leaves)...)
-    tn = TensorNetwork(g) do v
+    tn = ITensorNetwork(g) do v
         return tensors[v]
     end
     return TensorNetworkOperator(tn, sitemap)
@@ -124,7 +123,7 @@ end
 
 function random_ket(rng, g)
     sites = Dict(v => Index(Base.OneTo(2)) for v in vertices(g))
-    ket = TensorNetwork(NamedGraph(collect(vertices(g)))) do v
+    ket = ITensorNetwork(NamedGraph(collect(vertices(g)))) do v
         return randn(rng, Float64, (sites[v],))
     end
     for e in edges(g)
@@ -138,7 +137,7 @@ end
         rng = StableRNG(8)
         g = named_path_graph(N)
         ket0, sites = random_ket(rng, g)
-        sitemap = Dict(name(sites[v]) => randname(name(sites[v])) for v in vertices(g))
+        sitemap = Dict(name(sites[v]) => uniquename(name(sites[v])) for v in vertices(g))
         operator = tfim_path_operator(N, sites, sitemap; J = 1.0, h = 0.7)
         exact = minimum(eigen(tfim_path_dense(N; J = 1.0, h = 0.7)).values)
 
@@ -151,7 +150,7 @@ end
         rng = StableRNG(8)
         g = named_path_graph(N)
         ket0, sites = random_ket(rng, g)
-        sitemap = Dict(name(sites[v]) => randname(name(sites[v])) for v in vertices(g))
+        sitemap = Dict(name(sites[v]) => uniquename(name(sites[v])) for v in vertices(g))
         operator = tfim_path_operator(N, sites, sitemap; J = 1.0, h = 0.7)
         exact = minimum(eigen(tfim_path_dense(N; J = 1.0, h = 0.7)).values)
 
@@ -165,7 +164,7 @@ end
         rng = StableRNG(8)
         g = named_path_graph(N)
         ket0, sites = random_ket(rng, g)
-        sitemap = Dict(name(sites[v]) => randname(name(sites[v])) for v in vertices(g))
+        sitemap = Dict(name(sites[v]) => uniquename(name(sites[v])) for v in vertices(g))
         operator = tfim_path_operator(N, sites, sitemap; J = 1.0, h = 0.7)
         exact = minimum(eigen(tfim_path_dense(N; J = 1.0, h = 0.7)).values)
 
@@ -180,7 +179,7 @@ end
         rng = StableRNG(8)
         g = named_path_graph(N)
         ket0, sites = random_ket(rng, g)
-        sitemap = Dict(name(sites[v]) => randname(name(sites[v])) for v in vertices(g))
+        sitemap = Dict(name(sites[v]) => uniquename(name(sites[v])) for v in vertices(g))
         operator = tfim_path_operator(N, sites, sitemap; J = 1.0, h = 0.7)
         exact = minimum(eigen(tfim_path_dense(N; J = 1.0, h = 0.7)).values)
 
@@ -197,7 +196,7 @@ end
             add_edge!(g, 1, v)
         end
         ket0, sites = random_ket(rng, g)
-        sitemap = Dict(name(sites[v]) => randname(name(sites[v])) for v in vertices(g))
+        sitemap = Dict(name(sites[v]) => uniquename(name(sites[v])) for v in vertices(g))
         operator = tfim_star_operator(sites, sitemap; J = 1.0, h = 0.6)
         exact = minimum(eigen(tfim_star_dense(; J = 1.0, h = 0.6)).values)
 
@@ -209,7 +208,7 @@ end
         rng = StableRNG(8)
         g = named_path_graph(4)
         ket0, sites = random_ket(rng, g)
-        sitemap = Dict(name(sites[v]) => randname(name(sites[v])) for v in vertices(g))
+        sitemap = Dict(name(sites[v]) => uniquename(name(sites[v])) for v in vertices(g))
         operator = tfim_path_operator(4, sites, sitemap; J = 1.0, h = 0.7)
         @test_throws ArgumentError dmrg(operator, ket0)
     end

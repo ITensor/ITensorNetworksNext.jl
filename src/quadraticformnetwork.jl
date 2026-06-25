@@ -1,17 +1,16 @@
-using .LazyNamedDimsArrays: lazy
 using DataGraphs: DataGraphs, underlying_graph
 using Graphs: dst, edgetype, neighbors, src, vertices
-using NamedDimsArrays: NamedDimsArrays as NDA, dimnames, replacedimnames
+using ITensorBase: dimnames, lazy, operator, replacedimnames, state
 using NamedGraphs.GraphsExtensions: vertextype
 
-# A lazy `⟨ψ|H|ψ⟩` network: a ket `TensorNetwork`, a `TensorNetworkOperator` (which carries
+# A lazy `⟨ψ|H|ψ⟩` network: a ket `ITensorNetwork`, a `TensorNetworkOperator` (which carries
 # the ket → bra *site* name map), and a forward ket → bra map for the *link* names. The bra
 # layer is derived from the ket (`conj` + index renaming), never stored, so updating a ket
-# tensor is reflected in the bra. As an `AbstractTensorNetwork`, the data on vertex `v` is
+# tensor is reflected in the bra. As an `AbstractITensorNetwork`, the data on vertex `v` is
 # the lazy product `lazy(ket) * lazy(operator) * lazy(bra)`, so the existing
 # `contract_network` / `MessageCache` machinery treats it like any other tensor network.
 struct QuadraticFormNetwork{V, VD, Ket, Operator, LinkMap} <:
-    AbstractTensorNetwork{V, VD}
+    AbstractITensorNetwork{V, VD}
     ket::Ket
     operator::Operator
     link_index_map::LinkMap
@@ -79,7 +78,7 @@ end
 
 function incoming_subtree_messages(messages, graph, v, w)
     return [
-        NDA.state(messages[edgetype(graph)(u, v)]) for
+        state(messages[edgetype(graph)(u, v)]) for
             u in neighbors(graph, v) if u != w
     ]
 end
@@ -87,14 +86,14 @@ end
 function environment_operator(message, link_index_map)
     ketnames = [n for n in dimnames(message) if haskey(link_index_map, n)]
     branames = [link_index_map[n] for n in ketnames]
-    return NDA.operator(message, branames, ketnames)
+    return operator(message, branames, ketnames)
 end
 
 """
     quadratic_form_environments(qf::QuadraticFormNetwork; root) -> MessageCache
 
 Exact projected-Hamiltonian environments of `⟨ψ|H|ψ⟩` on a tree, as a `MessageCache` of
-`NamedDimsArrays` operators keyed by directed edges. The message on `v → w` is the
+ITensor operators keyed by directed edges. The message on `v → w` is the
 contraction of the `⟨ψ|H|ψ⟩` subtree on `v`'s side of `(v, w)`, wrapped as an operator
 recording the bra ↔ ket link correspondence (see [`environment_operator`](@ref)).
 """

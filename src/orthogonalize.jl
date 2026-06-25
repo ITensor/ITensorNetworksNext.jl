@@ -1,7 +1,7 @@
 using Graphs: dst, src
-using NamedDimsArrays: dimnames, replacedimnames
+using ITensorBase: dimnames, replacedimnames
+using MatrixAlgebraKit: qr_compact
 using NamedGraphs.GraphsExtensions: edge_path, post_order_dfs_edges
-using TensorAlgebra: TensorAlgebra as TA
 
 # Isometric (QR) gauge on a tree. The orthogonality center is *not* stored on the network
 # — it is tracked by the caller. `orthogonalize(state, center)` canonicalizes the whole
@@ -19,7 +19,7 @@ function gauge_move!(state, v, w)
     ln = only(linknames(state, v => w))
     tv = state[v]
     rows = collect(setdiff(dimnames(tv), [ln]))
-    Q, R = TA.qr(tv, rows)
+    Q, R = qr_compact(tv, rows)
     r = only(setdiff(dimnames(Q), rows))
     new_w = R * state[w]
     setindex_preserve_graph!(state, replacedimnames(Q, r => ln), v)

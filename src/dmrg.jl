@@ -2,10 +2,11 @@ import .AlgorithmsInterfaceExtensions as AIE
 import AlgorithmsInterface as AI
 using Base: @kwdef
 using Graphs: dst, edges, edgetype, src
+using ITensorBase:
+    ITensorBase as ITB, dimnames, operator, replacedimnames, state, uniquename
 using KrylovKit: eigsolve
-using NamedDimsArrays: NamedDimsArrays as NDA, dimnames, replacedimnames
+using MatrixAlgebraKit: svd_trunc
 using NamedGraphs.GraphsExtensions: edge_path
-using TensorAlgebra: TensorAlgebra as TA
 
 # ============================ Top-level entry point =====================================
 
@@ -35,7 +36,7 @@ function dmrg(
         trunc = nothing,
         regions = default_dmrg_regions(ket),
         link_index_map = Dict(
-            ln => randname(ln) for e in edges(ket) for ln in linknames(ket, e)
+            ln => uniquename(ln) for e in edges(ket) for ln in linknames(ket, e)
         ),
         alg = nothing,
         kwargs...
@@ -361,14 +362,12 @@ function region_update_nsite!(::Val{2}, alg::TwoSiteEigsolve, qf, env, region)
     return qf, energy
 end
 
-function svd_split(T, rows; trunc)
-    return isnothing(trunc) ? TA.svd(T, rows) : TA.svd(T, rows; trunc)
-end
+svd_split(T, rows; trunc) = svd_trunc(T, rows; trunc)
 
 # Lowest eigenpair of the effective Hamiltonian operator `H_eff` acting on the named tensor
-# `T` (via `NamedDimsArrays.apply`), using `KrylovKit.eigsolve`.
+# `T` (via `ITensorBase.apply`), using `KrylovKit.eigsolve`.
 function eigsolve_named(H_eff, T, which)
-    vals, vecs = eigsolve(x -> NDA.apply(H_eff, x), T, 1, which; ishermitian = true)
+    vals, vecs = eigsolve(x -> ITB.apply(H_eff, x), T, 1, which; ishermitian = true)
     return real(vals[1]), vecs[1]
 end
 
@@ -376,29 +375,29 @@ end
 # obtained by contracting the operator tensors on the region with the incoming environment
 # messages on the region's boundary. Contracting those gives a single tensor whose codomain
 # (output) names are the region's bra names and whose domain (input) names are its ket names
-# — i.e. exactly a `NamedDimsArrays` operator. So `effective_hamiltonian` returns that
-# operator, and its action on a region ket tensor `T` is `NamedDimsArrays.apply(H, T)` (which
-# contracts the ket names and renames the resulting bra names back to ket names).
+# — i.e. exactly an ITensor operator. So `effective_hamiltonian` returns that operator, and
+# its action on a region ket tensor `T` is `ITensorBase.apply(H, T)` (which contracts the ket
+# names and renames the resulting bra names back to ket names).
 
 """
-    effective_hamiltonian(qf::QuadraticFormNetwork, env, region) -> NamedDimsOperator
+    effective_hamiltonian(qf::QuadraticFormNetwork, env, region) -> ITensorOperator
 
-Effective (projected) Hamiltonian for `region` (a vector of vertices) as a `NamedDimsArrays`
+Effective (projected) Hamiltonian for `region` (a vector of vertices) as an ITensor
 operator: its domain (input) names are the region's ket names and its codomain (output)
 names are the matching bra names. Apply it to a region ket tensor `T` with
-`NamedDimsArrays.apply`. The environment `env` is a `MessageCache` of
+`ITensorBase.apply`. The environment `env` is a `MessageCache` of
 [`quadratic_form_environments`](@ref).
 """
 function effective_hamiltonian(qf::QuadraticFormNetwork, env, region)
     operators = [operator_tensor(qf, v) for v in region]
-    boundary = [NDA.state(m) for m in incoming_edge_data(env, region)]
+    boundary = [state(m) for m in incoming_edge_data(env, region)]
     h = contract_network([operators; boundary])
     sitemap = site_index_map(qf.operator)
     ketnames = [
         n for n in dimnames(h) if haskey(sitemap, n) || haskey(qf.link_index_map, n)
     ]
     branames = [bra_name_map(qf)[n] for n in ketnames]
-    return NDA.operator(h, branames, ketnames)
+    return operator(h, branames, ketnames)
 end
 
 # ============================ Energy-based convergence ==================================
