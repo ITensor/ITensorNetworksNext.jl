@@ -2,8 +2,8 @@ using Base.Broadcast: materialize
 using DataGraphs: is_vertex_assigned
 using Dictionaries: isinsertable, issettable
 using Graphs: edges, vertices
-using ITensorBase: Index, ITensor, IndexName, LazyITensor, conj, inds, name, setname,
-    uniquename
+using ITensorBase:
+    ITensor, Index, IndexName, LazyITensor, conj, inds, name, setname, uniquename
 using ITensorNetworksNext: BraView, ITensorNetwork, KetView, NormNetwork, bra, conjbra,
     indmap, ket, namemap, normnetwork, tensornetwork
 using LinearAlgebra: norm

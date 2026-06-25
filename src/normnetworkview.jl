@@ -1,6 +1,6 @@
-using Graphs: Graphs, edges, vertices
 using DataGraphs: DataGraphs, get_vertex_data, is_vertex_assigned
 using Dictionaries: Dictionaries, isinsertable, issettable
+using Graphs: Graphs, edges, vertices
 using NamedGraphs: NamedGraphs, ordered_vertices, position_graph, vertex_positions
 
 struct KetView{T, V, I} <: AbstractITensorNetwork{T, V}
