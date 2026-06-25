@@ -69,19 +69,19 @@ end
 function Graphs.rem_vertex!(tn::ITensorNetwork, vertex)
     tensor = tn.tensors[vertex]
 
-    for ind in dimnames(tensor)
+    for name in dimnames(tensor)
 
         # If `ind` is associated with an edge, remove the edge.
-        delete_ind_edge!(tn, ind)
+        delete_ind_edge!(tn, name)
 
         # Delete the vertex from that `ind`s vertex list
         # (this index may still be one incident to one other vertex)
-        vertex_list = tn.dimname_vertices[ind]
+        vertex_list = tn.dimname_vertices[name]
         delete!(vertex_list, vertex)
 
         # If that index is now no longer associated with any vertices, it was dangling,
         # and that index should be deleted from the keys of reverse index mapping
-        isempty(vertex_list) && delete!(tn.dimname_vertices, ind)
+        isempty(vertex_list) && delete!(tn.dimname_vertices, name)
     end
 
     rem_vertex!(tn.underlying_graph, vertex)
