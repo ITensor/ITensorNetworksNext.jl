@@ -191,7 +191,7 @@ function Graphs.add_edge!(::ITensorNetwork, _edge)
 end
 
 # PERF: fast lookup compared to `AbstractITensorNetwork` fallback.
-indsites(tn::ITensorNetwork, ind) = tn.dimname_vertices[name(ind)]
+dimnamevertices(tn::ITensorNetwork, name) = tn.dimname_vertices[name]
 
 # PERF: fast lookup compared to `AbstractITensorNetwork` fallback.
 has_dimname(tn::ITensorNetwork, name) = haskey(tn.dimname_vertices, name)

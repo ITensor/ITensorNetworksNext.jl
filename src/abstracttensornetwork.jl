@@ -94,12 +94,12 @@ function sitenames(tn::AbstractGraph, v)
     return s
 end
 
-# Return the vertices associated with an index.
-function indsites(tn::AbstractGraph, ind)
+# Return the non-link vertices associated with an dim name
+function dimnamevertices(tn::AbstractGraph, name)
     sites = vertextype(tn)[]
 
     for v in vertices(tn)
-        if ind ∈ inds(tn[v])
+        if name ∈ dimnames(tn[v])
             push!(sites, v)
         end
     end
