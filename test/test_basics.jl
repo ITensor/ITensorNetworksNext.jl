@@ -40,8 +40,8 @@ using Test: @test, @testset
         for v1 in vertices(tn)
             for v2 in vertices(tn)
                 v1 == v2 && continue
-                # haslink = !isempty(linkinds(tn, v1 => v2))
-                # @test haslink == has_edge(tn, v1 => v2)
+                haslink = !isempty(linkinds(tn, v1 => v2))
+                @test haslink == has_edge(tn, v1 => v2)
             end
         end
         for e in edges(tn)
