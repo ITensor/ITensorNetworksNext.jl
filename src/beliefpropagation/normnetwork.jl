@@ -4,7 +4,7 @@ using ITensorBase: codomainnames, domainnames, name, operator, replacedimnames,
 using NamedGraphs.GraphsExtensions: all_edges, incident_edges
 using SplitApplyCombine: mapmany
 
-function message_environment(::UndefInitializer, nn::NormNetwork)
+function similar_message_environment(nn::NormNetwork)
     messages = mapmany(vertices(nn)) do vertex
         return map(in_incident_edges(nn, vertex)) do edge
             braview = BraView(nn)
@@ -27,7 +27,7 @@ function message_environment(::UndefInitializer, nn::NormNetwork)
 end
 
 function message_environment(f::Base.Callable, nn::NormNetwork)
-    return map(f, message_environment(undef, nn))
+    return map(f, similar_message_environment(nn))
 end
 
 function beliefpropagation(nn::NormNetwork, messages; kwargs...)
