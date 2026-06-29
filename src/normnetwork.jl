@@ -66,7 +66,7 @@ function braname(nn::NormNetwork, name)
     if !has_dimname(nn.ket, name)
         error("index name $name not found underlying tensor network.")
     end
-    # The indices not stored in `nn.braname` are precisely the site indices, which are
+    # The indices not stored in `nn.braname` are precisely the site indices, which
     # get mapped to themselves.
     return get(nn.braname, name, name)
 end
