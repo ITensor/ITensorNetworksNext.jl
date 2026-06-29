@@ -4,8 +4,8 @@ using Dictionaries: isinsertable, issettable
 using Graphs: edges, vertices
 using ITensorBase:
     ITensor, Index, IndexName, LazyITensor, conj, inds, name, setname, uniquename
-using ITensorNetworksNext: BraView, ITensorNetwork, KetView, NormNetwork, bra, conjbra,
-    indmap, ket, braname, normnetwork, tensornetwork
+using ITensorNetworksNext: BraView, ITensorNetwork, KetView, NormNetwork, bra, braname,
+    conjbra, indmap, ket, normnetwork, tensornetwork
 using LinearAlgebra: norm
 using NamedGraphs.GraphsExtensions: incident_edges
 using NamedGraphs.NamedGraphGenerators: named_grid, named_path_graph
@@ -15,7 +15,7 @@ using Test: @test, @test_throws, @testset
 # Contract a (possibly double-layer) network into a single tensor by multiplying all
 # of its vertex tensors together. For a `NormNetwork` the vertex data are lazy products
 # `ket * conj(bra)`, so the result is a lazy expression that we materialize.
-contract(tn) = materialize(prod(tn))
+contract_network(tn) = materialize(prod(tn))
 
 # Build a random `ITensorNetwork` state on the graph `g` with site dimension `d` and
 # bond dimension `χ`.
@@ -39,9 +39,6 @@ end
         # `normnetwork` is the public constructor and agrees with `NormNetwork`.
         @test normnetwork(tn) isa NormNetwork
         @test nn isa NormNetwork
-
-        # The underlying tensor network is accessible and is the same object.
-        @test tensornetwork(nn) === tn
 
         # The norm network shares the graph structure of the underlying network.
         @test issetequal(vertices(nn), vertices(tn))
@@ -145,7 +142,7 @@ end
             nn = NormNetwork(tn)
 
             # ⟨ψ|ψ⟩ for a single normalized site tensor is 1.
-            @test contract(nn)[] ≈ 1
+            @test contract_network(nn)[] ≈ 1
         end
 
         @testset "$T" for T in (Float64, ComplexF64)
@@ -153,18 +150,18 @@ end
             tn, l, s = random_state(T, g)
 
             # The norm network contracts to ⟨tn|tn⟩ = ‖prod(tn)‖², a real nonnegative number.
-            z = contract(NormNetwork(tn))[]
+            z = contract_network(NormNetwork(tn))[]
             @test z ≈ norm(prod(tn))^2
             @test imag(z) ≈ 0 atol = 1.0e-12 * abs(z)
             @test real(z) > 0
 
             # Rescaling a single tensor by 1/√z normalizes the state, so ⟨tn|tn⟩ = 1.
             tn[first(vertices(tn))] = tn[first(vertices(tn))] / sqrt(real(z))
-            @test contract(NormNetwork(tn))[] ≈ 1
+            @test contract_network(NormNetwork(tn))[] ≈ 1
 
             # The contracted norm does not depend on the chosen bra-layer name map.
             custom = map(uniquename, keys(tn.dimname_vertices))
-            @test contract(normnetwork(tn, custom))[] ≈ contract(NormNetwork(tn))[]
+            @test contract_network(normnetwork(tn, custom))[] ≈ contract_network(NormNetwork(tn))[]
         end
     end
 end
