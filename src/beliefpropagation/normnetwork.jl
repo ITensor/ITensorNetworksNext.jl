@@ -10,7 +10,7 @@ function similar_message_environment(nn::NormNetwork)
             braview = BraView(nn)
             ketview = KetView(nn)
 
-            ketnames = linknames(KetView(nn), edge)
+            ketnames = linknames(ketview, edge)
 
             brainds = linkinds(braview, edge)
             branames = name.(brainds)
@@ -39,7 +39,7 @@ function beliefpropagation(nn::NormNetwork, messages; kwargs...)
             )
         end
 
-        bramap = Dict(codomainnames(msg) .=> Base.Fix1(namemap, nn).(domainnames(msg)))
+        bramap = Dict(codomainnames(msg) .=> Base.Fix1(braname, nn).(domainnames(msg)))
 
         return replacedimnames(name -> get(bramap, name, name), state(msg))
     end

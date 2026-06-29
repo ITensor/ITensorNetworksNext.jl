@@ -5,7 +5,7 @@ using Graphs: edges, vertices
 using ITensorBase:
     ITensor, Index, IndexName, LazyITensor, conj, inds, name, setname, uniquename
 using ITensorNetworksNext: BraView, ITensorNetwork, KetView, NormNetwork, bra, conjbra,
-    indmap, ket, namemap, normnetwork, tensornetwork
+    indmap, ket, braname, normnetwork, tensornetwork
 using LinearAlgebra: norm
 using NamedGraphs.GraphsExtensions: incident_edges
 using NamedGraphs.NamedGraphGenerators: named_grid, named_path_graph
@@ -69,28 +69,28 @@ end
         # Site indices appear in a single tensor, so they are *not* renamed: the ket and
         # bra layers share them (they get contracted, forming the physical overlap).
         sname = name(s[2])
-        @test namemap(nn, sname) == sname
+        @test braname(nn, sname) == sname
         @test sname in name.(inds(ket(nn, 2)))
         @test sname in name.(inds(conjbra(nn, 2)))
 
         # Link indices are shared by two tensors, so they *are* renamed in the bra layer
         # to keep the two layers' bonds distinct.
         lname = name(l[NamedEdge(1 => 2)])
-        @test namemap(nn, lname) != lname
+        @test braname(nn, lname) != lname
         @test lname in name.(inds(ket(nn, 2)))
         @test !(lname in name.(inds(conjbra(nn, 2))))
-        @test namemap(nn, lname) in name.(inds(conjbra(nn, 2)))
+        @test braname(nn, lname) in name.(inds(conjbra(nn, 2)))
 
         # `bra` is the elementwise conjugate of `conjbra` and carries the same indices.
         @test inds(bra(nn, 2)) == inds(conjbra(nn, 2))
 
         # `indmap` conjugates an index and renames it according to the name map.
         ind = only(i for i in inds(ket(nn, 2)) if name(i) == lname)
-        @test name(indmap(nn, ind)) == namemap(nn, name(ind))
-        @test indmap(nn, ind) == setname(conj(ind), namemap(nn, name(ind)))
+        @test name(indmap(nn, ind)) == braname(nn, name(ind))
+        @test indmap(nn, ind) == setname(conj(ind), braname(nn, name(ind)))
 
         # Querying the name map with an index name absent from the network errors.
-        @test_throws ErrorException namemap(nn, name(Index(2)))
+        @test_throws ErrorException braname(nn, name(Index(2)))
     end
 
     @testset "custom name map" begin
@@ -102,8 +102,8 @@ end
         nn = normnetwork(tn, custom)
 
         lname = name(l[NamedEdge(1 => 2)])
-        @test namemap(nn, lname) == custom[lname]
-        @test namemap(nn, lname) in name.(inds(conjbra(nn, 2)))
+        @test braname(nn, lname) == custom[lname]
+        @test braname(nn, lname) in name.(inds(conjbra(nn, 2)))
     end
 
     @testset "`KetView` / `BraView`" begin

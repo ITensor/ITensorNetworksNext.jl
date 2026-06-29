@@ -11,15 +11,15 @@ the name of the corresponding index in the bra layer.
 """
 struct NormNetwork{T, V, I} <: AbstractITensorNetwork{T, V}
     tensornetwork::ITensorNetwork{T, V, I}
-    namemap::Dictionary{I, I}
+    braname::Dictionary{I, I}
     function NormNetwork(tn::ITensorNetwork{T, V, I}, map::Dictionary{I, I}) where {T, V, I}
-        namemap = Dictionary{I, I}()
+        braname = Dictionary{I, I}()
         for (name, vertices) in pairs(tn.dimname_vertices)
             if length(vertices) == 2
-                insert!(namemap, name, map[name])
+                insert!(braname, name, map[name])
             end
         end
-        return new{T, V, I}(tn, namemap)
+        return new{T, V, I}(tn, braname)
     end
 end
 
@@ -61,27 +61,27 @@ Dictionaries.isinsertable(::NormNetwork) = false
 
 tensornetwork(nn::NormNetwork) = nn.tensornetwork
 
-function namemap(nn::NormNetwork, name)
+function braname(nn::NormNetwork, name)
     if !has_dimname(nn.tensornetwork, name)
         error("index name $name not found underlying tensor network.")
     end
-    return get(nn.namemap, name, name)
+    return get(nn.braname, name, name)
 end
 
-indmap(nn::NormNetwork, ind) = setname(conj(ind), namemap(nn, name(ind)))
+indmap(nn::NormNetwork, ind) = setname(conj(ind), braname(nn, name(ind)))
 
 ket(nn::NormNetwork, vertex) = nn.tensornetwork[vertex]
-conjbra(nn::NormNetwork, vertex) = replacedimnames(n -> namemap(nn, n), ket(nn, vertex))
+conjbra(nn::NormNetwork, vertex) = replacedimnames(n -> braname(nn, n), ket(nn, vertex))
 
 bra(nn::NormNetwork, vertex) = conj(conjbra(nn, vertex))
 
 """
-    normnetwork(tn::ITensorNetwork, [namemap]) -> NormNetwork
+    normnetwork(tn::ITensorNetwork, [braname]) -> NormNetwork
 
 Build the double-layer norm network `⟨tn|tn⟩`, represented lazily as a `NomnNetwork` object.
-The optional second argument `namemap` should implement `namemap[ketdimname] = bradimname` for
+The optional second argument `braname` should implement `braname[ketdimname] = bradimname` for
 every link dimension name `ketdimname` in `tn`. If this is not specified, then a name is
 generated via the `ITensorBase.uniquename` function.
 """
 normnetwork(tn::ITensorNetwork) = NormNetwork(tn)
-normnetwork(tn::ITensorNetwork, namemap) = NormNetwork(tn, namemap)
+normnetwork(tn::ITensorNetwork, braname) = NormNetwork(tn, braname)
