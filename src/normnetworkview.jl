@@ -37,13 +37,13 @@ end
 
 # ==================================== DataGraphs.jl ===================================== #
 
-DataGraphs.get_vertex_data(nn::KetView, vertex) = ket(nn.parent, vertex)
-DataGraphs.get_vertex_data(nn::BraView, vertex) = bra(nn.parent, vertex)
+DataGraphs.get_vertex_data(nn::KetView, vertex) = kettensor(nn.parent, vertex)
+DataGraphs.get_vertex_data(nn::BraView, vertex) = bratensor(nn.parent, vertex)
 
 for View in (:KetView, :BraView)
     @eval begin
         function DataGraphs.is_vertex_assigned(nnv::$View, vertex)
-            return isassigned(nnv.parent.tensornetwork, vertex)
+            return isassigned(nnv.parent.ket, vertex)
         end
     end
 end
