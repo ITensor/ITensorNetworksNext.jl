@@ -59,8 +59,6 @@ Dictionaries.isinsertable(::NormNetwork) = false
 
 # ====================================== interface ======================================= #
 
-tensornetwork(nn::NormNetwork) = nn.tensornetwork
-
 function braname(nn::NormNetwork, name)
     if !has_dimname(nn.tensornetwork, name)
         error("index name $name not found underlying tensor network.")
