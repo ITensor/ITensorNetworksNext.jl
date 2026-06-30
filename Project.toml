@@ -23,17 +23,9 @@ SimpleTraits = "699a6c99-e7fa-54fc-8d76-47d257e15c1d"
 SplitApplyCombine = "03a91e81-4c3e-53e1-a0a4-9c0c8f19dd66"
 TensorAlgebra = "68bd88dc-f39d-4e12-b2ca-f046b68fcc6a"
 
-[sources.GradedArrays]
-rev = "mf/scalar-unmatricize-graded"
-url = "https://github.com/ITensor/GradedArrays.jl"
-
 [sources.ITensorBase]
 rev = "mf/drop-blockarrays-ext"
 url = "https://github.com/ITensor/ITensorBase.jl"
-
-[sources.SparseArraysBase]
-rev = "mf/tensoralgebra-0.14"
-url = "https://github.com/ITensor/SparseArraysBase.jl"
 
 [sources.TensorAlgebra]
 rev = "mf/inline-strided-permute"
