@@ -1,5 +1,6 @@
 using Dictionaries: Dictionary
-using ITensorBase: LazyNamedTensor, lazy, replacedimnames, setname, similar_operator, uniquename
+using ITensorBase:
+    LazyNamedTensor, lazy, replacedimnames, setname, similar_operator, uniquename
 using ITensorNetworksNext
 
 """
