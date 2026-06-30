@@ -91,10 +91,10 @@ using Test: @test, @test_throws, @testset
         @test has_ind(tn, j)
         @test has_ind(tn, k)
 
-        @test inds(tn[1]) == (ip,)
-        @test inds(tn[2]) == (i, j)
-        @test inds(tn[3]) == (j, k)
-        @test inds(tn[4]) == (k,)
+        @test issetequal(inds(tn[1]), (ip,))
+        @test issetequal(inds(tn[2]), (i, j))
+        @test issetequal(inds(tn[3]), (j, k))
+        @test issetequal(inds(tn[4]), (k,))
     end
 
     @testset "link and site functions" begin

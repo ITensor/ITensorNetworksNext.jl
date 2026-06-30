@@ -45,7 +45,7 @@ end
         @test issetequal(edges(nn), edges(tn))
 
         # `eltype` is the type of the (lazy double-layer) vertex data.
-        @test eltype(nn) === typeof(nn[first(vertices(nn))])
+        @test eltype(nn) === typeof(nn[1])
 
         # Vertex data is assigned wherever the underlying network is.
         @test is_vertex_assigned(nn, 1)

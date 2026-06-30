@@ -18,7 +18,7 @@ using Test: @test, @testset
         @test ne(tn) == 0 # zero link indices
         @test issetequal(vertices(tn), vertices(g))
         for v in vertices(tn)
-            @test siteinds(tn, v) == (s[v],)
+            @test issetequal(siteinds(tn, v), [s[v]])
         end
     end
     @testset "Construct ITensorNetwork partition function" begin

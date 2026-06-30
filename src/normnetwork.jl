@@ -1,5 +1,5 @@
 using Dictionaries: Dictionary
-using ITensorBase: LazyITensor, lazy, replacedimnames, setname, similar_operator, uniquename
+using ITensorBase: LazyNamedTensor, lazy, replacedimnames, setname, similar_operator, uniquename
 using ITensorNetworksNext
 
 """
@@ -26,7 +26,7 @@ struct NormNetwork{T, V, I} <: AbstractITensorNetwork{T, V}
     end
 end
 
-Base.eltype(::Type{<:NormNetwork{T, V, I}}) where {T, V, I} = LazyITensor{I, T}
+Base.eltype(::Type{<:NormNetwork{T, V, I}}) where {T, V, I} = LazyNamedTensor{I, T}
 
 function NormNetwork(tn::ITensorNetwork)
     return NormNetwork(tn, map(uniquename, keys(tn.dimname_vertices)))
