@@ -66,10 +66,7 @@ an explicit `AlgorithmsInterface.StoppingCriterion`.
 `message_update_algorithm` controls how a single message is recomputed
 from its incoming neighbours.
 """
-function beliefpropagation(factors, messages; kwargs...)
-    return _beliefpropagation(factors, messages; kwargs...)
-end
-function _beliefpropagation(
+function beliefpropagation(
         factors, messages;
         edges = default_beliefpropagation_edges(factors),
         stopping_criterion = nothing,
