@@ -19,7 +19,6 @@ include("contract_network.jl")
 
 include("beliefpropagation/messagecache.jl")
 include("beliefpropagation/beliefpropagation.jl")
-include("beliefpropagation/normnetwork.jl")
 
 include("apply/apply_operators.jl")
 

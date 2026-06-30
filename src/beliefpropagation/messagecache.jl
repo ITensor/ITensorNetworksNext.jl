@@ -197,3 +197,31 @@ function bethe_free_energy(factors, messages)
 
     return sum(log.(numerator_terms)) - sum(log.(denominator_terms))
 end
+
+# ===================================== NormNetwork ====================================== #
+
+function similar_message_environment(nn::NormNetwork)
+    messages = mapmany(vertices(nn)) do vertex
+        return map(in_incident_edges(nn, vertex)) do edge
+            braview = BraView(nn)
+            ketview = KetView(nn)
+
+            ketnames = linknames(ketview, edge)
+
+            brainds = linkinds(braview, edge)
+            branames = name.(brainds)
+            braaxis = unnamed.(brainds)
+
+            # Message axis is conj to the tensor it points to.
+            message = similar_operator(ketview[vertex], braaxis, branames, ketnames)
+
+            return edge => message
+        end
+    end
+
+    return messagecache(messages)
+end
+
+function message_environment(f::Base.Callable, nn::NormNetwork)
+    return map(f, similar_message_environment(nn))
+end
