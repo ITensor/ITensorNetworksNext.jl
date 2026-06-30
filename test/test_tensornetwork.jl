@@ -1,9 +1,10 @@
-using DataGraphs: assigned_edge_data, assigned_vertex_data, underlying_graph, vertex_data
+using DataGraphs:
+    DataGraph, assigned_edge_data, assigned_vertex_data, underlying_graph, vertex_data
 using Graphs: add_edge!, add_vertex!, dst, edges, edgetype, has_edge, has_vertex,
-    is_directed, ne, nv, rem_vertex!, src, vertices
-using ITensorBase: Index, LazyITensor
-using ITensorNetworksNext:
-    ITensorNetwork, fix_edges!, linkaxes, linkinds, linknames, siteaxes, siteinds, sitenames
+    is_directed, ne, nv, rem_edge!, rem_vertex!, src, vertices
+using ITensorBase: Index, LazyITensor, inds
+using ITensorNetworksNext: ITensorNetwork, has_ind, linkaxes, linkinds, linknames, siteaxes,
+    siteinds, sitenames, tensornetwork
 using NamedGraphs.GraphsExtensions: incident_edges, subgraph, vertextype
 using NamedGraphs.NamedGraphGenerators: named_grid, named_path_graph
 using NamedGraphs.PartitionedGraphs: AbstractPartitionedGraph, QuotientVertex, departition,
@@ -15,9 +16,8 @@ using Test: @test, @test_throws, @testset
 @testset "`ITensorNetwork`" begin
     @testset "Basics" begin
         g = named_grid((2, 2))
-        s = Dict(v => Index(2) for v in vertices(g))
-        tn = ITensorNetwork(g) do v
-            return randn(s[v])
+        tn = tensornetwork(vertices(g)) do _
+            return randn(Index(2))
         end
 
         # `iterate` works (delegates to `vertex_data`).
@@ -36,23 +36,65 @@ using Test: @test, @test_throws, @testset
         s_default = sprint(show, tn)
         @test occursin("vertices", s_default)
 
+        # No link indices so should have no edges
+        @test ne(tn) == 0
+
+        j = Index(2)
+        tn[1, 1] = randn(j)
+        tn[2, 1] = randn(j)
+
+        # No link indices so should have no edges
+        @test ne(tn) == 1
+        @test has_edge(tn, (1, 1) => (2, 1))
+
         # `setindex!` for edges is intentionally unimplemented.
         e = first(edges(tn))
-        @test_throws ErrorException tn[e] = randn(2, 2)
-        @test_throws ErrorException tn[src(e) => dst(e)] = randn(2, 2)
+        @test_throws MethodError tn[e] = randn(2, 2)
+        @test_throws MethodError tn[src(e) => dst(e)] = randn(2, 2)
+
+        # `rem_edge!` is intentionally unimplemented.
+        @test_throws ErrorException rem_edge!(tn, (1, 1) => (2, 1))
+
+        tn[1, 1] = randn(Index(2))
+        tn[2, 1] = randn(Index(2))
+
+        @test !has_edge(tn, (1, 1) => (2, 1))
+        @test ne(tn) == 0
 
         rem_vertex!(tn, (2, 2))
         @test !has_vertex(tn, (2, 2))
-        add_vertex!(tn, (2, 2))
+        insert!(tn, (2, 2), randn(Index(2)))
         @test has_vertex(tn, (2, 2))
-        @test !isassigned(tn, (2, 2))
+        @test isassigned(tn, (2, 2))
 
-        # Test `fix_edges!` removes edges where there is no link index
-        t = randn(s[(2, 2)])
-        tn[(2, 2)] = t
-        add_edge!(tn.underlying_graph, (1, 2) => (2, 2))
-        fix_edges!(tn, (2, 2))
-        @test !has_edge(tn, (1, 2) => (2, 2))
+        links = DataGraph(named_path_graph(4))
+        i = Index(2)
+        j = Index(3)
+        k = Index(4)
+        links[1 => 2] = i
+        links[2 => 3] = j
+        links[3 => 4] = k
+
+        tn = tensornetwork(vertices(links)) do v
+            indices = map(e -> getindex(links, e), incident_edges(links, v))
+            return randn(Tuple(indices))
+        end
+
+        @test has_ind(tn, i)
+        @test has_ind(tn, j)
+        @test has_ind(tn, k)
+
+        ip = Index(2)
+
+        tn[1] = tn[1] * randn((i, ip))
+        @test has_ind(tn, ip)
+        @test has_ind(tn, j)
+        @test has_ind(tn, k)
+
+        @test issetequal(inds(tn[1]), (ip,))
+        @test issetequal(inds(tn[2]), (i, j))
+        @test issetequal(inds(tn[3]), (j, k))
+        @test issetequal(inds(tn[4]), (k,))
     end
 
     @testset "link and site functions" begin
@@ -60,7 +102,7 @@ using Test: @test, @test_throws, @testset
         l = Dict(e => Index(2) for e in edges(g))
         l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
         s = Dict(v => Index(2) for v in vertices(g))
-        tn = ITensorNetwork(g) do v
+        tn = tensornetwork(vertices(g)) do v
             is = map(e -> l[e], incident_edges(g, v))
             return randn((s[v], is...))
         end
@@ -82,9 +124,11 @@ using Test: @test, @test_throws, @testset
 
     @testset "`subgraph`" begin
         g = named_grid((3,))
+
         l = Dict(e => Index(2) for e in edges(g))
         l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
-        tn = ITensorNetwork(g) do v
+
+        tn = tensornetwork(vertices(g)) do v
             is = map(e -> l[e], incident_edges(g, v))
             return randn(Tuple(is))
         end
@@ -100,7 +144,7 @@ using Test: @test, @test_throws, @testset
         dims = (3, 3)
         g = named_grid(dims)
         s = Dict(v => Index(2) for v in vertices(g))
-        tn = ITensorNetwork(g) do v
+        tn = tensornetwork(vertices(g)) do v
             return randn(s[v])
         end
 
@@ -130,106 +174,5 @@ using Test: @test, @test_throws, @testset
         @test ctn isa ITensorNetwork
         @test vertextype(ctn) == Tuple{Float64, Float64}
         @test collect(vertex_data(ctn)) == collect(vertex_data(tn))
-    end
-
-    @testset "`PartitionedGraphs`" begin
-        dims = (3, 3)
-        g = named_grid(dims)
-        s = Dict(v => Index(2) for v in vertices(g))
-        tn = ITensorNetwork(g) do v
-            return randn(s[v])
-        end
-
-        # Row partition: each partition is one row of the grid.
-        row_parts = [[(i, j) for i in 1:dims[1]] for j in 1:dims[2]]
-
-        @testset "default `partitioned_vertices`" begin
-            # By default the entire underlying graph is one partition.
-            pvs = partitioned_vertices(tn)
-            @test length(pvs) == 1
-            @test issetequal(only(pvs), vertices(tn))
-        end
-
-        @testset "default `quotientvertices`" begin
-            qvs = collect(quotientvertices(tn))
-            @test length(qvs) == 1
-            @test only(qvs) isa QuotientVertex
-        end
-
-        @testset "`tn[QuotientVertex(...)]` (default)" begin
-            qv = only(collect(quotientvertices(tn)))
-            data = tn[qv]
-            @test data isa LazyITensor
-        end
-
-        @testset "`quotient_graph` (default partitioning)" begin
-            qtn = quotient_graph(tn)
-            @test qtn isa ITensorNetwork
-            @test nv(qtn) == 1
-            @test ne(qtn) == 0
-            v = only(collect(vertices(qtn)))
-            @test qtn[v] isa LazyITensor
-        end
-
-        @testset "`quotient_graph_type`" begin
-            QT = quotient_graph_type(typeof(tn))
-            @test QT <: ITensorNetwork
-            qtn = quotient_graph(tn)
-            @test vertextype(qtn) === vertextype(QT)
-        end
-
-        @testset "`partitionedgraph(tn, parts)`" begin
-            ptn = partitionedgraph(tn, row_parts)
-            @test ptn isa ITensorNetwork
-            # The set of underlying vertices/edges is preserved.
-            @test issetequal(vertices(ptn), vertices(tn))
-            @test issetequal(edges(ptn), edges(tn))
-            @test nv(ptn) == nv(tn)
-            @test ne(ptn) == ne(tn)
-            # Vertex data is copied, not aliased.
-            @test collect(vertex_data(ptn)) == collect(vertex_data(tn))
-            @test vertex_data(ptn) !== vertex_data(tn)
-        end
-
-        @testset "`partitioned_vertices` of partitioned tn" begin
-            ptn = partitionedgraph(tn, row_parts)
-            pvs = partitioned_vertices(ptn)
-            @test length(pvs) == dims[2]
-            for part in pvs
-                @test length(part) == dims[1]
-            end
-            @test issetequal(reduce(vcat, pvs), vertices(tn))
-        end
-
-        @testset "`tn[QuotientVertex(...)]` (partitioned)" begin
-            ptn = partitionedgraph(tn, row_parts)
-            for qv in quotientvertices(ptn)
-                @test ptn[qv] isa LazyITensor
-            end
-        end
-
-        @testset "`quotient_graph` of partitioned tn" begin
-            ptn = partitionedgraph(tn, row_parts)
-            qtn = quotient_graph(ptn)
-            @test qtn isa ITensorNetwork
-            @test nv(qtn) == dims[2]
-            # The row-partitioned grid quotients to a path graph of length `dims[2]`.
-            @test ne(qtn) == dims[2] - 1
-            for v in vertices(qtn)
-                @test qtn[v] isa LazyITensor
-            end
-        end
-
-        @testset "`departition`" begin
-            # `departition` on a non-partitioned tn returns itself.
-            @test departition(tn) === tn
-
-            # `departition` on a partitioned tn unwraps one layer of partitioning.
-            ptn = partitionedgraph(tn, row_parts)
-            dtn = departition(ptn)
-            @test dtn isa ITensorNetwork
-            @test issetequal(vertices(dtn), vertices(tn))
-            @test issetequal(edges(dtn), edges(tn))
-        end
     end
 end

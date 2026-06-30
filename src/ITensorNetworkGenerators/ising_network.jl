@@ -1,4 +1,4 @@
-using ..ITensorNetworksNext: @preserve_graph
+using ..ITensorNetworksNext
 using Graphs: degree, dst, edges, src
 using ITensorBase: apply, name, operator, uniquename
 using LinearAlgebra: Diagonal, eigen
@@ -29,20 +29,23 @@ function ising_network(
     )
     elt = typeof(β)
     l̃ = Dict(e => uniquename(f(e)) for e in edges(g))
-    f̃(e) = get(() -> l̃[reverse(e)], l̃, e)
-    tn = delta_network(f̃, elt, g)
+
+    fp(e) = get(() -> l̃[reverse(e)], l̃, e)
+    tn = delta_network(fp, elt, g)
     for v in sz_vertices
         tn[v] = diagonaltensor(elt[1, -1], axes(tn[v]))
     end
-    for e in edges(tn)
+
+    for e in edges(g)
         v1 = src(e)
         v2 = dst(e)
         deg1 = degree(tn, v1)
+
         deg2 = degree(tn, v2)
         m = sqrt_ising_bond(β; J, h, deg1, deg2)
-        t = operator(m, (name(f̃(e)),), (name(f(e)),))
-        @preserve_graph tn[v1] = apply(t, tn[v1])
-        @preserve_graph tn[v2] = apply(t, tn[v2])
+        t = operator(m, (name(fp(e)),), (name(f(e)),))
+        tn[v1] = apply(t, tn[v1])
+        tn[v2] = apply(t, tn[v2])
     end
     return tn
 end

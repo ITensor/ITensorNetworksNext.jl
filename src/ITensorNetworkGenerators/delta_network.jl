@@ -1,5 +1,5 @@
-using ..ITensorNetworksNext: ITensorNetwork
-using Graphs: AbstractGraph
+using ..ITensorNetworksNext: tensornetwork
+using Graphs: AbstractGraph, vertices
 using ITensorBase: NamedUnitRange, name, nameddims, unnamed
 using NamedGraphs.GraphsExtensions: incident_edges
 
@@ -32,7 +32,7 @@ function diagonaltensor(
     return nameddims(diagonaltensor(diag, unnamed.(is)), name.(is))
 end
 
-delta(elt::Type, is) = diagonaltensor(ones(elt, minimum(length, is)), is)
+delta(elt::Type, is) = diagonaltensor(ones(elt, minimum(length ∘ unnamed, is)), is)
 
 """
     delta_network(f, elt::Type = Float64, g::AbstractGraph)
@@ -42,10 +42,11 @@ on each vertex. Link dimensions are defined using the function `f(e)` that shoul
 edge `e` as an input and should output the link index on that edge.
 """
 function delta_network(f, elt::Type, g::AbstractGraph)
-    return tn = ITensorNetwork(g) do v
+    tn = tensornetwork(vertices(g)) do v
         is = Tuple(f.(incident_edges(g, v)))
         return delta(elt, is)
     end
+    return tn
 end
 function delta_network(f, g::AbstractGraph)
     return delta_network(f, Float64, g)

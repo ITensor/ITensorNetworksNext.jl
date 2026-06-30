@@ -1,11 +1,11 @@
-using AlgorithmsInterface: AlgorithmsInterface as AI
-using DataGraphs: edge_data, edge_data_type
+import AlgorithmsInterface as AI
+using DataGraphs: DataGraphs, DataGraph, edge_data, edge_data_type
 using Dictionaries: Dictionary, dictionary, set!
 using Graphs: AbstractGraph, dst, edges, has_edge, src, vertices
 using ITensorBase: ITensor, Index, inds, name, noprime, prime
 using ITensorNetworksNext: ITensorNetworksNext, ITensorNetwork, MessageCache,
     StopWhenConverged, bethe_free_energy, edge_scalar, incoming_messages, linkinds,
-    messagecache, region_scalar, subgraph, vertex_scalar, vertex_scalars
+    messagecache, region_scalar, subgraph, tensornetwork, vertex_scalar, vertex_scalars
 using LinearAlgebra: LinearAlgebra
 using NamedGraphs.GraphsExtensions: all_edges, arranged_edges, incident_edges, vertextype
 using NamedGraphs.NamedGraphGenerators: named_comb_tree, named_grid, named_path_graph
@@ -14,12 +14,10 @@ using StableRNGs: StableRNG
 using Test: @test, @testset
 
 function spin_ice_tensornetwork(g)
-    links = Dictionary(
-        edges(g),
-        [Index(2) for e in edges(g)]
-        # [Index(2; tags = "edge " => "e$(src(e))_$(dst(e))") for e in edges(g)]
-    )
-    links = merge(links, Dictionary(reverse.(edges(g)), [links[e] for e in edges(g)]))
+    links = DataGraph(g)
+    for e in edges(g)
+        links[e] = Index(2)
+    end
 
     ts = Dictionary{vertextype(g), ITensor}()
     for v in vertices(g)
@@ -34,7 +32,7 @@ function spin_ice_tensornetwork(g)
         t = t_data[linkinds...]
         set!(ts, v, t)
     end
-    return ITensorNetwork(g, ts)
+    return ITensorNetwork(ts)
 end
 
 @testset "Belief propagation" begin
@@ -42,10 +40,11 @@ end
         @testset "Basics" begin
             dims = (3, 3)
             g = named_grid(dims)
+
             l = Dict(e => Index(2) for e in edges(g))
             l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
 
-            tn = ITensorNetwork(g) do v
+            tn = tensornetwork(vertices(g)) do v
                 is = map(e -> l[e], incident_edges(g, v))
                 return randn(Tuple(is))
             end
@@ -85,7 +84,8 @@ end
             g = named_path_graph(3)
             l = Dict(e => Index(2) for e in edges(g))
             l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
-            tn = ITensorNetwork(g) do v
+
+            tn = tensornetwork(vertices(g)) do v
                 is = map(e -> l[e], incident_edges(g, v))
                 return randn(ComplexF32, Tuple(is))
             end
@@ -118,7 +118,8 @@ end
             g = named_grid((3,))
             l = Dict(e => Index(2) for e in edges(g))
             l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
-            tn = ITensorNetwork(g) do v
+
+            tn = tensornetwork(vertices(g)) do v
                 is = map(e -> l[e], incident_edges(g, v))
                 return randn(Tuple(is))
             end
@@ -134,7 +135,8 @@ end
             g = named_grid((2,))
             l = Dict(e => Index(2) for e in edges(g))
             l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
-            tn = ITensorNetwork(g) do v
+
+            tn = tensornetwork(vertices(g)) do v
                 is = map(e -> l[e], incident_edges(g, v))
                 return randn(Tuple(is))
             end
@@ -154,14 +156,16 @@ end
 
             #Chain of tensors
             dims = (2, 1)
-            g = named_grid(dims)
-            l = Dict(e => Index(2) for e in edges(g))
-            l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
-
-            tn = ITensorNetwork(g) do v
-                is = map(e -> l[e], incident_edges(g, v))
-                return randn(rng, T, Tuple(is))
+            g = DataGraph(named_grid(dims)) # graph to hold the links.
+            for edge in edges(g)
+                g[edge] = Index(2)
             end
+
+            tensors = map(vertices(g)) do vertex
+                is = map(edge -> g[edge], incident_edges(g, vertex))
+                return randn(T, Tuple(is))
+            end
+            tn = ITensorNetwork(tensors)
 
             messages = Dict(
                 edge => ones(T, Tuple(linkinds(tn, edge))) for edge in all_edges(g)
@@ -176,13 +180,15 @@ end
 
             #Tree of tensors
             dims = (4, 3)
-            g = named_comb_tree(dims)
-            l = Dict(e => Index(3) for e in edges(g))
-            l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
-            tn = ITensorNetwork(g) do v
-                is = map(e -> l[e], incident_edges(g, v))
-                return randn(rng, T, Tuple(is))
+            g = DataGraph(named_comb_tree(dims)) # graph to hold the links.
+            for edge in edges(g)
+                g[edge] = Index(3)
             end
+            tensors = map(vertices(g)) do vertex
+                is = map(edge -> g[edge], incident_edges(g, vertex))
+                return randn(T, Tuple(is))
+            end
+            tn = ITensorNetwork(tensors)
 
             messages = Dict(
                 edge => ones(T, Tuple(linkinds(tn, edge))) for edge in all_edges(g)

@@ -1,65 +1,53 @@
 using Adapt: Adapt, adapt
-using DataGraphs: DataGraphs, AbstractDataGraph, edge_data, set_vertex_data!,
-    underlying_graph, underlying_graph_type, vertex_data
+using DataGraphs: DataGraphs, AbstractDataGraph, AbstractVertexDataGraph, edge_data,
+    set_vertex_data!, underlying_graph, underlying_graph_type, vertex_data
 using Dictionaries: Dictionary
 using Graphs: Graphs, AbstractEdge, AbstractGraph, add_edge!, add_vertex!, dst, edges,
     edgetype, ne, neighbors, nv, rem_edge!, src, vertices
-using ITensorBase: dimnames, inds
+using ITensorBase: dimnames, inds, name, named, nametype, prime, uniquename, unnamedtype
 using LinearAlgebra: LinearAlgebra
 using MacroTools: @capture
 using NamedGraphs.GraphsExtensions: directed_graph, incident_edges, rem_edges!, vertextype
 using NamedGraphs.OrdinalIndexing: OrdinalSuffixedInteger
 using NamedGraphs: NamedGraphs, NamedGraph, not_implemented, similar_graph
+using TensorAlgebra: trivialrange
 
-abstract type AbstractITensorNetwork{V, VD} <: AbstractDataGraph{V, VD, Nothing} end
+abstract type AbstractITensorNetwork{T, V} <: AbstractVertexDataGraph{T, V} end
+
+# ====================================== Graphs.jl ======================================= #
 
 # Need to be careful about removing edges from tensor networks in case there is a bond
-Graphs.rem_edge!(::AbstractITensorNetwork, edge) = not_implemented()
+Graphs.rem_edge!(::AbstractITensorNetwork, _edge) = not_implemented()
 
-# Graphs.jl overloads
 function Graphs.weights(graph::AbstractITensorNetwork)
     V = vertextype(graph)
     es = Tuple.(edges(graph))
     ws = Dictionary{Tuple{V, V}, Float64}(es, undef)
     for e in edges(graph)
-        w = log2(dim(commoninds(graph, e)))
+        w = log2(dim(linkinds(graph, e)))
         ws[(src(e), dst(e))] = w
     end
     return ws
 end
 
-# Copy
-Base.copy(::AbstractITensorNetwork) = not_implemented()
-
-# Iteration
-Base.iterate(tn::AbstractITensorNetwork, args...) = iterate(vertex_data(tn), args...)
-Base.keys(tn::AbstractITensorNetwork) = vertices(tn)
-
-# TODO: This contrasts with the `DataGraphs.AbstractDataGraph` definition,
-# where it is defined as the `vertextype`. Does that cause problems or should it be changed?
-Base.eltype(tn::AbstractITensorNetwork) = eltype(vertex_data(tn))
-
 # Overload if needed
 Graphs.is_directed(::Type{<:AbstractITensorNetwork}) = false
 
-DataGraphs.underlying_graph(::AbstractITensorNetwork) = not_implemented()
-function NamedGraphs.vertex_positions(tn::AbstractITensorNetwork)
-    return NamedGraphs.vertex_positions(underlying_graph(tn))
-end
-function NamedGraphs.ordered_vertices(tn::AbstractITensorNetwork)
-    return NamedGraphs.ordered_vertices(underlying_graph(tn))
+# ==================================== NamedGraphs.jl ==================================== #
+
+function NamedGraphs.similar_graph(::AbstractITensorNetwork, VD::Type, vertices)
+    return ITensorNetwork{VD}(undef, collect(vertices))
 end
 
-function Adapt.adapt_structure(to, tn::AbstractITensorNetwork)
-    # TODO: Define and use:
-    #
-    # @preserve_graph map_vertex_data(adapt(to), tn)
-    #
-    # or just:
-    #
-    # @preserve_graph map(adapt(to), tn)
-    return map_vertex_data_preserve_graph(adapt(to), tn)
+# ==================================== DataGraphs.jl ===================================== #
+
+function DataGraphs.underlying_graph(tn::AbstractITensorNetwork)
+    ug = NamedGraph(vertices(tn))
+    add_edges!(ug, edges(tn))
+    return ug
 end
+
+# ====================================== interface ======================================= #
 
 linkinds(tn::AbstractGraph, edge::Pair) = linkinds(tn, edgetype(tn)(edge))
 # Pick the link indices from the `src` side, identified by name match with `dst`.
@@ -106,139 +94,40 @@ function sitenames(tn::AbstractGraph, v)
     return s
 end
 
-function setindex_preserve_graph!(tn::AbstractGraph, value, vertex)
-    set_vertex_data!(tn, value, vertex)
-    return tn
-end
+# Return the non-link vertices associated with an dim name
+function dimnamevertices(tn::AbstractGraph, name)
+    sites = vertextype(tn)[]
 
-function is_setindex!_expr(expr::Expr)
-    return is_assignment_expr(expr) && is_getindex_expr(first(expr.args))
-end
-is_setindex!_expr(x) = false
-is_getindex_expr(expr::Expr) = (expr.head === :ref)
-is_getindex_expr(x) = false
-is_assignment_expr(expr::Expr) = (expr.head === :(=))
-is_assignment_expr(expr) = false
-
-# TODO: Define this in terms of a function mapping
-# preserve_graph_function(::typeof(setindex!)) = setindex!_preserve_graph
-# preserve_graph_function(::typeof(map_vertex_data)) = map_vertex_data_preserve_graph
-# Also allow annotating codeblocks like `@views`.
-macro preserve_graph(expr)
-    if !is_setindex!_expr(expr)
-        error(
-            "preserve_graph must be used with setindex! syntax (as @preserve_graph a[i,j,...] = value)"
-        )
-    end
-    @capture(expr, array_[indices__] = value_)
-    return :(setindex_preserve_graph!($(esc(array)), $(esc(value)), $(esc.(indices)...)))
-end
-
-# Update the graph of the ITensorNetwork `tn` to include
-# edges that should exist based on the tensor connectivity.
-function add_missing_edges!(tn::AbstractGraph)
-    foreach(v -> add_missing_edges!(tn, v), vertices(tn))
-    return tn
-end
-
-# Update the graph of the ITensorNetwork `tn` to include
-# edges that should be incident to the vertex `v`
-# based on the tensor connectivity.
-function add_missing_edges!(tn::AbstractGraph, v)
-    for v′ in vertices(tn)
-        if v ≠ v′
-            e = v => v′
-            if !isempty(linknames(tn, e))
-                add_edge!(tn, e)
-            end
+    for v in vertices(tn)
+        if name ∈ dimnames(tn[v])
+            push!(sites, v)
         end
     end
-    return tn
+
+    return sites
 end
 
-# Fix the edges of the ITensorNetwork `tn` to match
-# the tensor connectivity.
-function fix_edges!(tn::AbstractGraph)
-    foreach(v -> fix_edges!(tn, v), vertices(tn))
-    return tn
-end
-# Fix the edges of the ITensorNetwork `tn` to match
-# the tensor connectivity at vertex `v`.
-function fix_edges!(tn::AbstractGraph, v)
-    for e in incident_edges(tn, v)
-        # Remove an edge if there is no index on that edge.
-        if isempty(linknames(tn, e))
-            rem_edge!(tn, e)
+function has_dimname(tn::AbstractGraph, name)
+    for v in vertices(tn)
+        if name ∈ dimnames(tn[v])
+            return true
         end
     end
-    add_missing_edges!(tn, v)
-    return tn
+    return false
 end
 
-using ITensorBase: named, nametype, uniquename, unnamedtype
-using TensorAlgebra: trivialrange
-function insertlink!(tn, e)
-    add_edge!(tn, e)
+has_ind(tn::AbstractGraph, ind) = has_dimname(tn, name(ind))
+
+function insertlink!(tn::AbstractGraph, e)
     T = eltype(inds(tn[src(e)]))
-    l = named(trivialrange(unnamedtype(T)), uniquename(nametype(T)))
-    x = fill!(similar(tn[src(e)], (l,)), one(eltype(tn[src(e)])))
-    @preserve_graph tn[src(e)] = tn[src(e)] * x
-    @preserve_graph tn[dst(e)] = tn[dst(e)] * conj(x)
+
+    linkind = named(trivialrange(unnamedtype(T)), uniquename(nametype(T)))
+
+    x = similar(tn[src(e)], (linkind,))
+    fill!(x, true)
+
+    tn[src(e)] *= x
+    tn[dst(e)] *= conj(x)
+
     return tn
 end
-
-using ITensorBase: replacedimnames
-function randlinknames(tn)
-    new_tn = copy(tn)
-    for e in edges(new_tn)
-        u, v = src(e), dst(e)
-        for n in intersect(dimnames(new_tn[u]), dimnames(new_tn[v]))
-            n′ = uniquename(n)
-            new_tn[u] = replacedimnames(new_tn[u], n => n′)
-            new_tn[v] = replacedimnames(new_tn[v], n => n′)
-        end
-    end
-    return new_tn
-end
-
-function Base.setindex!(tn::AbstractITensorNetwork, value, v)
-    @preserve_graph tn[v] = value
-    fix_edges!(tn, v)
-    return tn
-end
-# Fix ambiguity error.
-function Base.setindex!(
-        graph::AbstractITensorNetwork,
-        value,
-        vertex::OrdinalSuffixedInteger
-    )
-    graph[vertices(graph)[vertex]] = value
-    return graph
-end
-Base.setindex!(tn::AbstractITensorNetwork, value, edge::AbstractEdge) = not_implemented()
-Base.setindex!(tn::AbstractITensorNetwork, value, edge::Pair) = not_implemented()
-# Fix ambiguity error.
-function Base.setindex!(
-        tn::AbstractITensorNetwork,
-        value,
-        edge::Pair{<:OrdinalSuffixedInteger, <:OrdinalSuffixedInteger}
-    )
-    return not_implemented()
-end
-
-function Base.show(io::IO, mime::MIME"text/plain", graph::AbstractITensorNetwork)
-    println(io, "$(typeof(graph)) with $(nv(graph)) vertices:")
-    show(io, mime, vertices(graph))
-    println(io, "\n")
-    println(io, "and $(ne(graph)) edge(s):")
-    for e in edges(graph)
-        show(io, mime, e)
-        println(io)
-    end
-    println(io)
-    println(io, "with vertex data:")
-    show(io, mime, axes.(vertex_data(graph)))
-    return nothing
-end
-
-Base.show(io::IO, graph::AbstractITensorNetwork) = show(io, MIME"text/plain"(), graph)
