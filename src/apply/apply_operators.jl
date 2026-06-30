@@ -5,8 +5,9 @@ using Graphs: dst, src, vertices
 using ITensorBase:
     ITensorBase as ITB, AbstractITensor, dimnames, domainnames, operator, replacedimnames
 using LinearAlgebra: norm
+using MatrixAlgebraKit: qr_compact, svd_trunc
 using NamedGraphs.GraphsExtensions: all_edges, boundary_edges
-using TensorAlgebra: TensorAlgebra as TA, gram_eigh_full, gram_eigh_full_with_pinv
+using TensorAlgebra.MatrixAlgebra: gram_eigh_full, gram_eigh_full_with_pinv
 
 # === Top-level user entry point ===
 
@@ -258,10 +259,10 @@ function apply_gate_bp_nsite!(
     ψ_v1 = prod([[state[v1]]; gauges_v1])
     ψ_v2 = prod([[state[v2]]; gauges_v2])
 
-    Q_v1, R_v1 = TA.qr(ψ_v1, setdiff(dimnames(ψ_v1), dimnames(ψ_v2), dimnames(op)))
-    Q_v2, R_v2 = TA.qr(ψ_v2, setdiff(dimnames(ψ_v2), dimnames(ψ_v1), dimnames(op)))
+    Q_v1, R_v1 = qr_compact(ψ_v1, setdiff(dimnames(ψ_v1), dimnames(ψ_v2), dimnames(op)))
+    Q_v2, R_v2 = qr_compact(ψ_v2, setdiff(dimnames(ψ_v2), dimnames(ψ_v1), dimnames(op)))
     op_R_v1v2 = ITB.apply(op, R_v1 * R_v2)
-    U_v1, S, U_v2 = TA.svd(op_R_v1v2, setdiff(dimnames(R_v1), dimnames(R_v2)); trunc)
+    U_v1, S, U_v2 = svd_trunc(op_R_v1v2, setdiff(dimnames(R_v1), dimnames(R_v2)); trunc)
     if normalize
         S = S / norm(S)
     end
