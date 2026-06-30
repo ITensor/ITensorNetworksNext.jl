@@ -3,12 +3,14 @@ using DataGraphs: DataGraphs, AbstractDataGraph, AbstractEdgeDataGraph, edge_dat
     vertex_data_type
 using Dictionaries: Dictionary, delete!, getindices, set!
 using Graphs: AbstractGraph, connected_components, is_directed, is_tree
+using ITensorBase: unnamed
 using NamedGraphs.GraphsExtensions: IsDirected, boundary_edges, default_root_vertex,
     directed_graph, forest_cover, in_incident_edges, post_order_dfs_edges, undirected_graph,
     vertextype
 using NamedGraphs.PartitionedGraphs: QuotientEdge, QuotientView, quotient_graph
 using NamedGraphs: AbstractNamedEdge, NamedDiGraph, NamedEdge, Vertices, convert_vertextype,
     ordered_vertices, parent_graph_indices, position_graph, to_graph_index, vertex_positions
+using SplitApplyCombine: mapmany
 
 struct MessageCache{T, V} <: AbstractEdgeDataGraph{T, V}
     messages::Dictionary{NamedEdge{V}, T}
