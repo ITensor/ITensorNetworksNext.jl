@@ -21,16 +21,8 @@ TensorAlgebra = "68bd88dc-f39d-4e12-b2ca-f046b68fcc6a"
 TensorOperations = "6aa20fa7-93e2-5fca-9bc0-fbd0db3c71a2"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
-[sources.GradedArrays]
-rev = "mf/scalar-unmatricize-graded"
-url = "https://github.com/ITensor/GradedArrays.jl"
-
 [sources.ITensorNetworksNext]
 path = ".."
-
-[sources.SparseArraysBase]
-rev = "mf/tensoralgebra-0.14"
-url = "https://github.com/ITensor/SparseArraysBase.jl"
 
 [compat]
 AlgorithmsInterface = "0.1"
