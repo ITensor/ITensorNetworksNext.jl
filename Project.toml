@@ -1,6 +1,6 @@
 name = "ITensorNetworksNext"
 uuid = "302f2e75-49f0-4526-aef7-d8ba550cb06c"
-version = "0.9.2"
+version = "0.9.3"
 authors = ["ITensor developers <support@itensor.org> and contributors"]
 
 [workspace]
@@ -38,5 +38,5 @@ NamedGraphs = "0.11, 0.12"
 Random = "1.10"
 SimpleTraits = "0.9.5"
 SplitApplyCombine = "1.2.3"
-TensorAlgebra = "0.15"
+TensorAlgebra = "0.15, 0.16"
 julia = "1.10"
