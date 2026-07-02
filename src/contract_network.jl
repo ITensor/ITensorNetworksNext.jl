@@ -52,12 +52,11 @@ struct LeftAssociative end
 function contraction_order(alg::LeftAssociative, tn)
     return prod(i -> symnameddims(i, Tuple(axes(tn[i]))), keys(tn))
 end
-# Optimize the flattened product with `alg`. Shared by the built-in
-# `EvaluationOrderAlgorithm`s and the OMEinsumContractionOrders extension.
-function optimized_contraction_order(alg, tn)
+# Internal implementation shared with the OMEinsumContractionOrders extension.
+function _contraction_order(alg, tn)
     s = contraction_order(Flat(), tn)
     return optimize_evaluation_order(s; alg)
 end
 function contraction_order(alg::EvaluationOrderAlgorithm, tn)
-    return optimized_contraction_order(alg, tn)
+    return _contraction_order(alg, tn)
 end
