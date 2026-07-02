@@ -1,7 +1,6 @@
 using Base.Broadcast: materialize
 using Base: @kwdef
-using ITensorBase: EvaluationOrderAlgorithm, Greedy, Mul, lazy, optimize_evaluation_order,
-    substitute, symnameddims
+using ITensorBase: Greedy, Mul, lazy, optimize_evaluation_order, substitute, symnameddims
 
 # `contract_network`
 @kwdef struct Exact{Order, OrderAlg}
@@ -52,7 +51,9 @@ struct LeftAssociative end
 function contraction_order(alg::LeftAssociative, tn)
     return prod(i -> symnameddims(i, Tuple(axes(tn[i]))), keys(tn))
 end
-function contraction_order(alg::EvaluationOrderAlgorithm, tn)
+# Fall back to optimizing the flattened product with `alg`, which covers ITensorBase's
+# `Greedy`/`Optimal` and any OMEinsumContractionOrders optimizer.
+function contraction_order(alg, tn)
     s = contraction_order(Flat(), tn)
     return optimize_evaluation_order(s; alg)
 end

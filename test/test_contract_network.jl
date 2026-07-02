@@ -4,6 +4,7 @@ using ITensorNetworksNext: Exact, ITensorNetwork, LeftAssociative, contract_netw
     linkinds, siteinds, tensornetwork
 using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges
 using NamedGraphs.NamedGraphGenerators: named_grid
+using OMEinsumContractionOrders: GreedyMethod, TreeSA
 using TensorOperations: TensorOperations
 using Test: @test, @testset
 
@@ -20,7 +21,11 @@ using Test: @test, @testset
         ABCD_1 = contract_network([A, B, C, D]; alg = orderalg(LeftAssociative()))
         ABCD_2 = contract_network([A, B, C, D]; alg = orderalg(Greedy()))
         ABCD_3 = contract_network([A, B, C, D]; alg = orderalg(Optimal()))
+        ABCD_4 = contract_network([A, B, C, D]; alg = orderalg(GreedyMethod()))
+        ABCD_5 = contract_network([A, B, C, D]; alg = orderalg(TreeSA()))
         @test ABCD_1 == ABCD_2 == ABCD_3
+        @test ABCD_1 ≈ ABCD_4
+        @test ABCD_1 ≈ ABCD_5
     end
 
     @testset "Contract One Dimensional Network" begin
@@ -36,11 +41,15 @@ using Test: @test, @testset
         z1 = contract_network(tn; alg = orderalg(LeftAssociative()))[]
         z2 = contract_network(tn; alg = orderalg(Greedy()))[]
         z3 = contract_network(tn; alg = orderalg(Optimal()))[]
+        z4 = contract_network(tn; alg = orderalg(GreedyMethod()))[]
+        z5 = contract_network(tn; alg = orderalg(TreeSA()))[]
 
         @test abs(z1 - z2) / abs(z1) <= 1.0e3 * eps(Float64)
         @test abs(z1 - z3) / abs(z1) <= 1.0e3 * eps(Float64)
 
         @test z1 ≈ z2
         @test z1 ≈ z3
+        @test z1 ≈ z4
+        @test z1 ≈ z5
     end
 end
