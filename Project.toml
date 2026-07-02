@@ -23,9 +23,15 @@ SimpleTraits = "699a6c99-e7fa-54fc-8d76-47d257e15c1d"
 SplitApplyCombine = "03a91e81-4c3e-53e1-a0a4-9c0c8f19dd66"
 TensorAlgebra = "68bd88dc-f39d-4e12-b2ca-f046b68fcc6a"
 
+[weakdeps]
+OMEinsumContractionOrders = "6f22d1fd-8eed-4bb7-9776-e7d684900715"
+
 [sources.ITensorBase]
 rev = "mf/omeinsum-contraction-order-ext"
 url = "https://github.com/ITensor/ITensorBase.jl"
+
+[extensions]
+ITensorNetworksNextOMEinsumContractionOrdersExt = "OMEinsumContractionOrders"
 
 [compat]
 Adapt = "4.3"
@@ -39,6 +45,7 @@ LinearAlgebra = "1.10"
 MacroTools = "0.5.16"
 MatrixAlgebraKit = "0.6"
 NamedGraphs = "0.11, 0.12"
+OMEinsumContractionOrders = "1"
 Random = "1.10"
 SimpleTraits = "0.9.5"
 SplitApplyCombine = "1.2.3"
