@@ -171,17 +171,9 @@ function DataGraphs.underlying_graph_type(type::Type{<:ITensorNetwork{T, V}}) wh
     return fieldtype(type, :underlying_graph)
 end
 
-function Graphs.rem_edge!(::ITensorNetwork, _edge)
-    return throw(
-        ErrorException("removing edges from the `ITensorNetwork` type is not supported.")
-    )
-end
-
-function Graphs.add_edge!(::ITensorNetwork, _edge)
-    return throw(
-        ErrorException("Adding edges to the `ITensorNetwork` type is not supported.")
-    )
-end
+# Can't add/remove edges from `ITensorNetwork` as graph topology fixed by indices.
+Graphs.rem_edge!(::ITensorNetwork, _edge) = false
+Graphs.add_edge!(::ITensorNetwork, _edge) = false
 
 # PERF: fast lookup compared to `AbstractITensorNetwork` fallback.
 dimnamevertices(tn::ITensorNetwork, name) = tn.dimname_vertices[name]

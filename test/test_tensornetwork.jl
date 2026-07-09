@@ -48,8 +48,14 @@ using Test: @test, @test_throws, @testset
         @test_throws MethodError tn[e] = randn(2, 2)
         @test_throws MethodError tn[src(e) => dst(e)] = randn(2, 2)
 
-        # `rem_edge!` is intentionally unimplemented.
-        @test_throws ErrorException rem_edge!(tn, (1, 1) => (2, 1))
+        # `rem_edge!` and `add_edge!` are intentionally unimplemented; they return
+        # `false` without modifying the network.
+        @test rem_edge!(tn, (1, 1) => (2, 1)) == false
+        @test has_edge(tn, (1, 1) => (2, 1))
+        @test ne(tn) == 1
+        @test add_edge!(tn, (2, 1) => (2, 2)) == false
+        @test !has_edge(tn, (2, 1) => (2, 2))
+        @test ne(tn) == 1
 
         tn[1, 1] = randn(Index(2))
         tn[2, 1] = randn(Index(2))
