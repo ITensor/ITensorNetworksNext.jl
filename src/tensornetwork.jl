@@ -116,38 +116,60 @@ DataGraphs.is_edge_assigned(::ITensorNetwork, _edge) = false
 
 DataGraphs.get_vertex_data(tn::ITensorNetwork, v) = tn.tensors[v]
 
+function check_incoming_dimnames(tn, tensor, vertex)
+    for name in dimnames(tensor)
+        vertices = get(tn.dimname_vertices, name, Set())
+        if length(setdiff(vertices, Set([vertex]))) > 1
+            throw(
+                ArgumentError(
+                    "index $name can appear in at most one existing tensor"
+                )
+            )
+        end
+    end
+    return nothing
+end
+
 function DataGraphs.insert_vertex_data!(tn::ITensorNetwork, vertex, tensor)
+    check_incoming_dimnames(tn, tensor, vertex)
     add_vertex!(tn.underlying_graph, vertex)
-    set!_tensornetwork(tn, vertex, tensor)
+    update_tensornetwork_metadata!(tn, vertex, tensor)
+    insert!(tn.tensors, vertex, tensor)
     return tn
 end
 
 function DataGraphs.set_vertex_data!(tn::ITensorNetwork, tensor, vertex)
-    set!_tensornetwork(tn, vertex, tensor)
+    check_incoming_dimnames(tn, tensor, vertex)
+    update_tensornetwork_metadata!(tn, vertex, tensor)
+    set!(tn.tensors, vertex, tensor)
     return tn
 end
 
-# "upsert"
-function set!_tensornetwork(tn::ITensorNetwork, vertex, tensor)
-    newinds = dimnames(tensor)
+function update_tensornetwork_metadata!(tn, vertex, tensor)
+    oldnames = isassigned(tn, vertex) ? dimnames(tn[vertex]) : Set()
+    newnames = dimnames(tensor)
 
-    oldinds = get(mapview(dimnames, tn.tensors), vertex, Set())
+    update_tensornetwork_metadata!(tn, vertex, oldnames, newnames)
 
+    return tn
+end
+
+function update_tensornetwork_metadata!(tn, vertex, oldinds, newinds)
     # Only have to deal with the indices that aren't shared.
-    for ind in symdiff(oldinds, newinds)
-        if ind in oldinds
-            delete_ind_edge!(tn, ind)
-            delete_ind_vertex!(tn, ind, vertex)
+    for name in symdiff(oldinds, newinds)
+        if name in oldinds
+            delete_ind_edge!(tn, name)
+            delete_ind_vertex!(tn, name, vertex)
             continue
         end
 
         # Now `ind` must be a new index that's not in `oldinds`
 
-        vertex_list = get!(tn.dimname_vertices, ind, Set())
+        vertex_list = get!(tn.dimname_vertices, name, Set())
         if length(vertex_list) > 1
             throw(
                 ArgumentError(
-                    "index $ind can appear in at most one existing tensor, got $(length(vertex_list))."
+                    "index $name can appear in at most one existing tensor, got $(length(vertex_list))."
                 )
             )
         end
@@ -159,8 +181,6 @@ function set!_tensornetwork(tn::ITensorNetwork, vertex, tensor)
             add_edge!(tn.underlying_graph, src, dst)
         end
     end
-
-    set!(tn.tensors, vertex, tensor)
 
     return tn
 end
