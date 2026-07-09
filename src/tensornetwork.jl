@@ -176,7 +176,9 @@ Graphs.rem_edge!(::ITensorNetwork, _edge) = false
 Graphs.add_edge!(::ITensorNetwork, _edge) = false
 
 # PERF: fast lookup compared to `AbstractITensorNetwork` fallback.
-dimnamevertices(tn::ITensorNetwork, name) = tn.dimname_vertices[name]
+function dimnamevertices(tn::ITensorNetwork, name)
+    return get(tn.dimname_vertices, name, Set{vertextype(tn)}())
+end
 
 # PERF: fast lookup compared to `AbstractITensorNetwork` fallback.
 has_dimname(tn::ITensorNetwork, name) = haskey(tn.dimname_vertices, name)
