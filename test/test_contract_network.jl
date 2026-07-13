@@ -1,11 +1,10 @@
 using Graphs: edges, vertices
-using ITensorBase: Greedy, Index, Optimal
+using ITensorBase: Greedy, Index
 using ITensorNetworksNext: Exact, ITensorNetwork, LeftAssociative, contract_network,
     linkinds, siteinds, tensornetwork
 using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges
 using NamedGraphs.NamedGraphGenerators: named_grid
-using OMEinsumContractionOrders: GreedyMethod, TreeSA
-using TensorOperations: TensorOperations
+using OMEinsumContractionOrders: ExhaustiveSearch, GreedyMethod, TreeSA
 using Test: @test, @testset
 
 @testset "contract_network" begin
@@ -20,7 +19,7 @@ using Test: @test, @testset
 
         ABCD_1 = contract_network([A, B, C, D]; alg = orderalg(LeftAssociative()))
         ABCD_2 = contract_network([A, B, C, D]; alg = orderalg(Greedy()))
-        ABCD_3 = contract_network([A, B, C, D]; alg = orderalg(Optimal()))
+        ABCD_3 = contract_network([A, B, C, D]; alg = orderalg(ExhaustiveSearch()))
         ABCD_4 = contract_network([A, B, C, D]; alg = orderalg(GreedyMethod()))
         ABCD_5 = contract_network([A, B, C, D]; alg = orderalg(TreeSA()))
         @test ABCD_1 == ABCD_2 == ABCD_3
@@ -40,7 +39,7 @@ using Test: @test, @testset
 
         z1 = contract_network(tn; alg = orderalg(LeftAssociative()))[]
         z2 = contract_network(tn; alg = orderalg(Greedy()))[]
-        z3 = contract_network(tn; alg = orderalg(Optimal()))[]
+        z3 = contract_network(tn; alg = orderalg(ExhaustiveSearch()))[]
         z4 = contract_network(tn; alg = orderalg(GreedyMethod()))[]
         z5 = contract_network(tn; alg = orderalg(TreeSA()))[]
 
