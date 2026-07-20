@@ -5,9 +5,9 @@ using Graphs: dst, src, vertices
 using ITensorBase:
     ITensorBase as ITB, AbstractITensor, dimnames, inputnames, operator, replacedimnames
 using LinearAlgebra: norm
-using MatrixAlgebraKit: qr_compact, svd_trunc
+using MatrixAlgebraKit: project_hermitian, qr_compact, svd_trunc
 using NamedGraphs.GraphsExtensions: all_edges, boundary_edges
-using TensorAlgebra.MatrixAlgebra: gram_eigh_full, gram_eigh_full_with_pinv
+using TensorAlgebra.MatrixAlgebra: sqrth_invsqrth_safe, sqrth_safe
 
 # === Top-level user entry point ===
 
@@ -205,6 +205,13 @@ end
 
 # === BP simple-update implementation ===
 
+# BP simple-update gauge. Each message is a bond operator that is positive semidefinite in
+# its intrinsic bra/ket bipartition — its domain (ket) leg is the one shared with the state
+# tensor it gauges. The balanced sqrt / inverse-sqrt of the Hermitian-projected message is
+# the gauge; the fermionic braid sign is carried by the graded contraction, so no bipartition
+# flip is needed. This works for bosonic (ungraded) messages too, generalizing the previous
+# `gram_eigh_full` gauge.
+
 function apply_gate_bp!(
         dest::AbstractITensorNetwork, op::AbstractITensor,
         state::AbstractITensorNetwork, env; kwargs...
@@ -233,7 +240,7 @@ function apply_gate_bp_nsite!(
     ψv = ITB.apply(op, state[v])
     if normalize
         gauges = [
-            conj(gram_eigh_full(env[e]))
+            sqrth_safe(project_hermitian(env[e]))
                 for e in boundary_edges(state, vs; dir = :in)
         ]
         ψv /= norm(prod([[ψv]; gauges]))
@@ -249,12 +256,16 @@ function apply_gate_bp_nsite!(
     )
     v1, v2 = vs
     edges_in = boundary_edges(state, vs; dir = :in)
-    grams_v1 =
-        [gram_eigh_full_with_pinv(env[e]) for e in edges_in if dst(e) == v1]
-    grams_v2 =
-        [gram_eigh_full_with_pinv(env[e]) for e in edges_in if dst(e) == v2]
-    gauges_v1, inv_gauges_v1 = conj.(first.(grams_v1)), conj.(last.(grams_v1))
-    gauges_v2, inv_gauges_v2 = conj.(first.(grams_v2)), conj.(last.(grams_v2))
+    sqrts_invsqrts_v1 = [
+        sqrth_invsqrth_safe(project_hermitian(env[e]))
+            for e in edges_in if dst(e) == v1
+    ]
+    sqrts_invsqrts_v2 = [
+        sqrth_invsqrth_safe(project_hermitian(env[e]))
+            for e in edges_in if dst(e) == v2
+    ]
+    gauges_v1, inv_gauges_v1 = first.(sqrts_invsqrts_v1), conj.(last.(sqrts_invsqrts_v1))
+    gauges_v2, inv_gauges_v2 = first.(sqrts_invsqrts_v2), conj.(last.(sqrts_invsqrts_v2))
 
     ψ_v1 = prod([[state[v1]]; gauges_v1])
     ψ_v2 = prod([[state[v2]]; gauges_v2])
@@ -267,7 +278,7 @@ function apply_gate_bp_nsite!(
         S = S / norm(S)
     end
     name_v1, name_v2 = dimnames(S)
-    sqrt_S = sqrt(S, (name_v1,), (name_v2,))
+    sqrt_S = sqrth_safe(S, (name_v1,), (name_v2,); atol = 0, rtol = 0)
     R_v1 = replacedimnames(U_v1 * sqrt_S, name_v2 => name_v1)
     R_v2 = sqrt_S * U_v2
 
@@ -275,9 +286,6 @@ function apply_gate_bp_nsite!(
     dest[v2] = prod([[Q_v2 * R_v2]; inv_gauges_v2])
 
     env[v1 => v2] = operator(conj(S), (name_v2,), (name_v1,))
-    env[v2 => v1] = operator(
-        conj(replacedimnames(S, name_v1 => name_v2, name_v2 => name_v1)),
-        (name_v2,), (name_v1,)
-    )
+    env[v2 => v1] = operator(S, (name_v1,), (name_v2,))
     return dest
 end
