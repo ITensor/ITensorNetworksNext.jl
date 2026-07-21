@@ -1,6 +1,6 @@
 using ..ITensorNetworksNext
 using Graphs: degree, dst, edges, src
-using ITensorBase: apply, name, operator, uniquename
+using ITensorBase: name, nameddims, uniquename
 using LinearAlgebra: Diagonal, eigen
 using NamedGraphs.GraphsExtensions: vertextype
 
@@ -43,9 +43,11 @@ function ising_network(
 
         deg2 = degree(tn, v2)
         m = sqrt_ising_bond(β; J, h, deg1, deg2)
-        t = operator(m, (name(fp(e)),), (name(f(e)),))
-        tn[v1] = apply(t, tn[v1])
-        tn[v2] = apply(t, tn[v2])
+        # Split the Ising bond as √b on each endpoint, contracting the delta-network bond
+        # name `fp(e)` and renaming the shared bond to the requested name `f(e)`.
+        b = nameddims(m, (name(fp(e)), name(f(e))))
+        tn[v1] = b * tn[v1]
+        tn[v2] = b * tn[v2]
     end
     return tn
 end
