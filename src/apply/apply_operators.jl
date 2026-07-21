@@ -205,12 +205,8 @@ end
 
 # === BP simple-update implementation ===
 
-# BP simple-update gauge. Each message is a bond operator that is positive semidefinite in
-# its intrinsic bra/ket bipartition — its domain (ket) leg is the one shared with the state
-# tensor it gauges. The balanced sqrt / inverse-sqrt of the Hermitian-projected message is
-# the gauge; the fermionic braid sign is carried by the graded contraction, so no bipartition
-# flip is needed. This works for bosonic (ungraded) messages too, generalizing the previous
-# `gram_eigh_full` gauge.
+# The message's domain (ket) leg is the one shared with the state tensor it gauges, so the
+# fermionic braid sign is carried by the graded contraction and no bipartition flip is needed.
 
 function apply_gate_bp!(
         dest::AbstractITensorNetwork, op::AbstractITensor,
@@ -243,7 +239,7 @@ function apply_gate_bp_nsite!(
             sqrth_safe(project_hermitian(env[e]))
                 for e in boundary_edges(state, vs; dir = :in)
         ]
-        ψv /= norm(prod([[ψv]; gauges]))
+        ψv /= norm(prod([[ψv]; ITB.state.(gauges)]))
     end
     dest[v] = ψv
     return dest
@@ -267,8 +263,8 @@ function apply_gate_bp_nsite!(
     gauges_v1, inv_gauges_v1 = first.(sqrts_invsqrts_v1), conj.(last.(sqrts_invsqrts_v1))
     gauges_v2, inv_gauges_v2 = first.(sqrts_invsqrts_v2), conj.(last.(sqrts_invsqrts_v2))
 
-    ψ_v1 = prod([[state[v1]]; gauges_v1])
-    ψ_v2 = prod([[state[v2]]; gauges_v2])
+    ψ_v1 = prod([[state[v1]]; ITB.state.(gauges_v1)])
+    ψ_v2 = prod([[state[v2]]; ITB.state.(gauges_v2)])
 
     Q_v1, R_v1 = qr_compact(ψ_v1, setdiff(dimnames(ψ_v1), dimnames(ψ_v2), dimnames(op)))
     Q_v2, R_v2 = qr_compact(ψ_v2, setdiff(dimnames(ψ_v2), dimnames(ψ_v1), dimnames(op)))
@@ -282,8 +278,8 @@ function apply_gate_bp_nsite!(
     R_v1 = replacedimnames(U_v1 * sqrt_S, name_v2 => name_v1)
     R_v2 = sqrt_S * U_v2
 
-    dest[v1] = prod([[Q_v1 * R_v1]; inv_gauges_v1])
-    dest[v2] = prod([[Q_v2 * R_v2]; inv_gauges_v2])
+    dest[v1] = prod([[Q_v1 * R_v1]; ITB.state.(inv_gauges_v1)])
+    dest[v2] = prod([[Q_v2 * R_v2]; ITB.state.(inv_gauges_v2)])
 
     env[v1 => v2] = operator(conj(S), (name_v2,), (name_v1,))
     env[v2 => v1] = operator(S, (name_v1,), (name_v2,))
