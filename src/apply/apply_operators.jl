@@ -3,7 +3,7 @@ using AlgorithmsInterface: AlgorithmsInterface as AI
 using Base: @kwdef
 using Graphs: dst, src, vertices
 using ITensorBase:
-    ITensorBase as ITB, AbstractITensor, dimnames, domainnames, operator, replacedimnames
+    ITensorBase as ITB, AbstractITensor, dimnames, inputnames, operator, replacedimnames
 using LinearAlgebra: norm
 using MatrixAlgebraKit: qr_compact, svd_trunc
 using NamedGraphs.GraphsExtensions: all_edges, boundary_edges
@@ -209,7 +209,7 @@ function apply_gate_bp!(
         dest::AbstractITensorNetwork, op::AbstractITensor,
         state::AbstractITensorNetwork, env; kwargs...
     )
-    op_in = domainnames(op)
+    op_in = inputnames(op)
     vs = [v for v in vertices(state) if !isempty(intersect(op_in, sitenames(state, v)))]
     isempty(vs) && throw(
         ArgumentError("operator shares no indices with the tensor network")
