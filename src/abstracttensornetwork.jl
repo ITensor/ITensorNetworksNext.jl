@@ -4,7 +4,7 @@ using DataGraphs: DataGraphs, AbstractDataGraph, AbstractVertexDataGraph, edge_d
 using Dictionaries: Dictionary
 using Graphs: Graphs, AbstractEdge, AbstractGraph, add_edge!, add_vertex!, dst, edges,
     edgetype, ne, neighbors, nv, rem_edge!, src, vertices
-using ITensorBase: ITensorOperator, dimnames, domainnames, inds, name, named, nametype,
+using ITensorBase: ITensorOperator, dimnames, inputnames, inds, name, named, nametype,
     prime, uniquename, unnamedtype
 using LinearAlgebra: LinearAlgebra
 using MacroTools: @capture
@@ -133,7 +133,7 @@ function insertlink!(tn::AbstractGraph, e)
 end
 
 function supportof(tn::AbstractGraph, op::ITensorOperator)
-    support = Base.Generator(domainnames(op)) do name
+    support = Base.Generator(inputnames(op)) do name
         vertices = dimnamevertices(tn, name)
 
         length(vertices) == 1 && return only(vertices)
