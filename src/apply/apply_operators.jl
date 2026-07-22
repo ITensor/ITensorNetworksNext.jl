@@ -1,6 +1,7 @@
 using .AlgorithmsInterfaceExtensions: AlgorithmsInterfaceExtensions as AIE
 using AlgorithmsInterface: AlgorithmsInterface as AI
 using Base: @kwdef
+using GradedArrays: GradedArrays
 using Graphs: dst, src, vertices
 using ITensorBase: ITensorBase as ITB, AbstractITensor, dimnames, inputnames, operator,
     outputnames, replacedimnames
@@ -205,25 +206,30 @@ end
 
 # === BP simple-update implementation ===
 
-# Balanced square-root / inverse-square-root gauge from an incoming BP message. Following the
-# TNQS `simple_update` recipe, project the message to Hermitian in its (ket, bra) = (output,
-# input) bipartition, then take the balanced √ / inv-√ in the bipartition where the projected
-# message is positive semidefinite. For a fermionic bond the odd-parity sign lands on one of the
-# two bipartitions depending on the bond arrows: the two directed messages of a bond carry
-# opposite ket arrows (each is dual to its own endpoint, and the two endpoints' bond arrows are
-# opposite), so they are PSD in opposite bipartitions — one in the transposed (bra, ket), the
-# other in the intrinsic (ket, bra). Taking the sqrt in whichever is PSD recovers the odd-parity
-# fermion sign in both directions. `ITB.state` unwraps the operator to the underlying tensor, so
-# the returned gauges are plain tensors contracted directly into the state.
+# Balanced √ / inv-√ gauge from a BP message: project it Hermitian in its (ket, bra) = (output,
+# input) bipartition, then take the root in the bipartition where the projection is positive
+# semidefinite. The two directed messages of a fermionic bond have opposite ket arrows, so the
+# odd-parity sign makes each PSD in only one bipartition — try the transposed (bra, ket), fall
+# back to the intrinsic (ket, bra). `ITB.state` unwraps to the underlying tensor so the gauges
+# contract straight into the state.
 function message_gauge(message)
     ket, bra = outputnames(message), inputnames(message)
     hermitian_message = project_hermitian(ITB.state(message), ket, bra)
-    return try
-        sqrth_invsqrth_safe(hermitian_message, bra, ket)
-    catch err
-        err isa DomainError || rethrow()
-        sqrth_invsqrth_safe(hermitian_message, ket, bra)
+    return sqrth_invsqrth_safe(hermitian_message, bra, ket)
+end
+
+# HACK (experiment): reinterpret a graded tensor on dual-flipped axes (`isdual` toggled, sector
+# labels kept) WITHOUT the fermionic braid sign that `conj` applies. Flips the bond arrows while
+# keeping the odd-parity block intact.
+function dualize(t)
+    a = ITB.unnamed(t)
+    da = similar(a, eltype(a), map(GradedArrays.dual, axes(a)))
+    fill!(da, zero(eltype(a)))
+    for I in CartesianIndices(size(a))
+        v = a[I]
+        iszero(v) || (da[I] = v)
     end
+    return ITB.nameddims(da, dimnames(t))
 end
 
 function apply_gate_bp!(
@@ -293,12 +299,10 @@ function apply_gate_bp_nsite!(
     dest[v1] = prod([[Q_v1 * R_v1]; inv_gauges_v1])
     dest[v2] = prod([[Q_v2 * R_v2]; inv_gauges_v2])
 
-    # Uniform messages over the bond (ket) and the auxiliary leg (bra), mirroring TNQS's
-    # `s_values` / `conj(s_values)` but keeping ITNN's random names (`name_v2`) in place of TNQS's
-    # `prime(u)`: `conj(S)` goes into `v2` and `S` into `v1`. The two directions carry opposite
-    # ket arrows, so `conj` flips the odd-parity sector between them; `message_gauge` then recovers
-    # the fermion sign by factorizing each in its PSD bipartition.
-    env[v1 => v2] = operator(conj(S), (name_v1,), (name_v2,))
-    env[v2 => v1] = operator(S, (name_v1,), (name_v2,))
+    # `conj(S)` is the PSD bond message; the reverse direction is its arrow-flip that keeps the
+    # odd-parity block (via `dualize`, not `conj`, which would negate it and break PSD).
+    psd_message = conj(S)
+    env[v1 => v2] = operator(psd_message, (name_v1,), (name_v2,))
+    env[v2 => v1] = operator(dualize(psd_message), (name_v1,), (name_v2,))
     return dest
 end
