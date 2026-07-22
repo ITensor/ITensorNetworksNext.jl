@@ -218,19 +218,12 @@ function message_gauge(message)
     return sqrth_invsqrth_safe(hermitian_message, bra, ket)
 end
 
-# HACK (experiment): reinterpret a graded tensor on dual-flipped axes (`isdual` toggled, sector
-# labels kept) WITHOUT the fermionic braid sign that `conj` applies. Flips the bond arrows while
-# keeping the odd-parity block intact.
-function dualize(t)
-    a = ITB.unnamed(t)
-    da = similar(a, eltype(a), map(GradedArrays.dual, axes(a)))
-    fill!(da, zero(eltype(a)))
-    for I in CartesianIndices(size(a))
-        v = a[I]
-        iszero(v) || (da[I] = v)
-    end
-    return ITB.nameddims(da, dimnames(t))
+# TODO: replace with an ITensorBase-level `twist` to drop the direct `GradedArrays` dependency.
+function twist!(t, names)
+    GradedArrays.twist!(ITB.unnamed(t), map(n -> findfirst(==(n), dimnames(t)), names))
+    return t
 end
+twist(t, names) = twist!(copy(t), names)
 
 function apply_gate_bp!(
         dest::AbstractITensorNetwork, op::AbstractITensor,
@@ -299,10 +292,9 @@ function apply_gate_bp_nsite!(
     dest[v1] = prod([[Q_v1 * R_v1]; inv_gauges_v1])
     dest[v2] = prod([[Q_v2 * R_v2]; inv_gauges_v2])
 
-    # `conj(S)` is the PSD bond message; the reverse direction is its arrow-flip that keeps the
-    # odd-parity block (via `dualize`, not `conj`, which would negate it and break PSD).
-    psd_message = conj(S)
-    env[v1 => v2] = operator(psd_message, (name_v1,), (name_v2,))
-    env[v2 => v1] = operator(dualize(psd_message), (name_v1,), (name_v2,))
+    # The two directed messages are `conj(S)` and the ribbon twist of `S` over its ket side,
+    # both positive semidefinite in the transposed gauge.
+    env[v1 => v2] = operator(conj(S), (name_v1,), (name_v2,))
+    env[v2 => v1] = operator(twist(S, (name_v1,)), (name_v1,), (name_v2,))
     return dest
 end

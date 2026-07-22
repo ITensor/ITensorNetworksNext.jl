@@ -247,7 +247,7 @@ function message_update!(algorithm::SimpleMessageUpdate, cache, factors, edge)
     # `contract_network` works on plain named arrays, so unwrap any operator messages to
     # their underlying tensors before contracting (fermionic signs ride on the graded
     # arrays, so nothing is lost).
-    message_tensors = map(m -> m isa NamedTensorOperator ? state(m) : m, messages)
+    message_tensors = state.(messages)
     new_message = contract_network(
         [message_tensors; [factor]]; alg = algorithm.contraction_alg
     )
