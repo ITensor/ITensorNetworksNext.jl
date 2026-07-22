@@ -211,7 +211,7 @@ function similar_message_environment(nn::NormNetwork)
             ketnames = linknames(ketview, edge)
             ketaxis = unnamed.(linkaxes(ketview, edge))
 
-            branames = name.(linkinds(braview, edge))
+            branames = linknames(braview, edge)
 
             # Bond leg (ket) = operator output, bra-layer leg = input. Built on the src-side ket
             # axis, whose arrow is opposite the dst endpoint's bond, so the gauge contracts back
