@@ -209,13 +209,15 @@ function similar_message_environment(nn::NormNetwork)
             ketview = KetView(nn)
 
             ketnames = linknames(ketview, edge)
+            ketaxis = unnamed.(linkaxes(ketview, edge))
 
-            brainds = linkinds(braview, edge)
-            branames = name.(brainds)
-            braaxis = unnamed.(brainds)
+            branames = name.(linkinds(braview, edge))
 
-            # Message axis is conj to the tensor it points to.
-            message = similar_operator(ketview[vertex], braaxis, branames, ketnames)
+            # Uniform message convention: the bond leg shared with the ket tensor is the operator
+            # output (ket), the bra-layer leg is the input (bra). The message is built on the
+            # src-side ket axis, whose arrow is opposite the dst endpoint's bond, so the gauge's
+            # ket leg contracts back into the destination state.
+            message = similar_operator(ketview[vertex], ketaxis, ketnames, branames)
 
             return edge => message
         end

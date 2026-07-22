@@ -4,7 +4,7 @@ using AlgorithmsInterface: AlgorithmsInterface as AI
 using DataGraphs: edge_data
 using Graphs: AbstractEdge, edges, edgetype, has_edge, vertices
 using ITensorBase:
-    AbstractITensor, NamedTensorOperator, codomainnames, domainnames, operator, state
+    AbstractITensor, NamedTensorOperator, inputnames, operator, outputnames, state
 using LinearAlgebra: norm, normalize, tr
 using NamedGraphs.GraphsExtensions:
     add_edges!, boundary_edges, forest_cover_edge_sequence, subgraph
@@ -260,7 +260,7 @@ function message_update!(algorithm::SimpleMessageUpdate, cache, factors, edge)
     old_message = cache[edge]
     if old_message isa NamedTensorOperator
         new_message =
-            operator(new_message, codomainnames(old_message), domainnames(old_message))
+            operator(new_message, outputnames(old_message), inputnames(old_message))
     end
 
     if algorithm.normalize

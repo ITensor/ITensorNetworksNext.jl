@@ -2,8 +2,8 @@ using .AlgorithmsInterfaceExtensions: AlgorithmsInterfaceExtensions as AIE
 using AlgorithmsInterface: AlgorithmsInterface as AI
 using Base: @kwdef
 using Graphs: dst, src, vertices
-using ITensorBase:
-    ITensorBase as ITB, AbstractITensor, dimnames, inputnames, operator, replacedimnames
+using ITensorBase: ITensorBase as ITB, AbstractITensor, dimnames, inputnames, operator,
+    outputnames, replacedimnames
 using LinearAlgebra: norm
 using MatrixAlgebraKit: project_hermitian, qr_compact, svd_trunc
 using NamedGraphs.GraphsExtensions: all_edges, boundary_edges
@@ -205,8 +205,26 @@ end
 
 # === BP simple-update implementation ===
 
-# The message's domain (ket) leg is the one shared with the state tensor it gauges, so the
-# fermionic braid sign is carried by the graded contraction and no bipartition flip is needed.
+# Balanced square-root / inverse-square-root gauge from an incoming BP message. Following the
+# TNQS `simple_update` recipe, project the message to Hermitian in its (ket, bra) = (output,
+# input) bipartition, then take the balanced √ / inv-√ in the bipartition where the projected
+# message is positive semidefinite. For a fermionic bond the odd-parity sign lands on one of the
+# two bipartitions depending on the bond arrows: the two directed messages of a bond carry
+# opposite ket arrows (each is dual to its own endpoint, and the two endpoints' bond arrows are
+# opposite), so they are PSD in opposite bipartitions — one in the transposed (bra, ket), the
+# other in the intrinsic (ket, bra). Taking the sqrt in whichever is PSD recovers the odd-parity
+# fermion sign in both directions. `ITB.state` unwraps the operator to the underlying tensor, so
+# the returned gauges are plain tensors contracted directly into the state.
+function message_gauge(message)
+    ket, bra = outputnames(message), inputnames(message)
+    hermitian_message = project_hermitian(ITB.state(message), ket, bra)
+    return try
+        sqrth_invsqrth_safe(hermitian_message, bra, ket)
+    catch err
+        err isa DomainError || rethrow()
+        sqrth_invsqrth_safe(hermitian_message, ket, bra)
+    end
+end
 
 function apply_gate_bp!(
         dest::AbstractITensorNetwork, op::AbstractITensor,
@@ -236,10 +254,10 @@ function apply_gate_bp_nsite!(
     ψv = ITB.apply(op, state[v])
     if normalize
         gauges = [
-            sqrth_safe(project_hermitian(env[e]))
+            first(message_gauge(env[e]))
                 for e in boundary_edges(state, vs; dir = :in)
         ]
-        ψv /= norm(prod([[ψv]; ITB.state.(gauges)]))
+        ψv /= norm(prod([[ψv]; gauges]))
     end
     dest[v] = ψv
     return dest
@@ -252,19 +270,13 @@ function apply_gate_bp_nsite!(
     )
     v1, v2 = vs
     edges_in = boundary_edges(state, vs; dir = :in)
-    sqrts_invsqrts_v1 = [
-        sqrth_invsqrth_safe(project_hermitian(env[e]))
-            for e in edges_in if dst(e) == v1
-    ]
-    sqrts_invsqrts_v2 = [
-        sqrth_invsqrth_safe(project_hermitian(env[e]))
-            for e in edges_in if dst(e) == v2
-    ]
-    gauges_v1, inv_gauges_v1 = first.(sqrts_invsqrts_v1), conj.(last.(sqrts_invsqrts_v1))
-    gauges_v2, inv_gauges_v2 = first.(sqrts_invsqrts_v2), conj.(last.(sqrts_invsqrts_v2))
+    siv_v1 = [message_gauge(env[e]) for e in edges_in if dst(e) == v1]
+    siv_v2 = [message_gauge(env[e]) for e in edges_in if dst(e) == v2]
+    gauges_v1, inv_gauges_v1 = first.(siv_v1), conj.(last.(siv_v1))
+    gauges_v2, inv_gauges_v2 = first.(siv_v2), conj.(last.(siv_v2))
 
-    ψ_v1 = prod([[state[v1]]; ITB.state.(gauges_v1)])
-    ψ_v2 = prod([[state[v2]]; ITB.state.(gauges_v2)])
+    ψ_v1 = prod([[state[v1]]; gauges_v1])
+    ψ_v2 = prod([[state[v2]]; gauges_v2])
 
     Q_v1, R_v1 = qr_compact(ψ_v1, setdiff(dimnames(ψ_v1), dimnames(ψ_v2), dimnames(op)))
     Q_v2, R_v2 = qr_compact(ψ_v2, setdiff(dimnames(ψ_v2), dimnames(ψ_v1), dimnames(op)))
@@ -278,10 +290,15 @@ function apply_gate_bp_nsite!(
     R_v1 = replacedimnames(U_v1 * sqrt_S, name_v2 => name_v1)
     R_v2 = sqrt_S * U_v2
 
-    dest[v1] = prod([[Q_v1 * R_v1]; ITB.state.(inv_gauges_v1)])
-    dest[v2] = prod([[Q_v2 * R_v2]; ITB.state.(inv_gauges_v2)])
+    dest[v1] = prod([[Q_v1 * R_v1]; inv_gauges_v1])
+    dest[v2] = prod([[Q_v2 * R_v2]; inv_gauges_v2])
 
-    env[v1 => v2] = operator(conj(S), (name_v2,), (name_v1,))
+    # Uniform messages over the bond (ket) and the auxiliary leg (bra), mirroring TNQS's
+    # `s_values` / `conj(s_values)` but keeping ITNN's random names (`name_v2`) in place of TNQS's
+    # `prime(u)`: `conj(S)` goes into `v2` and `S` into `v1`. The two directions carry opposite
+    # ket arrows, so `conj` flips the odd-parity sector between them; `message_gauge` then recovers
+    # the fermion sign by factorizing each in its PSD bipartition.
+    env[v1 => v2] = operator(conj(S), (name_v1,), (name_v2,))
     env[v2 => v1] = operator(S, (name_v1,), (name_v2,))
     return dest
 end
