@@ -206,16 +206,31 @@ end
 # === BP simple-update implementation ===
 
 # The odd-parity sign leaves a fermionic message positive semidefinite in only one
-# bipartition, so diagonalize it in the transposed (bra, ket) one. We use the balanced gauge
-# `v * √d * v'` (and inverse `v * √d⁻¹ * v'`), which works with fermions; the asymmetric gauge
-# `√d * v'` has an issue that is under investigation.
-function message_gauge(message)
+# bipartition, so diagonalize it in the transposed (bra, ket) one, placing the
+# eigenvectors on the bra and ket legs ready to sandwich a function of the eigenvalues.
+# Shared by `message_root` and `message_gauge`.
+function message_eigen(message)
     ket, bra = outputnames(message), inputnames(message)
     hermitian_message = project_hermitian(ITB.state(message), ket, bra)
     d, v = eigh_full(hermitian_message, bra, ket)
     name_d′, name_d = dimnames(d)
     v_ket = conj(v)
     v_bra = replacedimnames(v, only(ket) => only(bra), name_d => name_d′)
+    return d, v_bra, v_ket
+end
+
+# The balanced Hermitian root `v * √d * v'` of the message. This gauge works with
+# fermions; the asymmetric gauge `√d * v'` has an issue that is under investigation.
+function message_root(message)
+    d, v_bra, v_ket = message_eigen(message)
+    name_d′, name_d = dimnames(d)
+    return v_bra * sqrth_safe(d, (name_d′,), (name_d,)) * v_ket
+end
+
+# The message root paired with its inverse `v * √d⁻¹ * v'`, to gauge a bond and undo it.
+function message_gauge(message)
+    d, v_bra, v_ket = message_eigen(message)
+    name_d′, name_d = dimnames(d)
     return v_bra * sqrth_safe(d, (name_d′,), (name_d,)) * v_ket,
         v_bra * invsqrth_safe(d, (name_d′,), (name_d,)) * v_ket
 end
@@ -248,7 +263,7 @@ function apply_gate_bp_nsite!(
     ψv = ITB.apply(op, state[v])
     if normalize
         gauges = [
-            first(message_gauge(env[e]))
+            message_root(env[e])
                 for e in boundary_edges(state, vs; dir = :in)
         ]
         ψv /= norm(prod([[ψv]; gauges]))
