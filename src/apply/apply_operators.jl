@@ -206,10 +206,8 @@ end
 # === BP simple-update implementation ===
 
 # The odd-parity sign leaves a fermionic message positive semidefinite in only one
-# bipartition, so diagonalize it in the transposed (bra, ket) one. From the eigenvectors
-# `v` and eigenvalues `d`, the gauge and its inverse are the balanced roots
-# `v * √d * v'` and `v * √d⁻¹ * v'`, with `v` supplying the ket leg and its `bra`-relabeled
-# copy the other, so the odd-parity sign stays inside the graded contraction.
+# bipartition, so diagonalize it in the transposed (bra, ket) one. The gauge and its inverse
+# are then the balanced roots `v * √d * v'` and `v * √d⁻¹ * v'` of the eigendecomposition.
 function message_gauge(message)
     ket, bra = outputnames(message), inputnames(message)
     hermitian_message = project_hermitian(ITB.state(message), ket, bra)
