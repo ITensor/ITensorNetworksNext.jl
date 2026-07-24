@@ -1,7 +1,6 @@
 using .AlgorithmsInterfaceExtensions: AlgorithmsInterfaceExtensions as AIE
 using AlgorithmsInterface: AlgorithmsInterface as AI
 using Base: @kwdef
-using GradedArrays: GradedArrays
 using Graphs: dst, src, vertices
 using ITensorBase: ITensorBase as ITB, AbstractITensor, dimnames, inputnames, operator,
     outputnames, replacedimnames
@@ -206,24 +205,13 @@ end
 
 # === BP simple-update implementation ===
 
-# Balanced √ / inv-√ gauge from a BP message: project it Hermitian in its (ket, bra) = (output,
-# input) bipartition, then take the root in the bipartition where the projection is positive
-# semidefinite. The two directed messages of a fermionic bond have opposite ket arrows, so the
-# odd-parity sign makes each PSD in only one bipartition — try the transposed (bra, ket), fall
-# back to the intrinsic (ket, bra). `ITB.state` unwraps to the underlying tensor so the gauges
-# contract straight into the state.
+# The odd-parity sign leaves a fermionic message positive semidefinite in only one
+# bipartition, so root it in the transposed (bra, ket) one.
 function message_gauge(message)
     ket, bra = outputnames(message), inputnames(message)
     hermitian_message = project_hermitian(ITB.state(message), ket, bra)
     return sqrth_invsqrth_safe(hermitian_message, bra, ket)
 end
-
-# TODO: replace with an ITensorBase-level `twist` to drop the direct `GradedArrays` dependency.
-function twist!(t, names)
-    GradedArrays.twist!(ITB.unnamed(t), map(n -> findfirst(==(n), dimnames(t)), names))
-    return t
-end
-twist(t, names) = twist!(copy(t), names)
 
 function apply_gate_bp!(
         dest::AbstractITensorNetwork, op::AbstractITensor,
@@ -292,9 +280,12 @@ function apply_gate_bp_nsite!(
     dest[v1] = prod([[Q_v1 * R_v1]; inv_gauges_v1])
     dest[v2] = prod([[Q_v2 * R_v2]; inv_gauges_v2])
 
-    # The two directed messages are `conj(S)` and the ribbon twist of `S` over its ket side,
-    # both positive semidefinite in the transposed gauge.
-    env[v1 => v2] = operator(conj(S), (name_v1,), (name_v2,))
-    env[v2 => v1] = operator(twist(S, (name_v1,)), (name_v1,), (name_v2,))
+    # The graded contraction of a factor with its conjugate carries the odd-parity sign.
+    env[v1 => v2] = operator(
+        replacedimnames(conj(R_v1), name_v1 => name_v2) * R_v1, (name_v1,), (name_v2,)
+    )
+    env[v2 => v1] = operator(
+        replacedimnames(conj(R_v2), name_v1 => name_v2) * R_v2, (name_v1,), (name_v2,)
+    )
     return dest
 end
