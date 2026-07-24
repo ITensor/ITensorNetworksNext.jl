@@ -5,9 +5,9 @@ using Graphs: dst, src, vertices
 using ITensorBase: ITensorBase as ITB, AbstractITensor, dimnames, inputnames, operator,
     outputnames, replacedimnames
 using LinearAlgebra: norm
-using MatrixAlgebraKit: project_hermitian, qr_compact, svd_trunc
+using MatrixAlgebraKit: eigh_full, project_hermitian, qr_compact, svd_trunc
 using NamedGraphs.GraphsExtensions: all_edges, boundary_edges
-using TensorAlgebra.MatrixAlgebra: sqrth_invsqrth_safe, sqrth_safe
+using TensorAlgebra.MatrixAlgebra: invsqrth_safe, sqrth_safe
 
 # === Top-level user entry point ===
 
@@ -206,11 +206,19 @@ end
 # === BP simple-update implementation ===
 
 # The odd-parity sign leaves a fermionic message positive semidefinite in only one
-# bipartition, so root it in the transposed (bra, ket) one.
+# bipartition, so diagonalize it in the transposed (bra, ket) one. From the eigenvectors
+# `v` and eigenvalues `d`, the gauge and its inverse are the balanced roots
+# `v * √d * v'` and `v * √d⁻¹ * v'`, with `v` supplying the ket leg and its `bra`-relabeled
+# copy the other, so the odd-parity sign stays inside the graded contraction.
 function message_gauge(message)
     ket, bra = outputnames(message), inputnames(message)
     hermitian_message = project_hermitian(ITB.state(message), ket, bra)
-    return sqrth_invsqrth_safe(hermitian_message, bra, ket)
+    d, v = eigh_full(hermitian_message, bra, ket)
+    name_d′, name_d = dimnames(d)
+    v_ket = conj(v)
+    v_bra = replacedimnames(v, only(ket) => only(bra), name_d => name_d′)
+    return v_bra * sqrth_safe(d, (name_d′,), (name_d,)) * v_ket,
+        v_bra * invsqrth_safe(d, (name_d′,), (name_d,)) * v_ket
 end
 
 function apply_gate_bp!(
