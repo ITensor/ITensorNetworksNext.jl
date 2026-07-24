@@ -3,8 +3,9 @@ using .AlgorithmsInterfaceExtensions:
 using AlgorithmsInterface: AlgorithmsInterface as AI
 using DataGraphs: edge_data
 using Graphs: AbstractEdge, edges, edgetype, has_edge, vertices
-using ITensorBase: AbstractITensor
-using LinearAlgebra: norm, normalize
+using ITensorBase:
+    AbstractITensor, NamedTensorOperator, inputnames, operator, outputnames, state
+using LinearAlgebra: norm, normalize, tr
 using NamedGraphs.GraphsExtensions:
     add_edges!, boundary_edges, forest_cover_edge_sequence, subgraph
 using NamedGraphs.PartitionedGraphs: quotientvertices
@@ -243,10 +244,28 @@ function message_update!(algorithm::SimpleMessageUpdate, cache, factors, edge)
     messages = collect(incoming_messages(cache, edge))
     factor = factors[src(edge)]
 
-    new_message = contract_network([messages; [factor]]; alg = algorithm.contraction_alg)
+    # `contract_network` works on plain named arrays, so unwrap any operator messages to
+    # their underlying tensors before contracting (fermionic signs ride on the graded
+    # arrays, so nothing is lost).
+    message_tensors = state.(messages)
+    new_message = contract_network(
+        [message_tensors; [factor]]; alg = algorithm.contraction_alg
+    )
+
+    # `contract_network` drops the bra/ket operator structure, so restore it from the
+    # existing message. A doubled (ket/bra) message is then a bond operator: normalize by
+    # its trace, which is sign-correct for fermionic bonds (the entrywise `sum` can flip
+    # the odd-parity block's sign). A single-layer message stays a vector with no bra/ket
+    # pairing, so fall back to the entrywise sum there.
+    old_message = cache[edge]
+    if old_message isa NamedTensorOperator
+        new_message =
+            operator(new_message, outputnames(old_message), inputnames(old_message))
+    end
 
     if algorithm.normalize
-        message_norm = sum(new_message)
+        message_norm =
+            new_message isa NamedTensorOperator ? tr(new_message) : sum(new_message)
         if !iszero(message_norm)
             new_message /= message_norm
         end

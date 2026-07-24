@@ -2,12 +2,12 @@ using .AlgorithmsInterfaceExtensions: AlgorithmsInterfaceExtensions as AIE
 using AlgorithmsInterface: AlgorithmsInterface as AI
 using Base: @kwdef
 using Graphs: dst, src, vertices
-using ITensorBase:
-    ITensorBase as ITB, AbstractITensor, dimnames, inputnames, operator, replacedimnames
+using ITensorBase: ITensorBase as ITB, AbstractITensor, dimnames, inputnames, operator,
+    outputnames, replacedimnames
 using LinearAlgebra: norm
-using MatrixAlgebraKit: qr_compact, svd_trunc
+using MatrixAlgebraKit: eigh_full, project_hermitian, qr_compact, svd_trunc
 using NamedGraphs.GraphsExtensions: all_edges, boundary_edges
-using TensorAlgebra.MatrixAlgebra: gram_eigh_full, gram_eigh_full_with_pinv
+using TensorAlgebra.MatrixAlgebra: invsqrth_safe, sqrth_safe
 
 # === Top-level user entry point ===
 
@@ -205,6 +205,36 @@ end
 
 # === BP simple-update implementation ===
 
+# The odd-parity sign leaves a fermionic message positive semidefinite in only one
+# bipartition, so diagonalize it in the transposed (bra, ket) one, placing the
+# eigenvectors on the bra and ket legs ready to sandwich a function of the eigenvalues.
+# Shared by `message_root` and `message_gauge`.
+function message_eigen(message)
+    ket, bra = outputnames(message), inputnames(message)
+    hermitian_message = project_hermitian(ITB.state(message), ket, bra)
+    d, v = eigh_full(hermitian_message, bra, ket)
+    name_d′, name_d = dimnames(d)
+    v_ket = conj(v)
+    v_bra = replacedimnames(v, only(ket) => only(bra), name_d => name_d′)
+    return d, v_bra, v_ket
+end
+
+# The balanced Hermitian root `v * √d * v'` of the message. This gauge works with
+# fermions; the asymmetric gauge `√d * v'` has an issue that is under investigation.
+function message_root(message)
+    d, v_bra, v_ket = message_eigen(message)
+    name_d′, name_d = dimnames(d)
+    return v_bra * sqrth_safe(d, (name_d′,), (name_d,)) * v_ket
+end
+
+# The message root paired with its inverse `v * √d⁻¹ * v'`, to gauge a bond and undo it.
+function message_gauge(message)
+    d, v_bra, v_ket = message_eigen(message)
+    name_d′, name_d = dimnames(d)
+    return v_bra * sqrth_safe(d, (name_d′,), (name_d,)) * v_ket,
+        v_bra * invsqrth_safe(d, (name_d′,), (name_d,)) * v_ket
+end
+
 function apply_gate_bp!(
         dest::AbstractITensorNetwork, op::AbstractITensor,
         state::AbstractITensorNetwork, env; kwargs...
@@ -233,7 +263,7 @@ function apply_gate_bp_nsite!(
     ψv = ITB.apply(op, state[v])
     if normalize
         gauges = [
-            conj(gram_eigh_full(env[e]))
+            message_root(env[e])
                 for e in boundary_edges(state, vs; dir = :in)
         ]
         ψv /= norm(prod([[ψv]; gauges]))
@@ -249,12 +279,10 @@ function apply_gate_bp_nsite!(
     )
     v1, v2 = vs
     edges_in = boundary_edges(state, vs; dir = :in)
-    grams_v1 =
-        [gram_eigh_full_with_pinv(env[e]) for e in edges_in if dst(e) == v1]
-    grams_v2 =
-        [gram_eigh_full_with_pinv(env[e]) for e in edges_in if dst(e) == v2]
-    gauges_v1, inv_gauges_v1 = conj.(first.(grams_v1)), conj.(last.(grams_v1))
-    gauges_v2, inv_gauges_v2 = conj.(first.(grams_v2)), conj.(last.(grams_v2))
+    siv_v1 = [message_gauge(env[e]) for e in edges_in if dst(e) == v1]
+    siv_v2 = [message_gauge(env[e]) for e in edges_in if dst(e) == v2]
+    gauges_v1, inv_gauges_v1 = first.(siv_v1), conj.(last.(siv_v1))
+    gauges_v2, inv_gauges_v2 = first.(siv_v2), conj.(last.(siv_v2))
 
     ψ_v1 = prod([[state[v1]]; gauges_v1])
     ψ_v2 = prod([[state[v2]]; gauges_v2])
@@ -267,17 +295,19 @@ function apply_gate_bp_nsite!(
         S = S / norm(S)
     end
     name_v1, name_v2 = dimnames(S)
-    sqrt_S = sqrt(S, (name_v1,), (name_v2,))
+    sqrt_S = sqrth_safe(S, (name_v1,), (name_v2,); atol = 0, rtol = 0)
     R_v1 = replacedimnames(U_v1 * sqrt_S, name_v2 => name_v1)
     R_v2 = sqrt_S * U_v2
 
     dest[v1] = prod([[Q_v1 * R_v1]; inv_gauges_v1])
     dest[v2] = prod([[Q_v2 * R_v2]; inv_gauges_v2])
 
-    env[v1 => v2] = operator(conj(S), (name_v2,), (name_v1,))
+    # The graded contraction of a factor with its conjugate carries the odd-parity sign.
+    env[v1 => v2] = operator(
+        replacedimnames(conj(R_v1), name_v1 => name_v2) * R_v1, (name_v1,), (name_v2,)
+    )
     env[v2 => v1] = operator(
-        conj(replacedimnames(S, name_v1 => name_v2, name_v2 => name_v1)),
-        (name_v2,), (name_v1,)
+        replacedimnames(conj(R_v2), name_v1 => name_v2) * R_v2, (name_v1,), (name_v2,)
     )
     return dest
 end
