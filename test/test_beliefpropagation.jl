@@ -5,9 +5,9 @@ using GradedArrays: U1, gradedrange
 using Graphs: AbstractGraph, dst, edges, has_edge, src, vertices
 using ITensorBase: ITensor, Index, inds, name, noprime, outputnames, prime
 using ITensorNetworksNext: ITensorNetworksNext, ITensorNetwork, MessageCache, NormNetwork,
-    StopWhenConverged, bethe_free_energy, edge_scalar, incoming_messages, insertlink!,
-    linkinds, message_environment, messagecache, region_scalar, subgraph, tensornetwork,
-    vertex_scalar, vertex_scalars
+    StopWhenConverged, beliefpropagation, bethe_free_energy, edge_scalar, incoming_messages,
+    insertlink!, linkinds, message_environment, messagecache, region_scalar, subgraph,
+    tensornetwork, vertex_scalar, vertex_scalars
 using LinearAlgebra: LinearAlgebra
 using NamedGraphs.GraphsExtensions: all_edges, arranged_edges, incident_edges, vertextype
 using NamedGraphs.NamedGraphGenerators: named_comb_tree, named_grid, named_path_graph
@@ -174,7 +174,7 @@ end
                 edge => ones(T, Tuple(linkinds(tn, edge))) for edge in all_edges(g)
             )
 
-            cache = ITensorNetworksNext.beliefpropagation(
+            cache = beliefpropagation(
                 tn, messages; stopping_criterion = (; maxiter = 1)
             )
             z_bp = exp(bethe_free_energy(tn, cache))
@@ -197,7 +197,7 @@ end
                 edge => ones(T, Tuple(linkinds(tn, edge))) for edge in all_edges(g)
             )
 
-            cache = ITensorNetworksNext.beliefpropagation(
+            cache = beliefpropagation(
                 tn, messages; stopping_criterion = (; maxiter = 1)
             )
             z_bp = exp(bethe_free_energy(tn, cache))
@@ -216,7 +216,7 @@ end
                             for edge in all_edges(g)
                     )
 
-                    cache = ITensorNetworksNext.beliefpropagation(
+                    cache = beliefpropagation(
                         tn, messages;
                         stopping_criterion = (; maxiter = 10, tol = 1.0e-10)
                     )
@@ -249,7 +249,7 @@ end
             end
             nn = NormNetwork(network)
 
-            cache = ITensorNetworksNext.beliefpropagation(
+            cache = beliefpropagation(
                 nn, message_environment(one, nn);
                 stopping_criterion = (; maxiter = 20, tol = 1.0e-10)
             )
