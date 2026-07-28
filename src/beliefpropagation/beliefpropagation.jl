@@ -244,10 +244,7 @@ end
 function updated_message(algorithm::SimpleMessageUpdate, cache, factors, edge)
     messages = collect(incoming_messages(cache, edge))
     factor = factors[src(edge)]
-    # TODO: `contract_network` can't currently contract a mix of operator and plain operands, so
-    # unwrap operator-valued messages with `state` first. Remove the `state.` once `contract_network`
-    # handles operator operands.
-    return contract_network([state.(messages); [factor]]; alg = algorithm.contraction_alg)
+    return contract_network([messages; [factor]]; alg = algorithm.contraction_alg)
 end
 
 # Single-layer network: the message is a plain bond vector, normalized by its entrywise sum.
@@ -261,11 +258,11 @@ function message_update!(algorithm::SimpleMessageUpdate, cache, factors, edge)
     return cache
 end
 
-# `NormNetwork`: the message is a doubled (ket/bra) bond operator. `contract_network` drops the
-# operator structure, so re-wrap the result with the ket/bra names the norm network assigns to this
-# edge (the same convention as `similar_message_environment`) rather than reconstructing them from
-# the old message. Normalize by the trace, which is sign-correct on fermionic bonds where the
-# entrywise `sum` can flip the odd-parity block's sign.
+# `NormNetwork`: the message is a doubled (ket/bra) bond operator. Contracting a plain vertex factor
+# with the incoming messages leaves the surviving bond legs dangling, so assign the ket/bra pairing
+# the norm network gives this edge (the same convention as `similar_message_environment`). Normalize
+# by the trace, which is sign-correct on fermionic bonds where the entrywise `sum` can flip the
+# odd-parity block's sign.
 function message_update!(algorithm::SimpleMessageUpdate, cache, factors::NormNetwork, edge)
     new_tensor = updated_message(algorithm, cache, factors, edge)
     new_message = operator(

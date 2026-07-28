@@ -26,12 +26,20 @@ function get_order(alg::Exact, tn)
     end
     # Contraction order may or may not have indices attached, canonicalize the format
     # by attaching indices.
-    subs = Dict(symnameddims(i) => symnameddims(i, Tuple(axes(tn[i]))) for i in keys(tn))
+    subs = Dict(symnameddims(i) => symnameddims(i, Tuple(axes(t))) for (i, t) in pairs(tn))
     return substitute(order, subs)
 end
+# Promote the operands to their common type before lowering to the lazy expression, so every lazy
+# operand shares one concrete type. Otherwise a network of mixed types (a plain tensor is a trivial
+# operator, so mixing operators and plain tensors is the common case) widens the symbolic `Mul`
+# container to a `UnionAll` it cannot construct. `promote_type`/`convert` keep an all-plain network
+# at the plain type (the promotion is a no-op), so its fast path is unchanged.
 function contract_network(alg::Exact, tn)
     order = get_order(alg, tn)
-    syms_to_ts = Dict(symnameddims(i, Tuple(axes(tn[i]))) => lazy(tn[i]) for i in keys(tn))
+    T = mapreduce(typeof, promote_type, tn)
+    syms_to_ts = Dict(
+        symnameddims(i, Tuple(axes(t))) => lazy(convert(T, t)) for (i, t) in pairs(tn)
+    )
     tn_expression = substitute(order, syms_to_ts)
     return materialize(tn_expression)
 end
