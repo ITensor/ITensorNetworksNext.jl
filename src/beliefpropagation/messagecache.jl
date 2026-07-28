@@ -136,8 +136,10 @@ function incoming_edge_data(cache::AbstractGraph, vertices)
     return getindices(cache, dimnames)
 end
 
-# `contract_network` works on plain named arrays, so operator-valued (doubled ket/bra) messages are
-# unwrapped with `state` (idempotent on plain messages) before contracting into a scalar.
+# `contract_network` routes operands through the lazy `Mul` path, which is invariant in the operand
+# type and currently only accepts plain arrays, so operator-valued (doubled ket/bra) messages are
+# unwrapped with `state` (idempotent on plain messages) before contracting. Drop the unwrap once
+# `contract_network` preserves operator operands.
 function vertex_scalar(factors, messages, vertex; kwargs...)
     in_messages = incoming_edge_data(messages, [vertex])
     tensors = vcat([factors[vertex]], state.(collect(in_messages)))
@@ -152,10 +154,8 @@ function vertex_scalars(factors, messages, vertices)
     return map(v -> vertex_scalar(factors, messages, v), vertices)
 end
 
-function edge_scalar(cache, edge; kwargs...)
-    m1 = state(cache[edge])
-    m2 = state(cache[reverse(edge)])
-    return contract_network([m1, m2]; kwargs...)[]
+function edge_scalar(cache, edge)
+    return (cache[edge] * cache[reverse(edge)])[]
 end
 
 edge_scalars(cache) = edge_scalars(cache, keys(cache))
