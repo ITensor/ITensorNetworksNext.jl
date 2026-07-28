@@ -241,7 +241,7 @@ end
 
 # Contract the incoming messages into the source factor to form the (unnormalized) new message on
 # `edge`.
-function contracted_message(algorithm::SimpleMessageUpdate, cache, factors, edge)
+function updated_message(algorithm::SimpleMessageUpdate, cache, factors, edge)
     messages = collect(incoming_messages(cache, edge))
     factor = factors[src(edge)]
     # TODO: `contract_network` can't currently contract a mix of operator and plain operands, so
@@ -252,7 +252,7 @@ end
 
 # Single-layer network: the message is a plain bond vector, normalized by its entrywise sum.
 function message_update!(algorithm::SimpleMessageUpdate, cache, factors, edge)
-    new_message = contracted_message(algorithm, cache, factors, edge)
+    new_message = updated_message(algorithm, cache, factors, edge)
     if algorithm.normalize
         message_norm = sum(new_message)
         iszero(message_norm) || (new_message /= message_norm)
@@ -267,7 +267,7 @@ end
 # the old message. Normalize by the trace, which is sign-correct on fermionic bonds where the
 # entrywise `sum` can flip the odd-parity block's sign.
 function message_update!(algorithm::SimpleMessageUpdate, cache, factors::NormNetwork, edge)
-    new_tensor = contracted_message(algorithm, cache, factors, edge)
+    new_tensor = updated_message(algorithm, cache, factors, edge)
     new_message = operator(
         new_tensor, linknames(KetView(factors), edge), linknames(BraView(factors), edge)
     )
