@@ -3,8 +3,7 @@ using .AlgorithmsInterfaceExtensions:
 using AlgorithmsInterface: AlgorithmsInterface as AI
 using DataGraphs: edge_data
 using Graphs: AbstractEdge, edges, edgetype, has_edge, vertices
-using ITensorBase:
-    AbstractITensor, NamedTensorOperator, inputnames, operator, outputnames, state
+using ITensorBase: AbstractITensor, operator, state
 using LinearAlgebra: norm, normalize, tr
 using NamedGraphs.GraphsExtensions:
     add_edges!, boundary_edges, forest_cover_edge_sequence, subgraph
@@ -240,37 +239,42 @@ end
     contraction_alg::ContractionAlg = Exact()
 end
 
-function message_update!(algorithm::SimpleMessageUpdate, cache, factors, edge)
+# Contract the incoming messages into the source factor to form the (unnormalized) new message on
+# `edge`.
+function updated_message(algorithm::SimpleMessageUpdate, cache, factors, edge)
     messages = collect(incoming_messages(cache, edge))
     factor = factors[src(edge)]
+    # TODO: `contract_network` can't currently contract a mix of operator and plain operands, so
+    # unwrap operator-valued messages with `state` first. Remove the `state.` once `contract_network`
+    # handles operator operands.
+    return contract_network([state.(messages); [factor]]; alg = algorithm.contraction_alg)
+end
 
-    # `contract_network` works on plain named arrays, so unwrap any operator messages to
-    # their underlying tensors before contracting (fermionic signs ride on the graded
-    # arrays, so nothing is lost).
-    message_tensors = state.(messages)
-    new_message = contract_network(
-        [message_tensors; [factor]]; alg = algorithm.contraction_alg
-    )
-
-    # `contract_network` drops the bra/ket operator structure, so restore it from the
-    # existing message. A doubled (ket/bra) message is then a bond operator: normalize by
-    # its trace, which is sign-correct for fermionic bonds (the entrywise `sum` can flip
-    # the odd-parity block's sign). A single-layer message stays a vector with no bra/ket
-    # pairing, so fall back to the entrywise sum there.
-    old_message = cache[edge]
-    if old_message isa NamedTensorOperator
-        new_message =
-            operator(new_message, outputnames(old_message), inputnames(old_message))
-    end
-
+# Single-layer network: the message is a plain bond vector, normalized by its entrywise sum.
+function message_update!(algorithm::SimpleMessageUpdate, cache, factors, edge)
+    new_message = updated_message(algorithm, cache, factors, edge)
     if algorithm.normalize
-        message_norm =
-            new_message isa NamedTensorOperator ? tr(new_message) : sum(new_message)
-        if !iszero(message_norm)
-            new_message /= message_norm
-        end
+        message_norm = sum(new_message)
+        iszero(message_norm) || (new_message /= message_norm)
     end
+    cache[edge] = new_message
+    return cache
+end
 
+# `NormNetwork`: the message is a doubled (ket/bra) bond operator. `contract_network` drops the
+# operator structure, so re-wrap the result with the ket/bra names the norm network assigns to this
+# edge (the same convention as `similar_message_environment`) rather than reconstructing them from
+# the old message. Normalize by the trace, which is sign-correct on fermionic bonds where the
+# entrywise `sum` can flip the odd-parity block's sign.
+function message_update!(algorithm::SimpleMessageUpdate, cache, factors::NormNetwork, edge)
+    new_tensor = updated_message(algorithm, cache, factors, edge)
+    new_message = operator(
+        new_tensor, linknames(KetView(factors), edge), linknames(BraView(factors), edge)
+    )
+    if algorithm.normalize
+        message_norm = tr(new_message)
+        iszero(message_norm) || (new_message /= message_norm)
+    end
     cache[edge] = new_message
     return cache
 end

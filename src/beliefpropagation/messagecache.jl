@@ -3,7 +3,7 @@ using DataGraphs: DataGraphs, AbstractDataGraph, AbstractEdgeDataGraph, edge_dat
     vertex_data_type
 using Dictionaries: Dictionary, delete!, getindices, set!
 using Graphs: AbstractGraph, connected_components, is_directed, is_tree
-using ITensorBase: unnamed
+using ITensorBase: state, unnamed
 using NamedGraphs.GraphsExtensions: IsDirected, boundary_edges, default_root_vertex,
     directed_graph, forest_cover, in_incident_edges, post_order_dfs_edges, undirected_graph,
     vertextype
@@ -138,7 +138,10 @@ end
 
 function vertex_scalar(factors, messages, vertex; kwargs...)
     in_messages = incoming_edge_data(messages, [vertex])
-    tensors = vcat([factors[vertex]], collect(in_messages))
+    # TODO: `contract_network` can't currently contract a mix of operator and plain operands, so
+    # unwrap operator-valued messages with `state` first. Remove the `state.` once `contract_network`
+    # handles operator operands.
+    tensors = [[factors[vertex]]; state.(collect(in_messages))]
     return contract_network(tensors; kwargs...)[]
 end
 
@@ -150,10 +153,8 @@ function vertex_scalars(factors, messages, vertices)
     return map(v -> vertex_scalar(factors, messages, v), vertices)
 end
 
-function edge_scalar(cache, edge; kwargs...)
-    m1 = cache[edge]
-    m2 = cache[reverse(edge)]
-    return contract_network([m1, m2]; kwargs...)[]
+function edge_scalar(cache, edge)
+    return (cache[edge] * cache[reverse(edge)])[]
 end
 
 edge_scalars(cache) = edge_scalars(cache, keys(cache))
