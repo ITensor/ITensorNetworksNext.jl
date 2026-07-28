@@ -1,16 +1,19 @@
 import AlgorithmsInterface as AI
 using DataGraphs: DataGraphs, DataGraph, edge_data, edge_data_type
 using Dictionaries: Dictionary, dictionary, set!
+using GradedArrays: U1, gradedrange
 using Graphs: AbstractGraph, dst, edges, has_edge, src, vertices
-using ITensorBase: ITensor, Index, inds, name, noprime, prime
-using ITensorNetworksNext: ITensorNetworksNext, ITensorNetwork, MessageCache,
-    StopWhenConverged, bethe_free_energy, edge_scalar, incoming_messages, linkinds,
-    messagecache, region_scalar, subgraph, tensornetwork, vertex_scalar, vertex_scalars
+using ITensorBase: ITensor, Index, inds, name, noprime, outputnames, prime
+using ITensorNetworksNext: ITensorNetworksNext, ITensorNetwork, MessageCache, NormNetwork,
+    StopWhenConverged, bethe_free_energy, edge_scalar, incoming_messages, insertlink!,
+    linkinds, message_environment, messagecache, region_scalar, subgraph, tensornetwork,
+    vertex_scalar, vertex_scalars
 using LinearAlgebra: LinearAlgebra
 using NamedGraphs.GraphsExtensions: all_edges, arranged_edges, incident_edges, vertextype
 using NamedGraphs.NamedGraphGenerators: named_comb_tree, named_grid, named_path_graph
 using NamedGraphs: NamedEdge
 using StableRNGs: StableRNG
+using TensorKitSectors: FermionParity
 using Test: @test, @testset
 
 function spin_ice_tensornetwork(g)
@@ -223,6 +226,42 @@ end
                     @test z_bp ≈ 1.5^(n^2)
                 end
             end
+        end
+    end
+
+    @testset "NormNetwork (operator-valued messages)" begin
+        site_ranges = (
+            "U1" => gradedrange([U1(0) => 1, U1(1) => 1]),
+            "FermionParity" =>
+                gradedrange([FermionParity(0) => 1, FermionParity(1) => 1]),
+        )
+        @testset "$label, T=$T" for (label, site_range) in site_ranges,
+                T in (Float64, ComplexF64)
+
+            rng = StableRNG(123)
+            g = named_path_graph(4)
+            site_axes = Dict(v => Index(site_range) for v in vertices(g))
+            network = tensornetwork(vertices(g)) do v
+                return randn(rng, T, (site_axes[v],))
+            end
+            for edge in edges(g)
+                insertlink!(network, edge)
+            end
+            nn = NormNetwork(network)
+
+            cache = ITensorNetworksNext.beliefpropagation(
+                nn, message_environment(one, nn);
+                stopping_criterion = (; maxiter = 20, tol = 1.0e-10)
+            )
+
+            # Messages stay operator-valued end to end (a plain message has no output names).
+            @test all(msg -> !isempty(outputnames(msg)), edge_data(cache))
+
+            # Belief propagation is exact on a tree, including on the fermionic norm network.
+            ket = prod(network)
+            z_exact = (ket * conj(ket))[]
+            z_bp = exp(bethe_free_energy(nn, cache))
+            @test z_bp ≈ z_exact rtol = eps(real(T))^(1 / 3)
         end
     end
 end

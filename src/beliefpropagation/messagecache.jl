@@ -3,7 +3,7 @@ using DataGraphs: DataGraphs, AbstractDataGraph, AbstractEdgeDataGraph, edge_dat
     vertex_data_type
 using Dictionaries: Dictionary, delete!, getindices, set!
 using Graphs: AbstractGraph, connected_components, is_directed, is_tree
-using ITensorBase: unnamed
+using ITensorBase: state, unnamed
 using NamedGraphs.GraphsExtensions: IsDirected, boundary_edges, default_root_vertex,
     directed_graph, forest_cover, in_incident_edges, post_order_dfs_edges, undirected_graph,
     vertextype
@@ -136,9 +136,11 @@ function incoming_edge_data(cache::AbstractGraph, vertices)
     return getindices(cache, dimnames)
 end
 
+# `contract_network` works on plain named arrays, so operator-valued (doubled ket/bra) messages are
+# unwrapped with `state` (idempotent on plain messages) before contracting into a scalar.
 function vertex_scalar(factors, messages, vertex; kwargs...)
     in_messages = incoming_edge_data(messages, [vertex])
-    tensors = vcat([factors[vertex]], collect(in_messages))
+    tensors = vcat([factors[vertex]], state.(collect(in_messages)))
     return contract_network(tensors; kwargs...)[]
 end
 
@@ -151,8 +153,8 @@ function vertex_scalars(factors, messages, vertices)
 end
 
 function edge_scalar(cache, edge; kwargs...)
-    m1 = cache[edge]
-    m2 = cache[reverse(edge)]
+    m1 = state(cache[edge])
+    m2 = state(cache[reverse(edge)])
     return contract_network([m1, m2]; kwargs...)[]
 end
 
