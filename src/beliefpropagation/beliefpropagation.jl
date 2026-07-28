@@ -240,12 +240,13 @@ end
 end
 
 # Contract the incoming messages into the source factor to form the (unnormalized) new message on
-# `edge`. `contract_network` works on plain named arrays, so operator-valued messages are unwrapped
-# with `state` (idempotent on plain messages) before contracting; fermionic signs ride on the graded
-# arrays, so nothing is lost.
+# `edge`.
 function contracted_message(algorithm::SimpleMessageUpdate, cache, factors, edge)
     messages = collect(incoming_messages(cache, edge))
     factor = factors[src(edge)]
+    # TODO: `contract_network` can't contract a mix of operator and plain operands right now (its
+    # lazy `Mul` path is invariant in the operand type), so unwrap operator-valued messages with
+    # `state` first. Remove the `state.` once `contract_network` handles operator operands.
     return contract_network([state.(messages); [factor]]; alg = algorithm.contraction_alg)
 end
 
