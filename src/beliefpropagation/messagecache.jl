@@ -138,10 +138,7 @@ end
 
 function vertex_scalar(factors, messages, vertex; kwargs...)
     in_messages = incoming_edge_data(messages, [vertex])
-    # TODO: `contract_network` can't currently contract a mix of operator and plain operands, so
-    # unwrap operator-valued messages with `state` first. Remove the `state.` once `contract_network`
-    # handles operator operands.
-    tensors = [[factors[vertex]]; state.(collect(in_messages))]
+    tensors = [[factors[vertex]]; collect(in_messages)]
     return contract_network(tensors; kwargs...)[]
 end
 

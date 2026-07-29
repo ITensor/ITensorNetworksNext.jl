@@ -1,5 +1,6 @@
 using Graphs: edges, vertices
-using ITensorBase: Greedy, Index
+using ITensorBase:
+    Greedy, Index, NamedTensorOperator, inputnames, operator, outputnames, state
 using ITensorNetworksNext: Exact, ITensorNetwork, LeftAssociative, contract_network,
     linkinds, siteinds, tensornetwork
 using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges
@@ -50,5 +51,44 @@ using Test: @test, @testset
         @test z1 ≈ z3
         @test z1 ≈ z4
         @test z1 ≈ z5
+    end
+
+    @testset "Contract network with operators" begin
+        i, j, k = Index(2), Index(2), Index(2)
+        o = operator(randn(2, 2), (i,), (j,))     # output i, input j
+
+        # A network mixing an operator with plain tensors previously threw a `convert`
+        # `MethodError`; it now contracts, stays an operator, and matches the binary product.
+        t = randn(2, 2)[j, k]
+        r = contract_network([o, t])
+        @test r isa NamedTensorOperator
+        @test state(r) ≈ state(o * t)
+        @test outputnames(r) == outputnames(o * t)
+        @test inputnames(r) == inputnames(o * t)
+
+        # An all-operator network is likewise preserved.
+        o2 = operator(randn(2, 2), (j,), (k,))
+        r2 = contract_network([o, o2])
+        @test r2 isa NamedTensorOperator
+        @test state(r2) ≈ state(o * o2)
+
+        # A fully-contracted operator network reads out as a scalar via `[]`.
+        f = randn(2, 2)[i, j]
+        @test contract_network([o, f])[] ≈ (o * f)[]
+
+        # An all-plain network is unaffected: it is not promoted to an operator.
+        a = randn(2, 2)[i, j]
+        b = randn(2, 2)[j, k]
+        @test !(contract_network([a, b]) isa NamedTensorOperator)
+
+        # Pairing is order-independent: a branching network with a surviving output/input pair
+        # matches the binary product under any fold order (greedy contraction included).
+        ip, mp, m, x = Index(2), Index(2), Index(2), Index(2)
+        op = operator(randn(2, 2, 2, 2), (ip, mp), (i, m))
+        u = randn(2, 2)[mp, x]
+        w = randn(2, 2)[m, x]
+        rb = contract_network([op, u, w])
+        @test outputnames(rb) == outputnames((op * u) * w) == outputnames(op * (u * w))
+        @test inputnames(rb) == inputnames((op * u) * w) == inputnames(op * (u * w))
     end
 end

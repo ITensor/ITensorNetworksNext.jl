@@ -1,21 +1,16 @@
-using Base.Broadcast: materialize
 using DataGraphs: is_vertex_assigned
 using Dictionaries: isinsertable, issettable
 using Graphs: edges, vertices
 using ITensorBase:
     ITensor, Index, IndexName, LazyITensor, conj, inds, name, setname, uniquename
 using ITensorNetworksNext: BraView, ITensorNetwork, KetView, NormNetwork, braname,
-    bratensor, conj_bratensor, indmap, kettensor, normnetwork, tensornetwork
+    bratensor, conj_bratensor, contract_network, indmap, kettensor, normnetwork,
+    tensornetwork
 using LinearAlgebra: norm
 using NamedGraphs.GraphsExtensions: incident_edges
 using NamedGraphs.NamedGraphGenerators: named_grid, named_path_graph
 using NamedGraphs: NamedEdge
 using Test: @test, @test_throws, @testset
-
-# Contract a (possibly double-layer) network into a single tensor by multiplying all
-# of its vertex tensors together. For a `NormNetwork` the vertex data are lazy products
-# `ket * conj(bra)`, so the result is a lazy expression that we materialize.
-contract_network(tn) = materialize(prod(tn))
 
 # Build a random `ITensorNetwork` state on the graph `g` with site dimension `d` and
 # bond dimension `χ`.
