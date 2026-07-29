@@ -20,6 +20,7 @@ StableRNGs = "860ef19b-820b-49d6-a774-d7a799459cd3"
 Suppressor = "fd094767-a336-5f1f-9728-57cf17d0bbfb"
 TensorAlgebra = "68bd88dc-f39d-4e12-b2ca-f046b68fcc6a"
 TensorKitSectors = "13a9c161-d5da-41f0-bcbd-e1a08ae0647f"
+TermInterface = "8ea1fca8-c5ef-4a55-8b96-4e9afe9c9a3c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [sources.ITensorNetworksNext]
@@ -46,4 +47,5 @@ StableRNGs = "1"
 Suppressor = "0.2.8"
 TensorAlgebra = "0.16, 0.17"
 TensorKitSectors = "0.3"
+TermInterface = "2"
 Test = "1.10"

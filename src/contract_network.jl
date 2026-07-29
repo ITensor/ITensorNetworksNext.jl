@@ -1,7 +1,7 @@
 using Base.Broadcast: materialize
 using Base: @kwdef
-using ITensorBase: EvaluationOrderAlgorithm, Greedy, Mul, lazy, optimize_evaluation_order,
-    substitute, symnameddims
+using ITensorBase: EvaluationOrderAlgorithm, Greedy, Mul, ismul, lazy,
+    optimize_evaluation_order, substitute, symnameddims, to_mul_arguments
 
 # `contract_network`
 @kwdef struct Exact{Order, OrderAlg}
@@ -29,19 +29,40 @@ function get_order(alg::Exact, tn)
     subs = Dict(symnameddims(i) => symnameddims(i, Tuple(axes(t))) for (i, t) in pairs(tn))
     return substitute(order, subs)
 end
+# The contraction leaves of an operand: a lazy product (the `NormNetwork` doubled vertex
+# `lazy(ket) * lazy(conj(bra))`) contributes each factor, recursively; anything else is one leaf.
+leaf_tensors(t) = ismul(t) ? mapreduce(leaf_tensors, vcat, to_mul_arguments(t)) : [t]
+
 # Promote the operands to their common type before lowering to the lazy expression, so every lazy
 # operand shares one concrete type. Otherwise a network of mixed types (a plain tensor is a trivial
 # operator, so mixing operators and plain tensors is the common case) widens the symbolic `Mul`
 # container to a `UnionAll` it cannot construct. `promote_type`/`convert` keep an all-plain network
 # at the plain type (the promotion is a no-op), so its fast path is unchanged.
+#
+# For a computed order, expand each promoted operand into its contraction leaves so the order
+# optimizer sees each factor of a lazy product — and the physical index shared between the ket and
+# bra of a doubled vertex — instead of one opaque node with only the outer bond legs. Without this
+# the optimizer cannot interleave the other operands between the two layers and is forced to form
+# the doubled `ket * conj(bra)` tensor first (χ^(2·degree)). Flattening the *promoted* operand keeps
+# the operator/state semantics the promotion just established. An explicit operand-level `order` is
+# honored over the operands as given, so it is not flattened.
 function contract_network(alg::Exact, tn)
-    order = get_order(alg, tn)
+    if !isnothing(alg.order)
+        # Explicit order: honor it over the operands as given, so it is not flattened.
+        order = get_order(alg, tn)
+        T = mapreduce(typeof, promote_type, tn)
+        syms_to_ts = Dict(
+            symnameddims(i, Tuple(axes(t))) => lazy(convert(T, t)) for (i, t) in pairs(tn)
+        )
+        return materialize(substitute(order, syms_to_ts))
+    end
+    # Computed order: expand each promoted operand into its contraction leaves.
     T = mapreduce(typeof, promote_type, tn)
-    syms_to_ts = Dict(
-        symnameddims(i, Tuple(axes(t))) => lazy(convert(T, t)) for (i, t) in pairs(tn)
-    )
-    tn_expression = substitute(order, syms_to_ts)
-    return materialize(tn_expression)
+    leaves = collect(Iterators.flatten(leaf_tensors(lazy(convert(T, t))) for t in tn))
+    order = get_order(alg, leaves)
+    syms_to_ts =
+        Dict(symnameddims(i, Tuple(axes(t))) => lazy(t) for (i, t) in pairs(leaves))
+    return materialize(substitute(order, syms_to_ts))
 end
 
 # `contraction_order`

@@ -1,11 +1,12 @@
 using Graphs: edges, vertices
-using ITensorBase:
-    Greedy, Index, NamedTensorOperator, inputnames, operator, outputnames, state
+using ITensorBase: Greedy, ITensor, Index, NamedTensorOperator, conj, dimnames, inputnames,
+    lazy, operator, outputnames, state
 using ITensorNetworksNext: Exact, ITensorNetwork, LeftAssociative, contract_network,
-    linkinds, siteinds, tensornetwork
+    get_order, leaf_tensors, linkinds, siteinds, tensornetwork
 using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges
 using NamedGraphs.NamedGraphGenerators: named_grid
 using OMEinsumContractionOrders: ExhaustiveSearch, GreedyMethod, TreeSA
+using TermInterface: arguments, iscall
 using Test: @test, @testset
 
 @testset "contract_network" begin
@@ -90,5 +91,53 @@ using Test: @test, @testset
         rb = contract_network([op, u, w])
         @test outputnames(rb) == outputnames((op * u) * w) == outputnames(op * (u * w))
         @test inputnames(rb) == inputnames((op * u) * w) == inputnames(op * (u * w))
+    end
+
+    @testset "Flatten lazy product operands into contraction leaves" begin
+        # A NormNetwork's doubled vertex is a lazy product `lazy(ket) * lazy(conj(bra))`. The
+        # contraction order must see each factor — and the physical index they share — as its own
+        # leaf, so the optimizer can interleave the other operands between the two layers instead of
+        # forming the doubled `ket * conj(bra)` tensor (χ^(2·degree)).
+        d, χ = 2, 8
+        p = Index(d)
+        b1, b2, b3 = Index(χ), Index(χ), Index(χ)
+        c1, c2, c3 = Index(χ), Index(χ), Index(χ)
+        A = ITensor(randn(d, χ, χ, χ), (p, b1, b2, b3))
+        B = ITensor(randn(d, χ, χ, χ), (p, c1, c2, c3))
+        factor = lazy(A) * lazy(conj(B))
+
+        # `leaf_tensors` splits a lazy product into its factors, recursively; anything else is one leaf.
+        @test length(leaf_tensors(factor)) == 2
+        @test length(leaf_tensors(lazy(A))) == 1
+        @test length(leaf_tensors(lazy(factor) * lazy(A))) == 3
+
+        # Degree-3 doubled vertex with two incoming bond messages, contracted to the outgoing message.
+        msg1 = ITensor(randn(χ, χ), (b1, c1))
+        msg2 = ITensor(randn(χ, χ), (b2, c2))
+        net = [msg1, msg2, factor]
+
+        # The network flattens to degree + 1 = 4 leaves: the ket and bra are separate contractible nodes.
+        T = mapreduce(typeof, promote_type, net)
+        leaves = collect(Iterators.flatten(leaf_tensors(lazy(convert(T, t))) for t in net))
+        @test length(leaves) == 4
+
+        # Walk the computed order: a contraction node's open dims are the symmetric difference of its
+        # children's, its width their size product. The peak stays at the χ^(degree+1) path — no
+        # intermediate spans all 2·degree bond legs (the χ^(2·degree) doubled tensor).
+        order = get_order(Exact(), leaves)
+        idxsize =
+            Dict(n => s for t in (A, B, msg1, msg2) for (n, s) in zip(dimnames(t), size(t)))
+        width(dims) = isempty(dims) ? 1 : prod(idxsize[n] for n in dims)
+        function peakwidth(node)
+            iscall(node) || return (Set(dimnames(node)), width(dimnames(node)))
+            (da, pa), (db, pb) = peakwidth.(arguments(node))
+            open = symdiff(da, db)
+            return open, max(pa, pb, width(open))
+        end
+        @test last(peakwidth(order)) ≤ χ^(3 + 1)
+        @test last(peakwidth(order)) < χ^(2 * 3)
+
+        # The flattened contraction matches forming the doubled vertex explicitly.
+        @test contract_network(net) ≈ contract_network([msg1, msg2, A, conj(B)])
     end
 end
