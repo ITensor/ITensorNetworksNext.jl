@@ -9,9 +9,8 @@ using ITensorNetworksNext: ITensorNetworksNext, ITensorNetwork, MessageCache, No
     insertlink!, linkinds, message_environment, messagecache, region_scalar, subgraph,
     tensornetwork, vertex_scalar, vertex_scalars
 using LinearAlgebra: LinearAlgebra
-using NamedGraphs.GraphsExtensions: all_edges, arranged_edges, incident_edges, vertextype
-using NamedGraphs.NamedGraphGenerators: named_comb_tree, named_grid, named_path_graph
-using NamedGraphs: NamedEdge
+using NamedGraphs: NamedEdge, all_edges, incident_edges, named_comb_tree, named_grid,
+    named_path_graph, vertextype
 using StableRNGs: StableRNG
 using TensorKitSectors: FermionParity
 using Test: @test, @testset
@@ -164,11 +163,10 @@ end
                 g[edge] = Index(2)
             end
 
-            tensors = map(vertices(g)) do vertex
+            tn = tensornetwork(vertices(g)) do vertex
                 is = map(edge -> g[edge], incident_edges(g, vertex))
                 return randn(T, Tuple(is))
             end
-            tn = ITensorNetwork(tensors)
 
             messages = Dict(
                 edge => ones(T, Tuple(linkinds(tn, edge))) for edge in all_edges(g)
@@ -187,11 +185,10 @@ end
             for edge in edges(g)
                 g[edge] = Index(3)
             end
-            tensors = map(vertices(g)) do vertex
+            tn = tensornetwork(vertices(g)) do vertex
                 is = map(edge -> g[edge], incident_edges(g, vertex))
                 return randn(T, Tuple(is))
             end
-            tn = ITensorNetwork(tensors)
 
             messages = Dict(
                 edge => ones(T, Tuple(linkinds(tn, edge))) for edge in all_edges(g)

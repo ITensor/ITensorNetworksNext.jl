@@ -4,12 +4,8 @@ using DataGraphs: DataGraphs, AbstractDataGraph, AbstractEdgeDataGraph, edge_dat
 using Dictionaries: Dictionary, delete!, getindices, set!
 using Graphs: AbstractGraph, connected_components, is_directed, is_tree
 using ITensorBase: state, unnamed
-using NamedGraphs.GraphsExtensions: IsDirected, boundary_edges, default_root_vertex,
-    directed_graph, forest_cover, in_incident_edges, post_order_dfs_edges, undirected_graph,
-    vertextype
-using NamedGraphs.PartitionedGraphs: QuotientEdge, QuotientView, quotient_graph
-using NamedGraphs: AbstractNamedEdge, NamedDiGraph, NamedEdge, Vertices, convert_vertextype,
-    ordered_vertices, parent_graph_indices, position_graph, to_graph_index, vertex_positions
+using NamedGraphs: AbstractNamedEdge, NamedDiGraph, NamedEdge, add_edges!, boundary_edges,
+    in_incident_edges, to_graph_index, vertextype
 using SplitApplyCombine: mapmany
 
 struct MessageCache{T, V} <: AbstractEdgeDataGraph{T, V}

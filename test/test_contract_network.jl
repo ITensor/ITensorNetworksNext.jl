@@ -3,8 +3,7 @@ using ITensorBase:
     Greedy, Index, NamedTensorOperator, inputnames, operator, outputnames, state
 using ITensorNetworksNext: Exact, ITensorNetwork, LeftAssociative, contract_network,
     linkinds, siteinds, tensornetwork
-using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges
-using NamedGraphs.NamedGraphGenerators: named_grid
+using NamedGraphs: incident_edges, named_grid
 using OMEinsumContractionOrders: ExhaustiveSearch, GreedyMethod, TreeSA
 using Test: @test, @testset
 

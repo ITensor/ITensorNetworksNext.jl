@@ -26,9 +26,17 @@ TensorAlgebra = "68bd88dc-f39d-4e12-b2ca-f046b68fcc6a"
 [weakdeps]
 OMEinsumContractionOrders = "6f22d1fd-8eed-4bb7-9776-e7d684900715"
 
+[sources.DataGraphs]
+rev = "mf/namedgraphs-v0.14"
+url = "https://github.com/ITensor/DataGraphs.jl"
+
 [sources.ITensorBase]
 rev = "main"
 url = "https://github.com/ITensor/ITensorBase.jl"
+
+[sources.NamedGraphs]
+rev = "main"
+url = "https://github.com/ITensor/NamedGraphs.jl"
 
 [sources.TensorAlgebra]
 rev = "main"
@@ -41,14 +49,14 @@ ITensorNetworksNextOMEinsumContractionOrdersExt = "OMEinsumContractionOrders"
 Adapt = "4.3"
 AlgorithmsInterface = "0.1"
 Combinatorics = "1"
-DataGraphs = "0.5"
+DataGraphs = "0.6"
 Dictionaries = "0.4.5"
 Graphs = "1.13.1"
 ITensorBase = "0.14"
 LinearAlgebra = "1.10"
 MacroTools = "0.5.16"
 MatrixAlgebraKit = "0.6"
-NamedGraphs = "0.11, 0.12, 0.13"
+NamedGraphs = "0.14"
 OMEinsumContractionOrders = "1"
 Random = "1.10"
 SimpleTraits = "0.9.5"
