@@ -7,9 +7,7 @@ using ITensorNetworksNext: BraView, ITensorNetwork, KetView, NormNetwork, branam
     bratensor, conj_bratensor, contract_network, indmap, kettensor, normnetwork,
     tensornetwork
 using LinearAlgebra: norm
-using NamedGraphs.GraphsExtensions: incident_edges
-using NamedGraphs.NamedGraphGenerators: named_grid, named_path_graph
-using NamedGraphs: NamedEdge
+using NamedGraphs: NamedEdge, incident_edges, named_grid, named_path_graph
 using Test: @test, @test_throws, @testset
 
 # Build a random `ITensorNetwork` state on the graph `g` with site dimension `d` and

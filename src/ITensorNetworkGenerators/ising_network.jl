@@ -2,7 +2,7 @@ using ..ITensorNetworksNext
 using Graphs: degree, dst, edges, src
 using ITensorBase: name, nameddims, uniquename
 using LinearAlgebra: Diagonal, eigen
-using NamedGraphs.GraphsExtensions: vertextype
+using NamedGraphs: vertextype
 
 function sqrt_ising_bond(β; J = one(β), h = zero(β), deg1::Integer, deg2::Integer)
     h1 = h / deg1

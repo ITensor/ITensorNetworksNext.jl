@@ -6,7 +6,7 @@ using ITensorBase: ITensorBase as ITB, AbstractITensor, dimnames, inputnames, op
     outputnames, replacedimnames
 using LinearAlgebra: norm
 using MatrixAlgebraKit: eigh_full, project_hermitian, qr_compact, svd_trunc
-using NamedGraphs.GraphsExtensions: all_edges, boundary_edges
+using NamedGraphs: boundary_edges
 using TensorAlgebra.MatrixAlgebra: invsqrth_safe, sqrth_safe
 
 # === Top-level user entry point ===
