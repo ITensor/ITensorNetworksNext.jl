@@ -57,8 +57,9 @@ using Test: @test, @test_throws, @testset
         @test !has_edge(tn, (1, 1) => (2, 1))
         @test ne(tn) == 0
 
-        rem_vertex!(tn, (2, 2))
+        @test rem_vertex!(tn, (2, 2))
         @test !has_vertex(tn, (2, 2))
+        @test !rem_vertex!(tn, (2, 2))
         insert!(tn, (2, 2), randn(Index(2)))
         @test has_vertex(tn, (2, 2))
         @test isassigned(tn, (2, 2))

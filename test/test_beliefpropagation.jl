@@ -2,7 +2,8 @@ import AlgorithmsInterface as AI
 using DataGraphs: DataGraphs, DataGraph, edge_data, edge_data_type
 using Dictionaries: Dictionary, dictionary, set!
 using GradedArrays: U1, gradedrange
-using Graphs: AbstractGraph, dst, edges, has_edge, src, vertices
+using Graphs: AbstractGraph, add_vertex!, dst, edges, has_edge, has_vertex, nv, rem_edge!,
+    src, vertices
 using ITensorBase: ITensor, Index, inds, name, noprime, outputnames, prime
 using ITensorNetworksNext: ITensorNetworksNext, ITensorNetwork, MessageCache, NormNetwork,
     StopWhenConverged, beliefpropagation, bethe_free_energy, edge_scalar, incoming_messages,
@@ -81,6 +82,21 @@ end
             @test bpc_dst[(1, 1) => (1, 2)] == ""
             @test bpc_dst[(1, 2) => (2, 2)] == "(1, 2) => (2, 2)"
             @test bpc_dst[(2, 2) => (2, 3)] == "(2, 2) => (2, 3)"
+        end
+        @testset "Graphs.jl mutation" begin
+            g = named_path_graph(3)
+            bpc = messagecache(edge -> "$(src(edge)) => $(dst(edge))", all_edges(g))
+
+            @test add_vertex!(bpc, 4)
+            @test has_vertex(bpc, 4)
+            @test !add_vertex!(bpc, 4)
+            @test nv(bpc) == 4
+
+            nmessages = length(edge_data(bpc))
+            @test rem_edge!(bpc, 1 => 2)
+            @test !has_edge(bpc, 1 => 2)
+            @test length(edge_data(bpc)) == nmessages - 1
+            @test !rem_edge!(bpc, 1 => 2)
         end
         @testset "Vertex/region scalars" begin
             g = named_path_graph(3)

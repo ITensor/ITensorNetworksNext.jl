@@ -3,7 +3,7 @@ using DataGraphs.DataGraphsPartitionedGraphsExt
 using DataGraphs: DataGraphs, AbstractDataGraph, DataGraph, edge_data, get_vertices_data,
     vertex_data, vertex_data_type
 using Dictionaries: Dictionaries, AbstractDictionary, Indices, dictionary, set!, unset!
-using Graphs: AbstractSimpleGraph, rem_edge!, rem_vertex!
+using Graphs: AbstractSimpleGraph, has_vertex, rem_edge!, rem_vertex!
 using ITensorBase:
     ITensorBase, AbstractITensor, dim, dimnames, dimnametype, name, unnamedtype
 using NamedGraphs: NamedGraphs, NamedEdge, NamedGraph, decoded_vertex, encoded_graph,
@@ -59,6 +59,8 @@ function Base.copy(tn::ITensorNetwork{T}) where {T}
 end
 
 function Graphs.rem_vertex!(tn::ITensorNetwork, vertex)
+    has_vertex(tn, vertex) || return false
+
     tensor = tn.tensors[vertex]
 
     for name in dimnames(tensor)
@@ -76,10 +78,9 @@ function Graphs.rem_vertex!(tn::ITensorNetwork, vertex)
         isempty(vertex_list) && delete!(tn.dimname_vertices, name)
     end
 
-    rem_vertex!(tn.underlying_graph, vertex)
     delete!(tn.tensors, vertex)
 
-    return tn
+    return rem_vertex!(tn.underlying_graph, vertex)
 end
 
 # Internal (unsafe)
