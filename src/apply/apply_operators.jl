@@ -237,7 +237,7 @@ function apply_gate_bp_nsite!(
     if normalize
         sqrt_messages = [
             sqrth_safe(project_hermitian(env[e])) for
-                e in boundary_edges(state, vs; dir = :in)
+                e in boundary_edges(state, vertices; dir = :in)
         ]
         ψv /= norm(foldl((ψ, m) -> apply(m, ψ), sqrt_messages; init = ψv))
     end
@@ -250,8 +250,8 @@ function apply_gate_bp_nsite!(
         state::AbstractITensorNetwork, env, vertices;
         trunc, normalize
     )
-    v1, v2 = vs
-    edges_in = boundary_edges(state, vs; dir = :in)
+    v1, v2 = vertices
+    edges_in = boundary_edges(state, vertices; dir = :in)
     roots_v1 =
         [sqrth_invsqrth_safe(project_hermitian(env[e])) for e in edges_in if dst(e) == v1]
     roots_v2 =
