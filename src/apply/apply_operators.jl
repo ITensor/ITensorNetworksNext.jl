@@ -267,7 +267,7 @@ function apply_gate_bp_nsite!(
     if normalize
         gauges = [
             message_root(env[e])
-                for e in boundary_edges(state, vs; dir = :in)
+                for e in boundary_edges(state, vertices; dir = :in)
         ]
         ψv /= norm(prod([[ψv]; gauges]))
     end
@@ -280,8 +280,8 @@ function apply_gate_bp_nsite!(
         state::AbstractITensorNetwork, env, vertices;
         trunc, normalize
     )
-    v1, v2 = vs
-    edges_in = boundary_edges(state, vs; dir = :in)
+    v1, v2 = vertices
+    edges_in = boundary_edges(state, vertices; dir = :in)
     siv_v1 = [message_gauge(env[e]) for e in edges_in if dst(e) == v1]
     siv_v2 = [message_gauge(env[e]) for e in edges_in if dst(e) == v2]
     gauges_v1, inv_gauges_v1 = first.(siv_v1), conj.(last.(siv_v1))
