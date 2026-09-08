@@ -4,7 +4,7 @@ using DataGraphs: DataGraphs, AbstractDataGraph, AbstractVertexDataGraph, edge_d
 using Dictionaries: Dictionary
 using Graphs: Graphs, AbstractEdge, AbstractGraph, add_edge!, add_vertex!, dst, edges,
     edgetype, ne, neighbors, nv, rem_edge!, src, vertices
-using ITensorBase: ITensorOperator, dimnames, inputnames, inds, name, named, nametype,
+using ITensorBase: ITensorOperator, dimnames, inds, inputnames, name, named, nametype,
     prime, uniquename, unnamedtype
 using LinearAlgebra: LinearAlgebra
 using MacroTools: @capture
@@ -133,21 +133,21 @@ function insertlink!(tn::AbstractGraph, e)
 end
 
 function supportof(tn::AbstractGraph, op::ITensorOperator)
-    support = Base.Generator(inputnames(op)) do name
+    support = Set{vertextype(tn)}()
+
+    for name in inputnames(op)
         vertices = dimnamevertices(tn, name)
 
-        length(vertices) == 1 && return only(vertices)
-
-        if length(vertices) == 0
-            throw(ArgumentError("operator dim name $name not found in tensor network."))
-        elseif length(vertices) > 1
+        if length(vertices) > 1
             throw(
                 ArgumentError(
                     "operator dim name $name associated with multiple vertices in tensor network."
                 )
             )
         end
+
+        union!(support, vertices)
     end
 
-    return Set(support)
+    return support
 end
