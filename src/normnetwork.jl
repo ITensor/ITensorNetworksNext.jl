@@ -1,15 +1,15 @@
 using Dictionaries: Dictionary, dictionary
-using ITensorBase: rename, setname, similar_operator, uniquename
+using ITensorBase: similar_operator, uniquename
 using ITensorNetworksNext
 
 """
-    struct NormNetwork{T, V, I} <: AbstractITensorNetwork{T, V}
+    struct NormNetwork{T, V, I} <: AbstractBilinearFormNetwork{T, V, I}
 
 Lazy wrapper representing the norm `⟨tn|tn⟩` of `tn::ITensorNetwork{T, V, I}`,
 together with a per-edge ket→bra name mapping that, for each index in the ket layer, defines
 the name of the corresponding index in the bra layer.
 """
-struct NormNetwork{T, V, I} <: AbstractITensorNetwork{T, V}
+struct NormNetwork{T, V, I} <: AbstractBilinearFormNetwork{T, V, I}
     ket::ITensorNetwork{T, V, I}
     braname::Dictionary{I, I}
     function NormNetwork(
@@ -49,19 +49,15 @@ NamedGraphs.encoded_graph(nn::NormNetwork) = encoded_graph(nn.ket)
 
 # ==================================== DataGraphs.jl ===================================== #
 
+function DataGraphs.is_vertex_assigned(nn::NormNetwork, vertex)
+    return isassigned(nn.ket, vertex)
+end
+
 function DataGraphs.get_vertex_data(nn::NormNetwork, vertex)
     return error(
         "Indexing a `NormNetwork` is not defined, since the double-layer tensor at a vertex has no representation of its own. Use `kettensor` and `bratensor` to reach the individual layers."
     )
 end
-
-function DataGraphs.is_vertex_assigned(nn::NormNetwork, vertex)
-    return isassigned(nn.ket, vertex)
-end
-# =================================== Dictionaries.jl ==================================== #
-
-Dictionaries.issettable(::NormNetwork) = false
-Dictionaries.isinsertable(::NormNetwork) = false
 
 # ====================================== interface ======================================= #
 
@@ -74,14 +70,7 @@ function braname(nn::NormNetwork, name)
     return get(nn.braname, name, name)
 end
 
-indmap(nn::NormNetwork, ind) = setname(conj(ind), braname(nn, name(ind)))
-
 kettensor(nn::NormNetwork, vertex) = nn.ket[vertex]
-function conj_bratensor(nn::NormNetwork, vertex)
-    return rename(n -> braname(nn, n), kettensor(nn, vertex))
-end
-
-bratensor(nn::NormNetwork, vertex) = conj(conj_bratensor(nn, vertex))
 
 """
     flatten_network(nn::NormNetwork) -> ITensorNetwork
