@@ -34,12 +34,18 @@ struct BraView{T, V, I, P <: AbstractBilinearFormNetwork{T, V, I}} <:
     end
 end
 
-struct OperatorView{T, V, I, P <: QuadraticFormNetwork{T, V, I}} <:
+struct OperatorView{T, V, I, P <: AbstractBilinearFormNetwork{T, V, I}} <:
     AbstractBilinearFormNetworkView{T, V, I}
     parent::P
-    function OperatorView(parent::QuadraticFormNetwork{T, V, I}) where {T, V, I}
+    function OperatorView(parent::AbstractBilinearFormNetwork{T, V, I}) where {T, V, I}
         return new{T, V, I, typeof(parent)}(parent)
     end
+end
+
+# A `NormNetwork`'s bra and ket layers share their site index names, so there is no distinct
+# bra site index for an identity operator to carry as its output name.
+function OperatorView(::NormNetwork)
+    throw(ArgumentError("a `NormNetwork` has no operator layer to view."))
 end
 
 Base.parent(nnv::KetView) = nnv.parent
