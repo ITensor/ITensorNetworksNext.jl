@@ -3,20 +3,11 @@ using Dictionaries: Dictionaries, isinsertable, issettable
 using Graphs: Graphs, edges, vertices
 using NamedGraphs: NamedGraphs, decoded_vertex, encoded_graph, encoded_vertex
 
-struct KetView{T, V, I} <: AbstractITensorNetwork{T, V}
-    parent::NormNetwork{T, V, I}
-end
-
-struct BraView{T, V, I} <: AbstractITensorNetwork{T, V}
-    parent::NormNetwork{T, V, I}
-end
-
-# ====================================== Graphs.jl ======================================= #
-
-for View in (:KetView, :BraView)
-    @eval begin
-        Graphs.edges(nnv::$View) = edges(nnv.parent)
-        Graphs.vertices(nnv::$View) = vertices(nnv.parent)
+struct KetView{T, V, I, P <: AbstractBilinearFormNetwork{T, V, I}} <:
+    AbstractBilinearFormNetworkView{T, V, I}
+    parent::P
+    function KetView(parent::AbstractBilinearFormNetwork{T, V, I}) where {T, V, I}
+        return new{T, V, I, typeof(parent)}(parent)
     end
 end
 
@@ -35,24 +26,28 @@ for View in (:KetView, :BraView)
     end
 end
 
+struct BraView{T, V, I, P <: AbstractBilinearFormNetwork{T, V, I}} <:
+    AbstractBilinearFormNetworkView{T, V, I}
+    parent::P
+    function BraView(parent::AbstractBilinearFormNetwork{T, V, I}) where {T, V, I}
+        return new{T, V, I, typeof(parent)}(parent)
+    end
+end
+
+struct OperatorView{T, V, I, P <: QuadraticFormNetwork{T, V, I}} <:
+    AbstractBilinearFormNetworkView{T, V, I}
+    parent::P
+    function OperatorView(parent::QuadraticFormNetwork{T, V, I}) where {T, V, I}
+        return new{T, V, I, typeof(parent)}(parent)
+    end
+end
+
+Base.parent(nnv::KetView) = nnv.parent
+Base.parent(nnv::BraView) = nnv.parent
+Base.parent(nnv::OperatorView) = nnv.parent
+
 # ==================================== DataGraphs.jl ===================================== #
 
-DataGraphs.get_vertex_data(nn::KetView, vertex) = kettensor(nn.parent, vertex)
-DataGraphs.get_vertex_data(nn::BraView, vertex) = bratensor(nn.parent, vertex)
-
-for View in (:KetView, :BraView)
-    @eval begin
-        function DataGraphs.is_vertex_assigned(nnv::$View, vertex)
-            return isassigned(nnv.parent.ket, vertex)
-        end
-    end
-end
-
-# =================================== Dictionaries.jl ==================================== #
-
-for View in (:KetView, :BraView)
-    @eval begin
-        Dictionaries.issettable(nnv::$View) = issettable(nnv.parent)
-        Dictionaries.isinsertable(nnv::$View) = isinsertable(nnv.parent)
-    end
-end
+DataGraphs.get_vertex_data(nnv::KetView, vertex) = kettensor(parent(nnv), vertex)
+DataGraphs.get_vertex_data(nnv::BraView, vertex) = bratensor(parent(nnv), vertex)
+DataGraphs.get_vertex_data(nnv::OperatorView, vertex) = operatortensor(parent(nnv), vertex)
