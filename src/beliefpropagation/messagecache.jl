@@ -173,23 +173,23 @@ function region_scalar(factors, messages, region)
     return mapreduce(vertex -> vertex_scalar(factors, messages, vertex), *, region)
 end
 
+function sum_log_scalars(terms)
+    if any(t -> real(t) < 0, terms)
+        terms = complex.(terms)
+    end
+    return sum(log.(terms))
+end
+
 # We need a graph structure here, so assume `factors` is a graph.
 function bethe_free_energy(factors, messages)
     numerator_terms = vertex_scalars(factors, messages)
     denominator_terms = edge_scalars(messages)
 
-    if any(t -> real(t) < 0, numerator_terms)
-        numerator_terms = complex.(numerator_terms)
-    end
-    if any(t -> real(t) < 0, denominator_terms)
-        denominator_terms = complex.(denominator_terms)
-    end
-
     if any(iszero, denominator_terms)
         return -Inf
     end
 
-    return sum(log.(numerator_terms)) - sum(log.(denominator_terms))
+    return sum_log_scalars(numerator_terms) - sum_log_scalars(denominator_terms)
 end
 
 # ===================================== NormNetwork ====================================== #
