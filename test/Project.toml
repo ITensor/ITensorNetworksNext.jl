@@ -28,7 +28,7 @@ path = ".."
 [compat]
 AlgorithmsInterface = "0.1"
 Aqua = "0.8.14"
-DataGraphs = "0.5"
+DataGraphs = "0.5, 0.6"
 Dictionaries = "0.4.5"
 GradedArrays = "0.16"
 Graphs = "1.13.1"
