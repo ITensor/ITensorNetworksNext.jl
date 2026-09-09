@@ -132,7 +132,7 @@ end
 
 function vertex_scalar(factors, messages, vertex; kwargs...)
     in_messages = incoming_edge_data(messages, [vertex])
-    tensors = [[factors[vertex]]; collect(in_messages)]
+    tensors = [factor_tensors(factors, vertex); collect(in_messages)]
     return contract_network(tensors; kwargs...)[]
 end
 
