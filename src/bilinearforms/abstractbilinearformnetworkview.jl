@@ -1,7 +1,7 @@
 using DataGraphs: DataGraphs, is_vertex_assigned
 using Dictionaries: Dictionaries, isinsertable, issettable
 using Graphs: Graphs, edges, vertices
-using NamedGraphs: NamedGraphs, ordered_vertices, position_graph, vertex_positions
+using NamedGraphs: NamedGraphs, decoded_vertex, encoded_graph, encoded_vertex
 
 """
     abstract type AbstractBilinearFormNetworkView{T, V, I} <: AbstractITensorNetwork{T, V}
@@ -21,15 +21,13 @@ Graphs.vertices(nnv::AbstractBilinearFormNetworkView) = vertices(parent(nnv))
 
 # ==================================== NamedGraphs.jl ==================================== #
 
-function NamedGraphs.vertex_positions(nnv::AbstractBilinearFormNetworkView)
-    return vertex_positions(parent(nnv))
+function NamedGraphs.encoded_vertex(nnv::AbstractBilinearFormNetworkView, vertex)
+    return encoded_vertex(parent(nnv), vertex)
 end
-function NamedGraphs.ordered_vertices(nnv::AbstractBilinearFormNetworkView)
-    return ordered_vertices(parent(nnv))
+function NamedGraphs.decoded_vertex(nnv::AbstractBilinearFormNetworkView, code::Integer)
+    return decoded_vertex(parent(nnv), code)
 end
-function NamedGraphs.position_graph(nnv::AbstractBilinearFormNetworkView)
-    return position_graph(parent(nnv))
-end
+NamedGraphs.encoded_graph(nnv::AbstractBilinearFormNetworkView) = encoded_graph(parent(nnv))
 
 # ==================================== DataGraphs.jl ===================================== #
 
