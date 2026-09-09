@@ -54,9 +54,13 @@ Graphs.vertices(qf::QuadraticFormNetwork) = vertices(qf.ket)
 
 # ==================================== NamedGraphs.jl ==================================== #
 
-NamedGraphs.vertex_positions(qf::QuadraticFormNetwork) = vertex_positions(qf.ket)
-NamedGraphs.ordered_vertices(qf::QuadraticFormNetwork) = ordered_vertices(qf.ket)
-NamedGraphs.position_graph(qf::QuadraticFormNetwork) = position_graph(qf.ket)
+function NamedGraphs.encoded_vertex(qf::QuadraticFormNetwork, vertex)
+    return encoded_vertex(qf.ket, vertex)
+end
+function NamedGraphs.decoded_vertex(qf::QuadraticFormNetwork, code::Integer)
+    return decoded_vertex(qf.ket, code)
+end
+NamedGraphs.encoded_graph(qf::QuadraticFormNetwork) = encoded_graph(qf.ket)
 
 # ==================================== DataGraphs.jl ===================================== #
 
