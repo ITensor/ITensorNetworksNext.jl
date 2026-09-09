@@ -4,7 +4,7 @@ using ITensorBase: ITensorBase as ITB, Index, name, operator, setname, uniquenam
 using ITensorNetworksNext: NormNetwork, apply_operator, apply_operators, insertlink!,
     message_environment, tensornetwork
 using MatrixAlgebraKit: svd_trunc, truncrank
-using NamedGraphs.NamedGraphGenerators: named_cycle_graph, named_path_graph
+using NamedGraphs: named_cycle_graph, named_path_graph
 using Random: AbstractRNG
 using StableRNGs: StableRNG
 using TensorKitSectors: FermionParity

@@ -1,7 +1,7 @@
 using ..ITensorNetworksNext: tensornetwork
 using Graphs: AbstractGraph, vertices
 using ITensorBase: NamedUnitRange, name, nameddims, unnamed
-using NamedGraphs.GraphsExtensions: incident_edges
+using NamedGraphs: incident_edges
 
 diaglength(a::AbstractArray) = minimum(size(a))
 function diagstride(a::AbstractArray)

@@ -7,9 +7,8 @@ using Graphs: Graphs, AbstractEdge, AbstractGraph, add_edge!, add_vertex!, dst, 
 using ITensorBase: dimnames, inds, name, named, nametype, prime, uniquename, unnamedtype
 using LinearAlgebra: LinearAlgebra
 using MacroTools: @capture
-using NamedGraphs.GraphsExtensions: directed_graph, incident_edges, rem_edges!, vertextype
-using NamedGraphs.OrdinalIndexing: OrdinalSuffixedInteger
-using NamedGraphs: NamedGraphs, NamedGraph, not_implemented, similar_graph
+using NamedGraphs:
+    NamedGraphs, NamedGraph, add_edges!, not_implemented, similar_graph, vertextype
 using TensorAlgebra: trivialrange
 
 abstract type AbstractITensorNetwork{T, V} <: AbstractVertexDataGraph{T, V} end

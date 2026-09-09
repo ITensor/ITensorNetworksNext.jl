@@ -1,15 +1,11 @@
 using DataGraphs: DataGraphs, AbstractDataGraph, AbstractEdgeDataGraph, edge_data,
     edge_data_type, set_vertex_data!, underlying_graph, underlying_graph_type, vertex_data,
     vertex_data_type
-using Dictionaries: Dictionary, delete!, getindices, set!
+using Dictionaries: Dictionary, getindices, set!, unset!
 using Graphs: AbstractGraph, connected_components, is_directed, is_tree
 using ITensorBase: state, unnamed
-using NamedGraphs.GraphsExtensions: IsDirected, boundary_edges, default_root_vertex,
-    directed_graph, forest_cover, in_incident_edges, post_order_dfs_edges, undirected_graph,
-    vertextype
-using NamedGraphs.PartitionedGraphs: QuotientEdge, QuotientView, quotient_graph
-using NamedGraphs: AbstractNamedEdge, NamedDiGraph, NamedEdge, Vertices, convert_vertextype,
-    ordered_vertices, parent_graph_indices, position_graph, to_graph_index, vertex_positions
+using NamedGraphs: AbstractNamedEdge, NamedDiGraph, NamedEdge, add_edges!, boundary_edges,
+    in_incident_edges, to_graph_index, vertextype
 using SplitApplyCombine: mapmany
 
 struct MessageCache{T, V} <: AbstractEdgeDataGraph{T, V}
@@ -52,14 +48,12 @@ messagecache(pairs) = MessageCache(Dict(pairs))
 messagecache(f, edges) = messagecache(edge => f(edge) for edge in edges)
 
 function Graphs.rem_edge!(c::MessageCache, edge)
-    delete!(c.messages, to_graph_index(c, edge))
-    rem_edge!(c.underlying_graph, edge)
-    return c
+    unset!(c.messages, to_graph_index(c, edge))
+    return rem_edge!(c.underlying_graph, edge)
 end
 
 function Graphs.add_vertex!(c::MessageCache, vertex)
-    add_edge!(c.underlying_graph, vertex)
-    return c
+    return add_vertex!(c.underlying_graph, vertex)
 end
 
 function Graphs.has_edge(c::MessageCache, edge::AbstractNamedEdge)

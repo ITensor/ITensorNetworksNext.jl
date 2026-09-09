@@ -3,19 +3,11 @@ using DataGraphs.DataGraphsPartitionedGraphsExt
 using DataGraphs: DataGraphs, AbstractDataGraph, DataGraph, edge_data, get_vertices_data,
     vertex_data, vertex_data_type
 using Dictionaries: Dictionaries, AbstractDictionary, Indices, dictionary, set!, unset!
-using Graphs: AbstractSimpleGraph, rem_edge!, rem_vertex!
+using Graphs: AbstractSimpleGraph, has_vertex, rem_edge!, rem_vertex!
 using ITensorBase:
     ITensorBase, AbstractITensor, dim, dimnames, dimnametype, name, unnamedtype
-using NamedGraphs.GraphsExtensions:
-    GraphsExtensions, arrange_edge, arranged_edges, vertextype
-using NamedGraphs.OrderedDictionaries:
-    OrderedDictionary, OrderedIndices, index_positions, ordered_indices
-using NamedGraphs.PartitionedGraphs: AbstractPartitionedGraph, PartitionedGraphs,
-    QuotientVertex, QuotientVertexVertices, QuotientVertices, departition,
-    partitioned_vertices, partitionedgraph, quotient_graph, quotient_graph_type,
-    quotientvertices
-using NamedGraphs: NamedGraphs, NamedEdge, NamedGraph, PositionGraphView, Vertices,
-    parent_graph_indices, vertextype
+using NamedGraphs: NamedGraphs, NamedEdge, NamedGraph, decoded_vertex, encoded_graph,
+    encoded_vertex, vertextype
 using SplitApplyCombine: mapview
 
 struct ITensorNetwork{T, V, I} <: AbstractITensorNetwork{T, V}
@@ -51,14 +43,14 @@ ITensorBase.dimnametype(::Type{<:ITensorNetwork{T, V, I}}) where {T, V, I} = I
 
 Graphs.vertices(tn::ITensorNetwork) = vertices(tn.underlying_graph)
 
-function NamedGraphs.vertex_positions(graph::ITensorNetwork)
-    return index_positions(vertices(graph))
+function NamedGraphs.encoded_vertex(graph::ITensorNetwork, vertex)
+    return encoded_vertex(graph.underlying_graph, vertex)
 end
-function NamedGraphs.ordered_vertices(graph::ITensorNetwork)
-    return ordered_indices(vertices(graph))
+function NamedGraphs.decoded_vertex(graph::ITensorNetwork, code::Integer)
+    return decoded_vertex(graph.underlying_graph, code)
 end
 
-NamedGraphs.position_graph(graph::ITensorNetwork) = position_graph(graph.underlying_graph)
+NamedGraphs.encoded_graph(graph::ITensorNetwork) = encoded_graph(graph.underlying_graph)
 
 function Base.copy(tn::ITensorNetwork{T}) where {T}
     tn_dst = ITensorNetwork{T}(undef, vertices(tn))
@@ -67,6 +59,8 @@ function Base.copy(tn::ITensorNetwork{T}) where {T}
 end
 
 function Graphs.rem_vertex!(tn::ITensorNetwork, vertex)
+    has_vertex(tn, vertex) || return false
+
     tensor = tn.tensors[vertex]
 
     for name in dimnames(tensor)
@@ -84,10 +78,9 @@ function Graphs.rem_vertex!(tn::ITensorNetwork, vertex)
         isempty(vertex_list) && delete!(tn.dimname_vertices, name)
     end
 
-    rem_vertex!(tn.underlying_graph, vertex)
     delete!(tn.tensors, vertex)
 
-    return tn
+    return rem_vertex!(tn.underlying_graph, vertex)
 end
 
 # Internal (unsafe)

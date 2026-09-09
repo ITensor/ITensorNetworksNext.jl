@@ -3,8 +3,7 @@ using Graphs: edges, ne, nv, vertices
 using ITensorBase: Index, inds
 using ITensorNetworksNext.ITensorNetworkGenerators: delta, delta_network, ising_network
 using ITensorNetworksNext: contract_network
-using NamedGraphs.GraphsExtensions: arranged_edges, incident_edges
-using NamedGraphs.NamedGraphGenerators: named_grid
+using NamedGraphs: arranged_edges, incident_edges, named_grid
 using Test: @test, @testset
 
 !@isdefined(TestUtils) && include("utils.jl")
