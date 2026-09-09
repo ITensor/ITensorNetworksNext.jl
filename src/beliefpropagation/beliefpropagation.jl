@@ -251,6 +251,8 @@ end
 # `edge`.
 function updated_message(algorithm::SimpleMessageUpdate, cache, factors, edge)
     messages = collect(incoming_messages(cache, edge))
+    # TODO: Remove `factor_tensors` once `contract_network` handles lazy tensors in
+    # contraction sequences properly.
     return contract_network(
         [messages; factor_tensors(factors, src(edge))]; alg = algorithm.contraction_alg
     )
