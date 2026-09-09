@@ -5,12 +5,8 @@ using Graphs: add_edge!, add_vertex!, dst, edges, edgetype, has_edge, has_vertex
 using ITensorBase: Index, LazyITensor, inds
 using ITensorNetworksNext: ITensorNetwork, has_ind, linkaxes, linkinds, linknames, siteaxes,
     siteinds, sitenames, tensornetwork
-using NamedGraphs.GraphsExtensions: incident_edges, subgraph, vertextype
-using NamedGraphs.NamedGraphGenerators: named_grid, named_path_graph
-using NamedGraphs.PartitionedGraphs: AbstractPartitionedGraph, QuotientVertex, departition,
-    partitioned_vertices, partitionedgraph, quotient_graph, quotient_graph_type,
-    quotientvertices
-using NamedGraphs: convert_vertextype, similar_graph
+using NamedGraphs: convert_vertextype, incident_edges, named_grid, named_path_graph,
+    similar_graph, subgraph, vertextype
 using Test: @test, @test_throws, @testset
 
 @testset "`ITensorNetwork`" begin
@@ -61,8 +57,9 @@ using Test: @test, @test_throws, @testset
         @test !has_edge(tn, (1, 1) => (2, 1))
         @test ne(tn) == 0
 
-        rem_vertex!(tn, (2, 2))
+        @test rem_vertex!(tn, (2, 2))
         @test !has_vertex(tn, (2, 2))
+        @test !rem_vertex!(tn, (2, 2))
         insert!(tn, (2, 2), randn(Index(2)))
         @test has_vertex(tn, (2, 2))
         @test isassigned(tn, (2, 2))

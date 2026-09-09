@@ -5,9 +5,7 @@ using DataGraphs: edge_data
 using Graphs: AbstractEdge, edges, edgetype, has_edge, vertices
 using ITensorBase: AbstractITensor, operator, state
 using LinearAlgebra: norm, normalize, tr
-using NamedGraphs.GraphsExtensions:
-    add_edges!, boundary_edges, forest_cover_edge_sequence, subgraph
-using NamedGraphs.PartitionedGraphs: quotientvertices
+using NamedGraphs: forest_cover_edge_sequence, subgraph
 
 # === Top-level user entry point ===
 

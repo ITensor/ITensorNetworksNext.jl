@@ -40,9 +40,9 @@ Graphs.vertices(nn::NormNetwork) = vertices(nn.ket)
 
 # ==================================== NamedGraphs.jl ==================================== #
 
-NamedGraphs.vertex_positions(nn::NormNetwork) = vertex_positions(nn.ket)
-NamedGraphs.ordered_vertices(nn::NormNetwork) = ordered_vertices(nn.ket)
-NamedGraphs.position_graph(nn::NormNetwork) = position_graph(nn.ket)
+NamedGraphs.encoded_vertex(nn::NormNetwork, vertex) = encoded_vertex(nn.ket, vertex)
+NamedGraphs.decoded_vertex(nn::NormNetwork, code::Integer) = decoded_vertex(nn.ket, code)
+NamedGraphs.encoded_graph(nn::NormNetwork) = encoded_graph(nn.ket)
 
 # ==================================== DataGraphs.jl ===================================== #
 
