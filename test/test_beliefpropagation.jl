@@ -1,14 +1,16 @@
 import AlgorithmsInterface as AI
+using Base.Broadcast: materialize
 using DataGraphs: DataGraphs, DataGraph, edge_data, edge_data_type
 using Dictionaries: Dictionary, dictionary, set!
 using GradedArrays: U1, gradedrange
 using Graphs: AbstractGraph, add_vertex!, dst, edges, has_edge, has_vertex, nv, rem_edge!,
     src, vertices
-using ITensorBase: ITensor, Index, inds, name, noprime, outputnames, prime
-using ITensorNetworksNext: ITensorNetworksNext, ITensorNetwork, MessageCache, NormNetwork,
-    StopWhenConverged, beliefpropagation, bethe_free_energy, edge_scalar, incoming_messages,
-    insertlink!, linkinds, message_environment, messagecache, region_scalar, subgraph,
-    tensornetwork, vertex_scalar, vertex_scalars
+using ITensorBase: Greedy, ITensor, Index, inds, name, noprime, outputnames, prime
+using ITensorNetworksNext: ITensorNetworksNext, Exact, ITensorNetwork, MessageCache,
+    NormNetwork, SimpleMessageUpdate, StopWhenConverged, beliefpropagation,
+    bethe_free_energy, contract_network, contraction_order, edge_scalar, factor_tensors,
+    incoming_messages, insertlink!, linkinds, message_environment, messagecache,
+    region_scalar, subgraph, tensornetwork, updated_message, vertex_scalar, vertex_scalars
 using LinearAlgebra: LinearAlgebra
 using NamedGraphs: NamedEdge, all_edges, incident_edges, named_comb_tree, named_grid,
     named_path_graph, vertextype
@@ -36,6 +38,15 @@ function spin_ice_tensornetwork(g)
         set!(ts, v, t)
     end
     return ITensorNetwork(ts)
+end
+
+# Records how many operands each `contract_network` call is given, then orders them greedily.
+struct RecordOperands
+    counts::Vector{Int}
+end
+function ITensorNetworksNext.contraction_order(alg::RecordOperands, tn)
+    push!(alg.counts, length(tn))
+    return contraction_order(tn; alg = Greedy())
 end
 
 @testset "Belief propagation" begin
@@ -275,6 +286,46 @@ end
             z_exact = (ket * conj(ket))[]
             z_bp = exp(bethe_free_energy(nn, cache))
             @test z_bp ≈ z_exact rtol = eps(real(T))^(1 / 3)
+        end
+    end
+
+    @testset "Doubled-vertex contraction operands" begin
+        site_ranges = (
+            "plain" => 2,
+            "U1" => gradedrange([U1(0) => 1, U1(1) => 1]),
+        )
+        @testset "$label" for (label, site_range) in site_ranges
+            rng = StableRNG(1234)
+            g = named_grid((3, 3))
+            network = tensornetwork(vertices(g)) do v
+                return randn(rng, (Index(site_range),))
+            end
+            for edge in edges(g)
+                insertlink!(network, edge)
+            end
+            nn = NormNetwork(network)
+            v = (2, 2)
+
+            # A doubled vertex splits into its two layers, and the split is faithful.
+            @test length(factor_tensors(nn, v)) == 2
+            @test prod(factor_tensors(nn, v)) ≈ materialize(nn[v])
+            # A single-layer network's factor is a single operand.
+            @test factor_tensors(network, v) == [network[v]]
+
+            # The message update passes the layers to `contract_network` as separate operands, so
+            # the contraction order can interleave the incoming messages between them, and the
+            # result matches contracting the doubled vertex as one operand.
+            counts = Int[]
+            algorithm = SimpleMessageUpdate(;
+                contraction_alg = Exact(; order_alg = RecordOperands(counts))
+            )
+            cache = message_environment(one, nn)
+            edge = NamedEdge(v => (2, 3))
+            messages = collect(incoming_messages(cache, edge))
+            message = updated_message(algorithm, cache, nn, edge)
+            # `v` has degree 4, so 3 incoming messages plus the ket and bra layers.
+            @test only(counts) == 5
+            @test message ≈ contract_network([messages; [nn[v]]])
         end
     end
 end
