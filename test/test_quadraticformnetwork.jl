@@ -148,6 +148,9 @@ identity_operator(g, s; d = 2) = product_operator(v -> Matrix(1.0I, d, d), g, s;
             @test is_vertex_assigned(view, 1)
         end
 
+        # A `NormNetwork` has no operator layer, so `OperatorView` rejects one.
+        @test_throws ArgumentError OperatorView(NormNetwork(tn))
+
         for v in vertices(tn)
             @test kv[v] === kettensor(qf, v)
             @test inds(ov[v]) == inds(operatortensor(qf, v))
