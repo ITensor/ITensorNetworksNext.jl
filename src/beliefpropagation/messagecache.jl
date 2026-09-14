@@ -175,11 +175,21 @@ function region_scalar(factors, messages, region)
     return mapreduce(vertex -> vertex_scalar(factors, messages, vertex), *, region)
 end
 
-function sum_log_scalars(terms)
-    if any(t -> real(t) < 0, terms)
-        terms = complex.(terms)
-    end
-    return sum(log.(terms))
+# (log|∏terms|, sign(∏terms))
+function sumlogabs(terms)
+
+    T = typeof(first(terms))
+
+    return mapreduce(
+        t -> (log(abs(t)), sign(t)),
+        ((d1, s1), (d2, s2)) -> (d1 + d2, s1 * s2),
+        terms; init = (zero(float(real(T))), one(T))
+    )
+end
+
+function sumlog(terms)
+    d, s = sumlogabs(terms)
+    return s isa Real && s > 0 ? d : d + log(complex(s))
 end
 
 # We need a graph structure here, so assume `factors` is a graph.
@@ -191,7 +201,7 @@ function bethe_free_energy(factors, messages)
         return -Inf
     end
 
-    return sum_log_scalars(numerator_terms) - sum_log_scalars(denominator_terms)
+    return sumlog(numerator_terms) - sumlog(denominator_terms)
 end
 
 # ===================================== NormNetwork ====================================== #
