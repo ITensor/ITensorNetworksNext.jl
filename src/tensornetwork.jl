@@ -154,16 +154,16 @@ function update_tensornetwork_metadata!(tn, vertex, tensor)
     return tn
 end
 
-function update_tensornetwork_metadata!(tn, vertex, oldinds, newinds)
+function update_tensornetwork_metadata!(tn, vertex, oldnames, newnames)
     # Only have to deal with the indices that aren't shared.
-    for name in symdiff(oldinds, newinds)
-        if name in oldinds
+    for name in symdiff(oldnames, newnames)
+        if name in oldnames
             delete_ind_edge!(tn, name)
             delete_ind_vertex!(tn, name, vertex)
             continue
         end
 
-        # Now `ind` must be a new index that's not in `oldinds`
+        # Now `name` must be a new index that's not in `oldinds`
 
         vertex_list = get!(tn.dimname_vertices, name, Set())
         if length(vertex_list) > 1
