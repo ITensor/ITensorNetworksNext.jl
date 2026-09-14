@@ -177,7 +177,6 @@ end
 
 # (log|∏terms|, sign(∏terms))
 function sumlogabs(terms)
-
     T = typeof(first(terms))
 
     return mapreduce(

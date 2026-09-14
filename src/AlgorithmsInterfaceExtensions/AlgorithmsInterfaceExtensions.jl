@@ -20,7 +20,8 @@ function initialize_subsolve(
 end
 
 function finalize_substate!(
-        problem::AI.Problem, algorithm::AI.Algorithm, state::AI.State, substate::AI.State
+        _problem::AI.Problem, _algorithm::AI.Algorithm, state::AI.State,
+        _subproblem::AI.Problem, _subalgorithm::AI.Algorithm, substate::AI.State
     )
     state.iterate = substate.iterate
     return state
@@ -29,7 +30,10 @@ end
 function AI.step!(problem::AI.Problem, algorithm::NestedAlgorithm, state::AI.State)
     subproblem, subalgorithm, substate = initialize_subsolve(problem, algorithm, state)
     AI.solve!(subproblem, subalgorithm, substate)
-    finalize_substate!(subproblem, subalgorithm, substate, state)
+    finalize_substate!(
+        problem, algorithm, state,
+        subproblem, subalgorithm, substate
+    )
     return state
 end
 
