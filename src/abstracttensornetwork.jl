@@ -132,7 +132,7 @@ function insertlink!(tn::AbstractGraph, e)
     return tn
 end
 
-function supportof(tn::AbstractGraph, op::ITensorOperator)
+function operator_support(tn::AbstractGraph, op::ITensorOperator)
     support = Set{vertextype(tn)}()
 
     for name in inputnames(op)

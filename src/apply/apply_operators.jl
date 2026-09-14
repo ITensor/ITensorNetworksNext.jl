@@ -239,7 +239,7 @@ function apply_gate_bp!(
         dest::AbstractITensorNetwork, op::AbstractITensor,
         state::AbstractITensorNetwork, env; kwargs...
     )
-    vertices = supportof(state, op)
+    vertices = operator_support(state, op)
 
     isempty(vertices) && throw(
         ArgumentError("operator shares no indices with the tensor network")
