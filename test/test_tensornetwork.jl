@@ -3,8 +3,8 @@ using DataGraphs:
 using Graphs: add_edge!, add_vertex!, dst, edges, edgetype, has_edge, has_vertex,
     is_directed, ne, nv, rem_edge!, rem_vertex!, src, vertices
 using ITensorBase: Index, LazyITensor, inds, operator
-using ITensorNetworksNext: ITensorNetwork, has_ind, linkaxes, linkinds, linknames, siteaxes,
-    siteinds, sitenames, operator_support, tensornetwork
+using ITensorNetworksNext: ITensorNetwork, has_ind, linkaxes, linkinds, linknames,
+    operator_support, siteaxes, siteinds, sitenames, tensornetwork
 using NamedGraphs: convert_vertextype, incident_edges, named_grid, named_path_graph,
     similar_graph, subgraph, vertextype
 using Test: @test, @test_throws, @testset
