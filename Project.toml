@@ -1,6 +1,6 @@
 name = "ITensorNetworksNext"
 uuid = "302f2e75-49f0-4526-aef7-d8ba550cb06c"
-version = "0.11.0-DEV"
+version = "0.10.2"
 authors = ["ITensor developers <support@itensor.org> and contributors"]
 
 [workspace]
@@ -25,14 +25,6 @@ TensorAlgebra = "68bd88dc-f39d-4e12-b2ca-f046b68fcc6a"
 
 [weakdeps]
 OMEinsumContractionOrders = "6f22d1fd-8eed-4bb7-9776-e7d684900715"
-
-[sources.ITensorBase]
-rev = "main"
-url = "https://github.com/ITensor/ITensorBase.jl"
-
-[sources.TensorAlgebra]
-rev = "main"
-url = "https://github.com/ITensor/TensorAlgebra.jl"
 
 [extensions]
 ITensorNetworksNextOMEinsumContractionOrdersExt = "OMEinsumContractionOrders"
