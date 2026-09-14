@@ -1,8 +1,8 @@
 using DataGraphs: is_vertex_assigned
 using Dictionaries: isinsertable, issettable
 using Graphs: edges, vertices
-using ITensorBase: ITensor, Index, IndexName, conj, inds, inputnames, name, operator,
-    outputnames, replacedimnames, setname, uniquename
+using ITensorBase: ITensor, Index, IndexName, conj, dimnames, inds, inputnames, name,
+    operator, outputnames, replacedimnames, setname, uniquename
 using ITensorNetworksNext: BraView, ITensorNetwork, KetView, NormNetwork, OperatorView,
     QuadraticFormNetwork, braname, bratensor, conj_bratensor, contract_network, indmap,
     kettensor, operatortensor, quadraticformnetwork, tensornetwork
@@ -26,11 +26,12 @@ end
 # Build a bondless operator layer on the vertices of `g`, with `f(v)` supplying the matrix
 # acting on the site index `s[v]`.
 function product_operator(f, g, s; d = 2)
-    op = tensornetwork(vertices(g)) do v
-        out = Index(d)
-        return operator(ITensor(f(v), (out, s[v])), (name(out),), (name(s[v]),))
+    out = Dict(v => Index(d) for v in vertices(g))
+    tn = tensornetwork(vertices(g)) do v
+        return ITensor(f(v), (out[v], s[v]))
     end
-    return op
+    vs = collect(vertices(g))
+    return operator(tn, [name(out[v]) for v in vs], [name(s[v]) for v in vs])
 end
 
 identity_operator(g, s; d = 2) = product_operator(v -> Matrix(1.0I, d, d), g, s; d)
@@ -94,8 +95,9 @@ identity_operator(g, s; d = 2) = product_operator(v -> Matrix(1.0I, d, d), g, s;
         # The operator's input name meets the ket and its output name is renamed to meet
         # the bra.
         o = operatortensor(qf, 2)
-        @test inputnames(o) == [sname]
-        @test outputnames(o) == [braname(qf, sname)]
+        @test sname in dimnames(o)
+        @test braname(qf, sname) in dimnames(o)
+        @test inputnames(op) == [name(s[v]) for v in vertices(g)]
 
         # `bratensor` is the elementwise conjugate of `conj_bratensor` and carries the same
         # indices.

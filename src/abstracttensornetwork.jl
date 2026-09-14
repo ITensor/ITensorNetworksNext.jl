@@ -132,10 +132,14 @@ function insertlink!(tn::AbstractGraph, e)
     return tn
 end
 
-function supportof(tn::AbstractGraph, op::ITensorOperator)
+supportof(tn::AbstractGraph, op::ITensorOperator) = supportof_dimnames(tn, inputnames(op))
+
+# Shared with the `ITensorNetworkOperator` method, which is defined alongside that type
+# because it is not yet known at this point in the include order.
+function supportof_dimnames(tn::AbstractGraph, opnames)
     support = Set{vertextype(tn)}()
 
-    for name in inputnames(op)
+    for name in opnames
         vertices = dimnamevertices(tn, name)
 
         if length(vertices) > 1
