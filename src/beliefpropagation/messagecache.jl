@@ -142,8 +142,10 @@ vertex_scalars(factors, messages) = vertex_scalars(factors, messages, keys(facto
 function vertex_scalars(factors::AbstractGraph, messages)
     return vertex_scalars(factors, messages, vertices(factors))
 end
+# `vertex_scalar` reads a number out of an `ITensor`, whose array field is untyped, so `map` would
+# give element type `Any`; collecting the values instead picks up the type they actually have.
 function vertex_scalars(factors, messages, vertices)
-    return map(v -> vertex_scalar(factors, messages, v), vertices)
+    return [vertex_scalar(factors, messages, v) for v in vertices]
 end
 
 function edge_scalar(cache, edge)
@@ -153,26 +155,37 @@ end
 edge_scalars(cache) = edge_scalars(cache, keys(cache))
 
 function edge_scalars(cache, edges)
-    processed = Set{eltype(edges)}()
-
-    T = Base.promote_op(edge_scalar, typeof(cache), eltype(edges))
-
-    scalars = T[]
+    unique_edges = Indices{eltype(edges)}()
 
     # Ignore repeated edges and their reverses.
     for e in edges
-        if e in processed || reverse(e) in processed
+        if e in unique_edges || reverse(e) in unique_edges
             continue
         end
-        push!(processed, e)
-        push!(scalars, edge_scalar(cache, e))
+        insert!(unique_edges, e)
     end
 
-    return scalars
+    return [edge_scalar(cache, e) for e in unique_edges]
 end
 
 function region_scalar(factors, messages, region)
     return mapreduce(vertex -> vertex_scalar(factors, messages, vertex), *, region)
+end
+
+# (log|∏terms|, sign(∏terms))
+function sumlogabs(terms)
+    T = eltype(terms)
+
+    return mapreduce(
+        t -> (log(abs(t)), sign(t)),
+        ((d1, s1), (d2, s2)) -> (d1 + d2, s1 * s2),
+        terms; init = (zero(float(real(T))), one(T))
+    )
+end
+
+function sumlog(terms)
+    d, s = sumlogabs(terms)
+    return s isa Real && s > 0 ? d : d + log(complex(s))
 end
 
 # We need a graph structure here, so assume `factors` is a graph.
@@ -180,18 +193,11 @@ function bethe_free_energy(factors, messages)
     numerator_terms = vertex_scalars(factors, messages)
     denominator_terms = edge_scalars(messages)
 
-    if any(t -> real(t) < 0, numerator_terms)
-        numerator_terms = complex.(numerator_terms)
-    end
-    if any(t -> real(t) < 0, denominator_terms)
-        denominator_terms = complex.(denominator_terms)
-    end
-
     if any(iszero, denominator_terms)
         return -Inf
     end
 
-    return sum(log.(numerator_terms)) - sum(log.(denominator_terms))
+    return sumlog(numerator_terms) - sumlog(denominator_terms)
 end
 
 # ===================================== NormNetwork ====================================== #
