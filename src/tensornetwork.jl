@@ -116,7 +116,7 @@ DataGraphs.is_edge_assigned(::ITensorNetwork, _edge) = false
 
 DataGraphs.get_vertex_data(tn::ITensorNetwork, v) = tn.tensors[v]
 
-function check_incoming_dimnames(tn, tensor, vertex)
+function check_input(::typeof(set_vertex_data!), tn, tensor, vertex)
     for name in dimnames(tensor)
         vertices = get(tn.dimname_vertices, name, Set())
         if length(setdiff(vertices, Set([vertex]))) > 1
@@ -131,7 +131,7 @@ function check_incoming_dimnames(tn, tensor, vertex)
 end
 
 function DataGraphs.insert_vertex_data!(tn::ITensorNetwork, vertex, tensor)
-    check_incoming_dimnames(tn, tensor, vertex)
+    check_input(set_vertex_data!, tn, tensor, vertex)
     add_vertex!(tn.underlying_graph, vertex)
     update_tensornetwork_metadata!(tn, vertex, tensor)
     insert!(tn.tensors, vertex, tensor)
@@ -139,7 +139,7 @@ function DataGraphs.insert_vertex_data!(tn::ITensorNetwork, vertex, tensor)
 end
 
 function DataGraphs.set_vertex_data!(tn::ITensorNetwork, tensor, vertex)
-    check_incoming_dimnames(tn, tensor, vertex)
+    check_input(set_vertex_data!, tn, tensor, vertex)
     update_tensornetwork_metadata!(tn, vertex, tensor)
     set!(tn.tensors, vertex, tensor)
     return tn
