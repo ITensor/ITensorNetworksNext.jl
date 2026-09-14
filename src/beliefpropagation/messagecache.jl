@@ -142,8 +142,10 @@ vertex_scalars(factors, messages) = vertex_scalars(factors, messages, keys(facto
 function vertex_scalars(factors::AbstractGraph, messages)
     return vertex_scalars(factors, messages, vertices(factors))
 end
+# `vertex_scalar` reads a number out of an `ITensor`, whose array field is untyped, so `map` would
+# give element type `Any`; collecting the values instead picks up the type they actually have.
 function vertex_scalars(factors, messages, vertices)
-    return map(v -> vertex_scalar(factors, messages, v), vertices)
+    return [vertex_scalar(factors, messages, v) for v in vertices]
 end
 
 function edge_scalar(cache, edge)
@@ -153,22 +155,17 @@ end
 edge_scalars(cache) = edge_scalars(cache, keys(cache))
 
 function edge_scalars(cache, edges)
-    processed = Set{eltype(edges)}()
-
-    T = Base.promote_op(edge_scalar, typeof(cache), eltype(edges))
-
-    scalars = T[]
+    unique_edges = Indices{eltype(edges)}()
 
     # Ignore repeated edges and their reverses.
     for e in edges
-        if e in processed || reverse(e) in processed
+        if e in unique_edges || reverse(e) in unique_edges
             continue
         end
-        push!(processed, e)
-        push!(scalars, edge_scalar(cache, e))
+        insert!(unique_edges, e)
     end
 
-    return scalars
+    return [edge_scalar(cache, e) for e in unique_edges]
 end
 
 function region_scalar(factors, messages, region)
@@ -177,7 +174,7 @@ end
 
 # (log|∏terms|, sign(∏terms))
 function sumlogabs(terms)
-    T = typeof(first(terms))
+    T = eltype(terms)
 
     return mapreduce(
         t -> (log(abs(t)), sign(t)),
