@@ -121,9 +121,15 @@ function insertlink!(tn::AbstractGraph, e)
 end
 
 function operator_support(tn::AbstractGraph, op::ITensorOperator)
+    return operator_support_names(tn, inputnames(op))
+end
+
+# Shared with the `ITensorNetworkOperator` method, which is defined alongside that type
+# because it is not yet known at this point in the include order.
+function operator_support_names(tn::AbstractGraph, opnames)
     support = Indices{vertextype(tn)}()
 
-    for name in inputnames(op)
+    for name in opnames
         vertices = dimnamevertices(tn, name)
 
         if length(vertices) > 1
