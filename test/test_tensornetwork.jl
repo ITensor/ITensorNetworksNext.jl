@@ -4,7 +4,7 @@ using Graphs: add_edge!, add_vertex!, dst, edges, edgetype, has_edge, has_vertex
     is_directed, ne, nv, rem_edge!, rem_vertex!, src, vertices
 using ITensorBase: Index, LazyITensor, inds, operator
 using ITensorNetworksNext: ITensorNetwork, has_ind, linkaxes, linkinds, linknames, siteaxes,
-    siteinds, sitenames, supportof, tensornetwork
+    siteinds, sitenames, operator_support, tensornetwork
 using NamedGraphs: convert_vertextype, incident_edges, named_grid, named_path_graph,
     similar_graph, subgraph, vertextype
 using Test: @test, @test_throws, @testset
@@ -125,7 +125,7 @@ using Test: @test, @test_throws, @testset
         @test sitenames(tn, 3) == [s[3].name]
     end
 
-    @testset "`supportof`" begin
+    @testset "`operator_support`" begin
         g = named_path_graph(3)
         l = Dict(e => Index(2) for e in edges(g))
         l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
@@ -136,21 +136,21 @@ using Test: @test, @test_throws, @testset
         end
 
         o1 = operator(randn(2, 2), (Index(2),), (s[2],))
-        @test supportof(tn, o1) == Set([2])
+        @test operator_support(tn, o1) == Set([2])
 
         o12 = operator(randn(2, 2, 2, 2), (Index(2), Index(2)), (s[1], s[2]))
-        @test supportof(tn, o12) == Set([1, 2])
+        @test operator_support(tn, o12) == Set([1, 2])
 
         # An input name that no tensor in the network carries contributes no vertex.
         o_absent = operator(randn(2, 2), (Index(2),), (Index(2),))
-        @test isempty(supportof(tn, o_absent))
+        @test isempty(operator_support(tn, o_absent))
 
         o_partial = operator(randn(2, 2, 2, 2), (Index(2), Index(2)), (s[3], Index(2)))
-        @test supportof(tn, o_partial) == Set([3])
+        @test operator_support(tn, o_partial) == Set([3])
 
         # A link index is carried by both endpoints of its edge.
         o_link = operator(randn(2, 2), (Index(2),), (l[first(edges(g))],))
-        @test_throws ArgumentError supportof(tn, o_link)
+        @test_throws ArgumentError operator_support(tn, o_link)
     end
 
     @testset "`subgraph`" begin
