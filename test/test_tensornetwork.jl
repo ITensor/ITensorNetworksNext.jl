@@ -2,9 +2,9 @@ using DataGraphs:
     DataGraph, assigned_edge_data, assigned_vertex_data, underlying_graph, vertex_data
 using Graphs: add_edge!, add_vertex!, dst, edges, edgetype, has_edge, has_vertex,
     is_directed, ne, nv, rem_edge!, rem_vertex!, src, vertices
-using ITensorBase: Index, LazyITensor, inds
+using ITensorBase: Index, LazyITensor, inds, operator
 using ITensorNetworksNext: ITensorNetwork, has_ind, linkaxes, linkinds, linknames, siteaxes,
-    siteinds, sitenames, tensornetwork
+    siteinds, sitenames, supportof, tensornetwork
 using NamedGraphs: convert_vertextype, incident_edges, named_grid, named_path_graph,
     similar_graph, subgraph, vertextype
 using Test: @test, @test_throws, @testset
@@ -48,8 +48,14 @@ using Test: @test, @test_throws, @testset
         @test_throws MethodError tn[e] = randn(2, 2)
         @test_throws MethodError tn[src(e) => dst(e)] = randn(2, 2)
 
-        # `rem_edge!` is intentionally unimplemented.
-        @test_throws ErrorException rem_edge!(tn, (1, 1) => (2, 1))
+        # `rem_edge!` and `add_edge!` are intentionally unimplemented; they return
+        # `false` without modifying the network.
+        @test rem_edge!(tn, (1, 1) => (2, 1)) == false
+        @test has_edge(tn, (1, 1) => (2, 1))
+        @test ne(tn) == 1
+        @test add_edge!(tn, (2, 1) => (2, 2)) == false
+        @test !has_edge(tn, (2, 1) => (2, 2))
+        @test ne(tn) == 1
 
         tn[1, 1] = randn(Index(2))
         tn[2, 1] = randn(Index(2))
@@ -117,6 +123,34 @@ using Test: @test, @test_throws, @testset
         @test siteinds(tn, 1) == [s[1]]
         @test siteaxes(tn, 2) == [s[2]]
         @test sitenames(tn, 3) == [s[3].name]
+    end
+
+    @testset "`supportof`" begin
+        g = named_path_graph(3)
+        l = Dict(e => Index(2) for e in edges(g))
+        l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
+        s = Dict(v => Index(2) for v in vertices(g))
+        tn = tensornetwork(vertices(g)) do v
+            is = map(e -> l[e], incident_edges(g, v))
+            return randn((s[v], is...))
+        end
+
+        o1 = operator(randn(2, 2), (Index(2),), (s[2],))
+        @test supportof(tn, o1) == Set([2])
+
+        o12 = operator(randn(2, 2, 2, 2), (Index(2), Index(2)), (s[1], s[2]))
+        @test supportof(tn, o12) == Set([1, 2])
+
+        # An input name that no tensor in the network carries contributes no vertex.
+        o_absent = operator(randn(2, 2), (Index(2),), (Index(2),))
+        @test isempty(supportof(tn, o_absent))
+
+        o_partial = operator(randn(2, 2, 2, 2), (Index(2), Index(2)), (s[3], Index(2)))
+        @test supportof(tn, o_partial) == Set([3])
+
+        # A link index is carried by both endpoints of its edge.
+        o_link = operator(randn(2, 2), (Index(2),), (l[first(edges(g))],))
+        @test_throws ArgumentError supportof(tn, o_link)
     end
 
     @testset "`subgraph`" begin

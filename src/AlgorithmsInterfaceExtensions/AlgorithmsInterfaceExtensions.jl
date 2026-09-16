@@ -2,6 +2,8 @@ module AlgorithmsInterfaceExtensions
 
 using AlgorithmsInterface: AlgorithmsInterface as AI
 
+abstract type NestedProblem <: AI.Problem end
+
 # ============================ NestedAlgorithm =============================================
 
 abstract type NestedAlgorithm <: AI.Algorithm end
@@ -27,7 +29,7 @@ end
 function AI.step!(problem::AI.Problem, algorithm::NestedAlgorithm, state::AI.State)
     subproblem, subalgorithm, substate = initialize_subsolve(problem, algorithm, state)
     AI.solve!(subproblem, subalgorithm, substate)
-    finalize_substate!(problem, algorithm, state, substate)
+    finalize_substate!(subproblem, subalgorithm, substate, state)
     return state
 end
 
