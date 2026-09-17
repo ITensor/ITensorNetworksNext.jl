@@ -152,20 +152,21 @@ function edge_scalar(cache, edge)
     return (cache[edge] * cache[reverse(edge)])[]
 end
 
-edge_scalars(cache) = edge_scalars(cache, keys(cache))
+function edge_scalars(cache)
+    seen = Indices{keytype(cache)}()
 
-function edge_scalars(cache, edges)
-    seen = Indices{edgetype(cache)}()
-
-    unique_edges = filter(edges) do edge
-        arranged = arrange_edge(edgetype(cache)(edge))
-        arranged in seen && return false
-        insert!(seen, arranged)
+    unique_edges = filter(keys(cache)) do edge
+        if edge in seen || reverse(edge) in seen
+            return false
+        end
+        insert!(seen, edge)
         return true
     end
 
-    return narrow_map(e -> edge_scalar(cache, e), unique_edges)
+    return edge_scalars(cache, unique_edges)
 end
+
+edge_scalars(cache, edges) = narrow_map(e -> edge_scalar(cache, e), edges)
 
 function region_scalar(factors, messages, region)
     return mapreduce(vertex -> vertex_scalar(factors, messages, vertex), *, region)
