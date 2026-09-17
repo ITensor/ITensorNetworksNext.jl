@@ -4,8 +4,8 @@ using DataGraphs: DataGraphs, AbstractDataGraph, AbstractEdgeDataGraph, edge_dat
 using Dictionaries: Dictionary, getindices, set!, unset!
 using Graphs: AbstractGraph, connected_components, is_directed, is_tree
 using ITensorBase: state, unnamed
-using NamedGraphs: AbstractNamedEdge, NamedDiGraph, NamedEdge, add_edges!, boundary_edges,
-    in_incident_edges, to_graph_index, vertextype
+using NamedGraphs: AbstractNamedEdge, NamedDiGraph, NamedEdge, add_edges!, arrange_edge,
+    boundary_edges, in_incident_edges, to_graph_index, vertextype
 using SplitApplyCombine: mapmany
 
 struct MessageCache{T, V} <: AbstractEdgeDataGraph{T, V}
@@ -145,7 +145,7 @@ end
 # `vertex_scalar` reads a number out of an `ITensor`, whose array field is untyped, so `map` would
 # give element type `Any`; collecting the values instead picks up the type they actually have.
 function vertex_scalars(factors, messages, vertices)
-    return [vertex_scalar(factors, messages, v) for v in vertices]
+    return narrow_map(v -> vertex_scalar(factors, messages, v), vertices)
 end
 
 function edge_scalar(cache, edge)
@@ -155,17 +155,16 @@ end
 edge_scalars(cache) = edge_scalars(cache, keys(cache))
 
 function edge_scalars(cache, edges)
-    unique_edges = Indices{eltype(edges)}()
+    seen = Indices{edgetype(cache)}()
 
-    # Ignore repeated edges and their reverses.
-    for e in edges
-        if e in unique_edges || reverse(e) in unique_edges
-            continue
-        end
-        insert!(unique_edges, e)
+    unique_edges = filter(edges) do edge
+        arranged = arrange_edge(edgetype(cache)(edge))
+        arranged in seen && return false
+        insert!(seen, arranged)
+        return true
     end
 
-    return [edge_scalar(cache, e) for e in unique_edges]
+    return narrow_map(e -> edge_scalar(cache, e), unique_edges)
 end
 
 function region_scalar(factors, messages, region)

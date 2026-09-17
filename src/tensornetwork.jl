@@ -39,6 +39,7 @@ function ITensorNetwork{T, V}(tensors) where {T, V}
     return tn
 end
 
+ITensorBase.dimnametype(tn::ITensorNetwork) = dimnametype(typeof(tn))
 ITensorBase.dimnametype(::Type{<:ITensorNetwork{T, V, I}}) where {T, V, I} = I
 
 Graphs.vertices(tn::ITensorNetwork) = vertices(tn.underlying_graph)
@@ -146,7 +147,7 @@ function DataGraphs.set_vertex_data!(tn::ITensorNetwork, tensor, vertex)
 end
 
 function update_tensornetwork_metadata!(tn, vertex, tensor)
-    oldnames = isassigned(tn, vertex) ? dimnames(tn[vertex]) : Set()
+    oldnames = isassigned(tn, vertex) ? dimnames(tn[vertex]) : Set{dimnametype(tn)}()
     newnames = dimnames(tensor)
 
     update_tensornetwork_metadata!(tn, vertex, oldnames, newnames)

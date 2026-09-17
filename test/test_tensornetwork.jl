@@ -136,17 +136,17 @@ using Test: @test, @test_throws, @testset
         end
 
         o1 = operator(randn(2, 2), (Index(2),), (s[2],))
-        @test operator_support(tn, o1) == Set([2])
+        @test issetequal(operator_support(tn, o1), Set([2]))
 
         o12 = operator(randn(2, 2, 2, 2), (Index(2), Index(2)), (s[1], s[2]))
-        @test operator_support(tn, o12) == Set([1, 2])
+        @test issetequal(operator_support(tn, o12), Set([1, 2]))
 
         # An input name that no tensor in the network carries contributes no vertex.
         o_absent = operator(randn(2, 2), (Index(2),), (Index(2),))
         @test isempty(operator_support(tn, o_absent))
 
         o_partial = operator(randn(2, 2, 2, 2), (Index(2), Index(2)), (s[3], Index(2)))
-        @test operator_support(tn, o_partial) == Set([3])
+        @test issetequal(operator_support(tn, o_partial), Set([3]))
 
         # A link index is carried by both endpoints of its edge.
         o_link = operator(randn(2, 2), (Index(2),), (l[first(edges(g))],))

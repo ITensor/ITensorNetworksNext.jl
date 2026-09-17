@@ -133,7 +133,7 @@ function insertlink!(tn::AbstractGraph, e)
 end
 
 function operator_support(tn::AbstractGraph, op::ITensorOperator)
-    support = Set{vertextype(tn)}()
+    support = Indices{vertextype(tn)}()
 
     for name in inputnames(op)
         vertices = dimnamevertices(tn, name)
