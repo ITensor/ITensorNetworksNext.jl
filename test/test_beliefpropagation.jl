@@ -2,16 +2,18 @@ import AlgorithmsInterface as AI
 using Base.Broadcast: materialize
 using DataGraphs: DataGraphs, DataGraph, edge_data, edge_data_type
 using Dictionaries: Dictionary, dictionary, set!
-using GradedArrays: U1, gradedrange
+using GradedArrays: U1, gradedrange, isdual
 using Graphs: AbstractGraph, add_vertex!, dst, edges, has_edge, has_vertex, nv, rem_edge!,
     src, vertices
-using ITensorBase: Greedy, ITensor, Index, inds, name, noprime, outputnames, prime
+using ITensorBase: Greedy, ITensor, Index, inds, inputnames, name, noprime, outputnames,
+    prime, replacedimnames, state
 using ITensorNetworksNext: ITensorNetworksNext, Exact, ITensorNetwork, MessageCache,
     NormNetwork, SimpleMessageUpdate, StopWhenConverged, beliefpropagation,
-    bethe_free_energy, contract_network, contraction_order, edge_scalar, factor_tensors,
-    incoming_messages, insertlink!, linkinds, message_environment, messagecache,
-    region_scalar, subgraph, tensornetwork, updated_message, vertex_scalar, vertex_scalars
-using LinearAlgebra: LinearAlgebra
+    bethe_free_energy, bratensor, contract_network, contraction_order, edge_scalar,
+    factor_tensors, incoming_messages, insertlink!, kettensor, linkaxes, linkinds,
+    message_environment, message_root, messagecache, region_scalar, subgraph, tensornetwork,
+    updated_message, vertex_scalar, vertex_scalars
+using LinearAlgebra: LinearAlgebra, norm, tr
 using NamedGraphs: NamedEdge, all_edges, incident_edges, named_comb_tree, named_grid,
     named_path_graph, vertextype
 using StableRNGs: StableRNG
@@ -286,6 +288,31 @@ end
             z_exact = (ket * conj(ket))[]
             z_bp = exp(bethe_free_energy(nn, cache))
             @test z_bp ≈ z_exact rtol = eps(real(T))^(1 / 3)
+
+            # Messages are stored as `bra ← ket`, the bipartition in which they are positive
+            # semidefinite: the square root `F` exists, reproduces the message as `F' F`, and the
+            # trace that normalizes them is positive.
+            for msg in edge_data(cache)
+                bra, ket = only(outputnames(msg)), only(inputnames(msg))
+                F = message_root(msg)
+                @test replacedimnames(conj(F), ket => bra) * F ≈ state(msg) rtol =
+                    eps(real(T))^(1 / 3)
+                @test real(tr(msg)) > 0
+            end
+
+            # In that bipartition `one` is the trivial environment: paired with the ket and bra
+            # layers of the rest of the network it gives that part's plain squared norm. The two
+            # edges have the receiving vertex on opposite ends of its bond's arrow.
+            @test isdual(only(linkaxes(network, 1 => 2))) !=
+                isdual(only(linkaxes(network, 4 => 3)))
+            ones = message_environment(one, nn)
+            for (edge, rest) in ((1 => 2, 2:4), (4 => 3, 1:3))
+                layers =
+                    [[kettensor(nn, v) for v in rest]; [bratensor(nn, v) for v in rest]]
+                z_rest = contract_network([state(ones[edge]); layers])[]
+                @test z_rest ≈ norm(prod([network[v] for v in rest]))^2 rtol =
+                    eps(real(T))^(1 / 3)
+            end
         end
     end
 

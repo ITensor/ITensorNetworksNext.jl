@@ -1,8 +1,9 @@
 using GradedArrays: U1, gradedrange
 using Graphs: dst, edges, src, vertices
-using ITensorBase: ITensorBase as ITB, Index, name, operator, setname, uniquename
+using ITensorBase: ITensorBase as ITB, Index, inputnames, name, operator, outputnames,
+    replacedimnames, setname, uniquename
 using ITensorNetworksNext: NormNetwork, apply_operator, apply_operators, insertlink!,
-    message_environment, tensornetwork
+    message_environment, message_gauge, tensornetwork
 using MatrixAlgebraKit: svd_trunc, truncrank
 using NamedGraphs: named_cycle_graph, named_path_graph
 using Random: AbstractRNG
@@ -90,5 +91,29 @@ end
         gated, _ = apply_operators([g1, g2], network, env)
         @test prod(gated) ≈ ITB.apply(g2, ITB.apply(g1, prod(network))) rtol =
             eps(real(T))^(1 / 3)
+    end
+
+    @testset "message gauge is a gauge transformation" begin
+        rng = StableRNG(123)
+        g = named_path_graph(N)
+        site_axes = Dict(v => Index(site_range) for v in vertices(g))
+        network, env = random_state(rng, T, g, site_axes; nlayers = 2, trunc = truncrank(4))
+        ψ = prod(network)
+
+        # Both directions of one bond, so the vertex receiving the message holds the dual bond
+        # leg in one case and the nondual one in the other.
+        for (edge, recv, send) in ((2 => 3, 3, 2), (3 => 2, 2, 3))
+            message = env[edge]
+            bra, ket = only(outputnames(message)), only(inputnames(message))
+            F, G = message_gauge(message)
+            # `F' F` reproduces the message, and `G F` is the identity on the bond: absorbing
+            # `F` into the receiver and `G` into the sender leaves the state unchanged.
+            @test replacedimnames(conj(F), ket => bra) * F ≈ ITB.state(message) rtol =
+                eps(real(T))^(1 / 3)
+            gauged = copy(network)
+            gauged[recv] = network[recv] * F
+            gauged[send] = network[send] * G
+            @test prod(gauged) ≈ ψ rtol = eps(real(T))^(1 / 3)
+        end
     end
 end
