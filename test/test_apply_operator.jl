@@ -1,13 +1,13 @@
 using GradedArrays: U1, gradedrange
 using Graphs: dst, edges, src, vertices
-using ITensorBase: ITensorBase as ITB, Index, inputnames, name, operator, outputnames,
-    replacedimnames, setname, uniquename
+using ITensorBase: Index, apply, name, operator, setname, uniquename
 using ITensorNetworksNext: NormNetwork, apply_operator, apply_operators, insertlink!,
-    message_environment, message_gauge, tensornetwork
+    message_environment, tensornetwork
 using MatrixAlgebraKit: svd_trunc, truncrank
 using NamedGraphs: named_cycle_graph, named_path_graph
 using Random: AbstractRNG
 using StableRNGs: StableRNG
+using TensorAlgebra.MatrixAlgebra: sqrth_invsqrth_safe
 using TensorKitSectors: FermionParity
 using Test: @test, @testset
 
@@ -61,7 +61,7 @@ end
                 randn_operator(rng, T, (site_axes[2], site_axes[3])),
             )
             gated, _ = apply_operator(gate, network, env)
-            @test prod(gated) ≈ ITB.apply(gate, prod(network)) rtol = eps(real(T))^(1 / 3)
+            @test prod(gated) ≈ apply(gate, prod(network)) rtol = eps(real(T))^(1 / 3)
         end
     end
 
@@ -72,7 +72,7 @@ end
         network, env = random_state(rng, T, g, site_axes; nlayers = 2, trunc = truncrank(4))
 
         gate = randn_operator(rng, T, (site_axes[2], site_axes[3]))
-        gated_full = ITB.apply(gate, prod(network))
+        gated_full = apply(gate, prod(network))
         left = [name(site_axes[v]) for v in 1:2]
         U, S, Vt = svd_trunc(gated_full, left; trunc = truncrank(k))
         gated, _ = apply_operator(gate, network, env; trunc = truncrank(k))
@@ -89,27 +89,21 @@ end
         g1 = randn_operator(rng, T, (site_axes[2], site_axes[3]))
         g2 = randn_operator(rng, T, (site_axes[3], site_axes[4]))
         gated, _ = apply_operators([g1, g2], network, env)
-        @test prod(gated) ≈ ITB.apply(g2, ITB.apply(g1, prod(network))) rtol =
+        @test prod(gated) ≈ apply(g2, apply(g1, prod(network))) rtol =
             eps(real(T))^(1 / 3)
     end
 
-    @testset "message gauge is a gauge transformation" begin
+    @testset "message roots gauge a vertex and undo it" begin
         rng = StableRNG(123)
         g = named_path_graph(N)
         site_axes = Dict(v => Index(site_range) for v in vertices(g))
         network, env = random_state(rng, T, g, site_axes; nlayers = 2, trunc = truncrank(4))
-        ψ = prod(network)
+        rtol = eps(real(T))^(1 / 3)
 
-        for (edge, recv, send) in ((2 => 3, 3, 2), (3 => 2, 2, 3))
-            message = env[edge]
-            bra, ket = only(outputnames(message)), only(inputnames(message))
-            F, G = message_gauge(message)
-            @test replacedimnames(conj(F), ket => bra) * F ≈ ITB.state(message) rtol =
-                eps(real(T))^(1 / 3)
-            gauged = copy(network)
-            gauged[recv] = network[recv] * F
-            gauged[send] = network[send] * G
-            @test prod(gauged) ≈ ψ rtol = eps(real(T))^(1 / 3)
+        for (edge, v) in ((2 => 3, 3), (3 => 2, 2))
+            sqrt_message, invsqrt_message = sqrth_invsqrth_safe(env[edge])
+            @test apply(invsqrt_message, apply(sqrt_message, network[v])) ≈ network[v] rtol =
+                rtol
         end
     end
 end

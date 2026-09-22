@@ -2,12 +2,11 @@ using .AlgorithmsInterfaceExtensions: AlgorithmsInterfaceExtensions as AIE
 using AlgorithmsInterface: AlgorithmsInterface as AI
 using Base: @kwdef
 using Graphs: dst, src, vertices
-using ITensorBase: ITensorBase as ITB, AbstractITensor, dimnames, inputnames, operator,
-    outputnames, replacedimnames
+using ITensorBase: AbstractITensor, apply, dimnames, inputnames, operator, replacedimnames
 using LinearAlgebra: norm
-using MatrixAlgebraKit: eigh_full, project_hermitian, qr_compact, svd_trunc
+using MatrixAlgebraKit: project_hermitian, qr_compact, svd_trunc
 using NamedGraphs: boundary_edges
-using TensorAlgebra.MatrixAlgebra: pow_diag_safe
+using TensorAlgebra.MatrixAlgebra: sqrth_invsqrth_safe, sqrth_safe
 
 # === Top-level user entry point ===
 
@@ -205,31 +204,7 @@ end
 
 # === BP simple-update implementation ===
 
-function pow_diag(d, p; kwargs...)
-    return ITB.nameddims(pow_diag_safe(ITB.unnamed(d), p; kwargs...), dimnames(d))
-end
-
-function message_eigen(message)
-    bra, ket = outputnames(message), inputnames(message)
-    hermitian_message = project_hermitian(ITB.state(message), bra, ket)
-    return eigh_full(hermitian_message, bra, ket)
-end
-
-function message_root(message)
-    d, v = message_eigen(message)
-    return message_root(d, v)
-end
-message_root(d, v) = pow_diag(d, 1 // 2) * conj(v)
-
-# The root `F = √d v'` and its inverse under contraction `G = v (v' v) √d⁻¹`, where `v' v` is
-# contracted over the bond leg so that `G F` is the identity on the bond for either bond direction.
-function message_gauge(message)
-    d, v = message_eigen(message)
-    name_d′, name_d = dimnames(d)
-    v′ = replacedimnames(v, name_d => name_d′)
-    inv_root = v * (conj(v) * v′) * pow_diag(d, -1 // 2)
-    return message_root(d, v), replacedimnames(inv_root, name_d => name_d′)
-end
+apply_gauges(gauges, ψ) = foldl((ψ, gauge) -> apply(gauge, ψ), gauges; init = ψ)
 
 function apply_gate_bp!(
         dest::AbstractITensorNetwork, op::AbstractITensor,
@@ -256,13 +231,13 @@ function apply_gate_bp_nsite!(
         normalize, kwargs...
     )
     v = only(vs)
-    ψv = ITB.apply(op, state[v])
+    ψv = apply(op, state[v])
     if normalize
-        gauges = [
-            message_root(env[e])
-                for e in boundary_edges(state, vs; dir = :in)
+        sqrt_messages = [
+            sqrth_safe(project_hermitian(env[e])) for
+                e in boundary_edges(state, vs; dir = :in)
         ]
-        ψv /= norm(prod([[ψv]; gauges]))
+        ψv /= norm(apply_gauges(sqrt_messages, ψv))
     end
     dest[v] = ψv
     return dest
@@ -275,28 +250,30 @@ function apply_gate_bp_nsite!(
     )
     v1, v2 = vs
     edges_in = boundary_edges(state, vs; dir = :in)
-    siv_v1 = [message_gauge(env[e]) for e in edges_in if dst(e) == v1]
-    siv_v2 = [message_gauge(env[e]) for e in edges_in if dst(e) == v2]
-    gauges_v1, inv_gauges_v1 = first.(siv_v1), last.(siv_v1)
-    gauges_v2, inv_gauges_v2 = first.(siv_v2), last.(siv_v2)
+    roots_v1 =
+        [sqrth_invsqrth_safe(project_hermitian(env[e])) for e in edges_in if dst(e) == v1]
+    roots_v2 =
+        [sqrth_invsqrth_safe(project_hermitian(env[e])) for e in edges_in if dst(e) == v2]
+    sqrt_messages_v1, invsqrt_messages_v1 = first.(roots_v1), last.(roots_v1)
+    sqrt_messages_v2, invsqrt_messages_v2 = first.(roots_v2), last.(roots_v2)
 
-    ψ_v1 = prod([[state[v1]]; gauges_v1])
-    ψ_v2 = prod([[state[v2]]; gauges_v2])
+    ψ_v1 = apply_gauges(sqrt_messages_v1, state[v1])
+    ψ_v2 = apply_gauges(sqrt_messages_v2, state[v2])
 
     Q_v1, R_v1 = qr_compact(ψ_v1, setdiff(dimnames(ψ_v1), dimnames(ψ_v2), dimnames(op)))
     Q_v2, R_v2 = qr_compact(ψ_v2, setdiff(dimnames(ψ_v2), dimnames(ψ_v1), dimnames(op)))
-    op_R_v1v2 = ITB.apply(op, R_v1 * R_v2)
+    op_R_v1v2 = apply(op, R_v1 * R_v2)
     U_v1, S, U_v2 = svd_trunc(op_R_v1v2, setdiff(dimnames(R_v1), dimnames(R_v2)); trunc)
     if normalize
         S = S / norm(S)
     end
     name_v1, name_v2 = dimnames(S)
-    sqrt_S = pow_diag(S, 1 // 2; atol = 0, rtol = 0)
+    sqrt_S = sqrth_safe(S, (name_v1,), (name_v2,); atol = 0, rtol = 0)
     R_v1 = replacedimnames(U_v1 * sqrt_S, name_v2 => name_v1)
     R_v2 = sqrt_S * U_v2
 
-    dest[v1] = prod([[Q_v1 * R_v1]; inv_gauges_v1])
-    dest[v2] = prod([[Q_v2 * R_v2]; inv_gauges_v2])
+    dest[v1] = apply_gauges(invsqrt_messages_v1, Q_v1 * R_v1)
+    dest[v2] = apply_gauges(invsqrt_messages_v2, Q_v2 * R_v2)
 
     env[v1 => v2] = operator(
         replacedimnames(conj(R_v1), name_v1 => name_v2) * R_v1, (name_v2,), (name_v1,)
