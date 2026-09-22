@@ -221,16 +221,13 @@ function message_root(message)
 end
 message_root(d, v) = pow_diag(d, 1 // 2) * conj(v)
 
-# The root `F = √d v'` and its inverse under contraction `G = √m⁻¹ v`, formed over the bond leg
-# so that `G F` is the identity on the bond for either bond direction.
+# The root `F = √d v'` and its inverse under contraction `G = v √d⁻¹ (v' v)`, where `v' v` is
+# contracted over the bond leg so that `G F` is the identity on the bond for either bond direction.
 function message_gauge(message)
     d, v = message_eigen(message)
-    bra, ket = only(outputnames(message)), only(inputnames(message))
     name_d′, name_d = dimnames(d)
-    v_bra = replacedimnames(v, ket => bra, name_d => name_d′)
-    inv_root = v_bra * pow_diag(d, -1 // 2) * conj(v)
-    return message_root(d, v),
-        replacedimnames(inv_root * replacedimnames(v, name_d => name_d′), bra => ket)
+    v′ = replacedimnames(v, name_d => name_d′)
+    return message_root(d, v), v′ * pow_diag(d, -1 // 2) * (conj(v) * v′)
 end
 
 function apply_gate_bp!(
