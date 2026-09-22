@@ -206,11 +206,8 @@ function similar_message_environment(nn::NormNetwork)
             branames = linknames(braview, edge)
             braaxis = unnamed.(linkaxes(braview, edge))
 
-            # Bra-layer leg = operator output, bond (ket) leg = input: the bipartition in which a
-            # norm-network message is positive semidefinite, so `one` is the trivial environment
-            # and `tr` is the trace rather than the fermionic supertrace. Built on the src-side
-            # bra axis; `similar_operator` flips the input side, which gives the ket leg the
-            # src-side ket arrow so the gauge contracts into the destination state.
+            # Bra leg = operator output, ket leg = input, the bipartition in which the message
+            # is positive semidefinite.
             message = similar_operator(ketview[vertex], braaxis, branames, ketnames)
 
             return edge => message

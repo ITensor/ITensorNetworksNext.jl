@@ -289,9 +289,6 @@ end
             z_bp = exp(bethe_free_energy(nn, cache))
             @test z_bp ≈ z_exact rtol = eps(real(T))^(1 / 3)
 
-            # Messages are stored as `bra ← ket`, the bipartition in which they are positive
-            # semidefinite: the square root `F` exists, reproduces the message as `F' F`, and the
-            # trace that normalizes them is positive.
             for msg in edge_data(cache)
                 bra, ket = only(outputnames(msg)), only(inputnames(msg))
                 F = message_root(msg)
@@ -300,9 +297,6 @@ end
                 @test real(tr(msg)) > 0
             end
 
-            # In that bipartition `one` is the trivial environment: paired with the ket and bra
-            # layers of the rest of the network it gives that part's plain squared norm. The two
-            # edges have the receiving vertex on opposite ends of its bond's arrow.
             @test isdual(only(linkaxes(network, 1 => 2))) !=
                 isdual(only(linkaxes(network, 4 => 3)))
             ones = message_environment(one, nn)

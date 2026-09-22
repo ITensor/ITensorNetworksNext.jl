@@ -100,14 +100,10 @@ end
         network, env = random_state(rng, T, g, site_axes; nlayers = 2, trunc = truncrank(4))
         ψ = prod(network)
 
-        # Both directions of one bond, so the vertex receiving the message holds the dual bond
-        # leg in one case and the nondual one in the other.
         for (edge, recv, send) in ((2 => 3, 3, 2), (3 => 2, 2, 3))
             message = env[edge]
             bra, ket = only(outputnames(message)), only(inputnames(message))
             F, G = message_gauge(message)
-            # `F' F` reproduces the message, and `G F` is the identity on the bond: absorbing
-            # `F` into the receiver and `G` into the sender leaves the state unchanged.
             @test replacedimnames(conj(F), ket => bra) * F ≈ ITB.state(message) rtol =
                 eps(real(T))^(1 / 3)
             gauged = copy(network)

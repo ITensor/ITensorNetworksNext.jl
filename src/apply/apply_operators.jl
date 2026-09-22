@@ -205,35 +205,24 @@ end
 
 # === BP simple-update implementation ===
 
-# A power of a diagonal (eigenvalue or singular value) tensor acts entrywise on the diagonal,
-# with no bipartition to choose, unlike a matrix function of a general fermionic tensor.
 function pow_diag(d, p; kwargs...)
     return ITB.nameddims(pow_diag_safe(ITB.unnamed(d), p; kwargs...), dimnames(d))
 end
 
-# A norm-network message is stored as the operator `bra ← ket`, the bipartition in which it
-# is positive semidefinite (see `similar_message_environment`). Diagonalize it there,
-# `m = v d v'`; `v` carries the bond leg under the ket leg's name with the bra leg's arrow, so
-# `conj(v)` is the factor whose bond leg contracts into the vertex the message flows into.
 function message_eigen(message)
     bra, ket = outputnames(message), inputnames(message)
     hermitian_message = project_hermitian(ITB.state(message), bra, ket)
     return eigh_full(hermitian_message, bra, ket)
 end
 
-# The asymmetric square root `F = √d v'` of the message, `m = F' F`, absorbed into the vertex
-# the message flows into.
 function message_root(message)
     d, v = message_eigen(message)
     return message_root(d, v)
 end
 message_root(d, v) = pow_diag(d, 1 // 2) * conj(v)
 
-# The root `F` paired with its inverse under contraction, `G = (F' F)⁻¹ F' = √m⁻¹ v`, which
-# undoes the gauge on the updated tensor. Under composition `G = v √d⁻¹`, but that product runs
-# over the eigenvalue leg and misses the odd-parity sign a graded contraction over the bond leg
-# carries when the receiving vertex holds the dual bond leg; `√m⁻¹ v` is formed over the bond
-# leg, so `G F` is the identity on the bond in both bond directions without a twist.
+# The root `F = √d v'` and its inverse under contraction `G = √m⁻¹ v`, formed over the bond leg
+# so that `G F` is the identity on the bond for either bond direction.
 function message_gauge(message)
     d, v = message_eigen(message)
     bra, ket = only(outputnames(message)), only(inputnames(message))
@@ -311,8 +300,6 @@ function apply_gate_bp_nsite!(
     dest[v1] = prod([[Q_v1 * R_v1]; inv_gauges_v1])
     dest[v2] = prod([[Q_v2 * R_v2]; inv_gauges_v2])
 
-    # Stored as `bra ← ket`, the bipartition in which the graded contraction of a factor with
-    # its conjugate is positive semidefinite (the same convention as `message_update!`).
     env[v1 => v2] = operator(
         replacedimnames(conj(R_v1), name_v1 => name_v2) * R_v1, (name_v2,), (name_v1,)
     )

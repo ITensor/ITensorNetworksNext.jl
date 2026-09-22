@@ -271,10 +271,8 @@ end
 
 # `NormNetwork`: the message is a doubled (ket/bra) bond operator. Contracting a plain vertex factor
 # with the incoming messages leaves the surviving bond legs dangling, so assign the bra/ket pairing
-# the norm network gives this edge (the same convention as `similar_message_environment`). In that
-# bipartition the message is positive semidefinite, so its trace is a positive normalization; the
-# entrywise `sum`, or the trace in the other bipartition, is the fermionic supertrace and can vanish
-# or flip the sign.
+# the norm network gives this edge (the same convention as `similar_message_environment`), in which
+# the message is positive semidefinite and its trace is a positive normalization.
 function message_update!(algorithm::SimpleMessageUpdate, cache, factors::NormNetwork, edge)
     new_tensor = updated_message(algorithm, cache, factors, edge)
     new_message = operator(
