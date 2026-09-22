@@ -204,8 +204,6 @@ end
 
 # === BP simple-update implementation ===
 
-apply_gauges(gauges, ψ) = foldl((ψ, gauge) -> apply(gauge, ψ), gauges; init = ψ)
-
 function apply_gate_bp!(
         dest::AbstractITensorNetwork, op::AbstractITensor,
         state::AbstractITensorNetwork, env; kwargs...
@@ -237,7 +235,7 @@ function apply_gate_bp_nsite!(
             sqrth_safe(project_hermitian(env[e])) for
                 e in boundary_edges(state, vs; dir = :in)
         ]
-        ψv /= norm(apply_gauges(sqrt_messages, ψv))
+        ψv /= norm(foldl((ψ, m) -> apply(m, ψ), sqrt_messages; init = ψv))
     end
     dest[v] = ψv
     return dest
@@ -257,8 +255,8 @@ function apply_gate_bp_nsite!(
     sqrt_messages_v1, invsqrt_messages_v1 = first.(roots_v1), last.(roots_v1)
     sqrt_messages_v2, invsqrt_messages_v2 = first.(roots_v2), last.(roots_v2)
 
-    ψ_v1 = apply_gauges(sqrt_messages_v1, state[v1])
-    ψ_v2 = apply_gauges(sqrt_messages_v2, state[v2])
+    ψ_v1 = foldl((ψ, m) -> apply(m, ψ), sqrt_messages_v1; init = state[v1])
+    ψ_v2 = foldl((ψ, m) -> apply(m, ψ), sqrt_messages_v2; init = state[v2])
 
     Q_v1, R_v1 = qr_compact(ψ_v1, setdiff(dimnames(ψ_v1), dimnames(ψ_v2), dimnames(op)))
     Q_v2, R_v2 = qr_compact(ψ_v2, setdiff(dimnames(ψ_v2), dimnames(ψ_v1), dimnames(op)))
@@ -272,8 +270,8 @@ function apply_gate_bp_nsite!(
     R_v1 = replacedimnames(U_v1 * sqrt_S, name_v2 => name_v1)
     R_v2 = sqrt_S * U_v2
 
-    dest[v1] = apply_gauges(invsqrt_messages_v1, Q_v1 * R_v1)
-    dest[v2] = apply_gauges(invsqrt_messages_v2, Q_v2 * R_v2)
+    dest[v1] = foldl((ψ, m) -> apply(m, ψ), invsqrt_messages_v1; init = Q_v1 * R_v1)
+    dest[v2] = foldl((ψ, m) -> apply(m, ψ), invsqrt_messages_v2; init = Q_v2 * R_v2)
 
     env[v1 => v2] = operator(
         replacedimnames(conj(R_v1), name_v1 => name_v2) * R_v1, (name_v2,), (name_v1,)
