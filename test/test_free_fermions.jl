@@ -32,27 +32,40 @@ number(s::Index) = operator(project([0 0; 0 1], (prime(s),), (s,)), [prime(s)], 
 
 expectation(o, ψ) = (conj(ψ) * apply(o, ψ))[] / (conj(ψ) * ψ)[]
 
-# The densities on the vertices followed by the hoppings on the edges, of a state or of a
-# correlation matrix `⟨cᵢ† cⱼ⟩`.
-function observables(g, sites, ψ)
-    return [
-        [expectation(number(sites[v]), ψ) for v in vertices(g)];
-        [expectation(hopping(sites[src(e)], sites[dst(e)]), ψ) for e in edges(g)]
-    ]
-end
-function observables(g, C::AbstractMatrix)
-    index = Dict(v => i for (i, v) in enumerate(vertices(g)))
-    return [
-        [C[index[v], index[v]] for v in vertices(g)];
-        [
-            C[index[src(e)], index[dst(e)]] + C[index[dst(e)], index[src(e)]] for
-                e in edges(g)
-        ]
-    ]
+# Densities on the vertices and hoppings on the edges from the full state `ψ`.
+function full_state_correlators(g, sites, ψ)
+    densities = Dict(v => expectation(number(sites[v]), ψ) for v in vertices(g))
+    hoppings = Dict(
+        e => expectation(hopping(sites[src(e)], sites[dst(e)]), ψ) for e in edges(g)
+    )
+    return densities, hoppings
 end
 
-# Create a fermion on each site in `occupied`, then apply `exp(-τ h)` on the bonds `(v1, v2, τ)`.
-function evolve(sector, g, occupied, bonds)
+# Densities and hoppings of free fermions created on the sites in `occupied` and evolved by
+# `exp(-τ h)` on the bonds `(v1, v2, τ)`. The state stays a Slater determinant with orbitals `Φ`,
+# each gate multiplies `Φ` by `exp(-τ h)` on its two sites, and `⟨cᵢ† cⱼ⟩ = (Φ (Φᵀ Φ)⁻¹ Φᵀ)ᵢⱼ`.
+function free_fermion_correlators(g, occupied, bonds)
+    index = Dict(v => i for (i, v) in enumerate(vertices(g)))
+    Φ = zeros(length(index), length(occupied))
+    for (k, v) in enumerate(occupied)
+        Φ[index[v], k] = 1
+    end
+    for (v1, v2, τ) in bonds
+        ij = [index[v1], index[v2]]
+        Φ[ij, :] = exp(-τ * [0 1; 1 0]) * Φ[ij, :]
+    end
+    C = Φ * ((Φ' * Φ) \ Φ')
+    densities = Dict(v => C[index[v], index[v]] for v in vertices(g))
+    hoppings = Dict(
+        e => C[index[src(e)], index[dst(e)]] + C[index[dst(e)], index[src(e)]] for
+            e in edges(g)
+    )
+    return densities, hoppings
+end
+
+# Create a fermion on each site in `occupied`, then apply `exp(-τ h)` on the bonds `(v1, v2, τ)`
+# by belief-propagation simple update. Returns the network and its site indices.
+function bp_evolve(sector, g, occupied, bonds)
     sites = Dict(v => Index([sector(0) => 1, sector(1) => 1]) for v in vertices(g))
     ψ = tensornetwork(v -> ones(sites[v]), vertices(g))
     for e in edges(g)
@@ -64,22 +77,7 @@ function evolve(sector, g, occupied, bonds)
     end
     gates = [exp(-τ * hopping(sites[v1], sites[v2])) for (v1, v2, τ) in bonds]
     ψ, env = apply_operators(gates, ψ, env)
-    return prod(ψ), sites
-end
-
-# The state stays a Slater determinant with orbitals `Φ`. Each gate multiplies `Φ` by `exp(-τ h)`
-# on its two sites, and `⟨cᵢ† cⱼ⟩ = (Φ (Φᵀ Φ)⁻¹ Φᵀ)ᵢⱼ`.
-function correlations(g, occupied, bonds)
-    index = Dict(v => i for (i, v) in enumerate(vertices(g)))
-    Φ = zeros(length(index), length(occupied))
-    for (k, v) in enumerate(occupied)
-        Φ[index[v], k] = 1
-    end
-    for (v1, v2, τ) in bonds
-        ij = [index[v1], index[v2]]
-        Φ[ij, :] = exp(-τ * [0 1; 1 0]) * Φ[ij, :]
-    end
-    return Φ * ((Φ' * Φ) \ Φ')
+    return ψ, sites
 end
 
 # An even number of fermions on the cycle, where an odd number would be indistinguishable from
@@ -89,13 +87,23 @@ end
         ("cycle", named_cycle_graph(6), [1, 2, 4, 5]),
     )
     bonds = [(src(e), dst(e), 0.5) for _ in 1:3 for e in edges(g)]
-    reference = observables(g, correlations(g, occupied, bonds))
+    densities, hoppings = free_fermion_correlators(g, occupied, bonds)
 
-    ψ, sites = evolve(FermionNumber, g, occupied, bonds)
-    @test observables(g, sites, ψ) ≈ reference atol = 1.0e-8
+    ψ, sites = bp_evolve(FermionNumber, g, occupied, bonds)
+    bp_densities, bp_hoppings = full_state_correlators(g, sites, prod(ψ))
+    for v in vertices(g)
+        @test bp_densities[v] ≈ densities[v] atol = 1.0e-8
+    end
+    for e in edges(g)
+        @test bp_hoppings[e] ≈ hoppings[e] atol = 1.0e-8
+    end
 
     # Hardcore bosons go through the same circuit without the fermion signs and come out
-    # different on these graphs, so the check above is sensitive to the signs.
-    ψ_boson, sites_boson = evolve(U1, g, occupied, bonds)
-    @test maximum(abs.(observables(g, sites_boson, ψ_boson) .- reference)) > 0.05
+    # different on these graphs, so the checks above are sensitive to the signs.
+    ψ_boson, sites_boson = bp_evolve(U1, g, occupied, bonds)
+    boson_densities, boson_hoppings = full_state_correlators(g, sites_boson, prod(ψ_boson))
+    @test max(
+        maximum(abs(boson_densities[v] - densities[v]) for v in vertices(g)),
+        maximum(abs(boson_hoppings[e] - hoppings[e]) for e in edges(g))
+    ) > 0.05
 end
