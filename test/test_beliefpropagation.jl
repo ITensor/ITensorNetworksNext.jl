@@ -9,7 +9,7 @@ using ITensorBase: Greedy, ITensor, Index, inds, name, noprime, outputnames, pri
 using ITensorNetworksNext: ITensorNetworksNext, Exact, ITensorNetwork, MessageCache,
     NormNetwork, SimpleMessageUpdate, StopWhenConverged, beliefpropagation,
     bethe_free_energy, contract_network, contraction_order, edge_scalar, factor_tensors,
-    incoming_messages, insertlink!, linkinds, message_environment, messagecache,
+    incoming_messages, insertinternalind!, internalinds, message_environment, messagecache,
     region_scalar, subgraph, tensornetwork, updated_message, vertex_scalar, vertex_scalars
 using LinearAlgebra: LinearAlgebra
 using NamedGraphs: NamedEdge, all_edges, incident_edges, named_comb_tree, named_grid,
@@ -33,8 +33,8 @@ function spin_ice_tensornetwork(g)
                 t_data[i + 1, j + 1, k + 1, l + 1] = 1
             end
         end
-        linkinds = [links[e] for e in es]
-        t = t_data[linkinds...]
+        internalinds = [links[e] for e in es]
+        t = t_data[internalinds...]
         set!(ts, v, t)
     end
     return ITensorNetwork(ts)
@@ -120,7 +120,7 @@ end
             end
 
             bpc = messagecache(all_edges(g)) do edge
-                return ones(Float64, Tuple(linkinds(tn, edge)))
+                return ones(Float64, Tuple(internalinds(tn, edge)))
             end
 
             # Vertex/edge/region scalars.
@@ -152,7 +152,7 @@ end
                 is = map(e -> l[e], incident_edges(g, v))
                 return randn(Tuple(is))
             end
-            bpc = messagecache(edge -> ones(Tuple(linkinds(tn, edge))), all_edges(g))
+            bpc = messagecache(edge -> ones(Tuple(internalinds(tn, edge))), all_edges(g))
 
             sub_vs = [(1,), (2,)]
             subbpc = subgraph(bpc, sub_vs)
@@ -170,7 +170,7 @@ end
                 return randn(Tuple(is))
             end
 
-            bpc1 = messagecache(edge -> ones(Tuple(linkinds(tn, edge))), all_edges(g))
+            bpc1 = messagecache(edge -> ones(Tuple(internalinds(tn, edge))), all_edges(g))
 
             bpc2 = copy(bpc1)
 
@@ -196,7 +196,7 @@ end
             end
 
             messages = Dict(
-                edge => ones(T, Tuple(linkinds(tn, edge))) for edge in all_edges(g)
+                edge => ones(T, Tuple(internalinds(tn, edge))) for edge in all_edges(g)
             )
 
             cache = beliefpropagation(
@@ -218,7 +218,7 @@ end
             end
 
             messages = Dict(
-                edge => ones(T, Tuple(linkinds(tn, edge))) for edge in all_edges(g)
+                edge => ones(T, Tuple(internalinds(tn, edge))) for edge in all_edges(g)
             )
 
             cache = beliefpropagation(
@@ -236,7 +236,7 @@ end
                     tn = spin_ice_tensornetwork(g)
 
                     messages = Dict(
-                        edge => rand(rng, T, Tuple(linkinds(tn, edge)))
+                        edge => rand(rng, T, Tuple(internalinds(tn, edge)))
                             for edge in all_edges(g)
                     )
 
@@ -269,7 +269,7 @@ end
                 return randn(rng, T, (site_axes[v],))
             end
             for edge in edges(g)
-                insertlink!(network, edge)
+                insertinternalind!(network, edge)
             end
             nn = NormNetwork(network)
 
@@ -301,7 +301,7 @@ end
                 return randn(rng, (Index(site_range),))
             end
             for edge in edges(g)
-                insertlink!(network, edge)
+                insertinternalind!(network, edge)
             end
             nn = NormNetwork(network)
             v = (2, 2)

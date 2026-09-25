@@ -1,10 +1,11 @@
 using DataGraphs:
     DataGraph, assigned_edge_data, assigned_vertex_data, underlying_graph, vertex_data
+using GradedArrays: U1, gradedrange, isdual
 using Graphs: add_edge!, add_vertex!, dst, edges, edgetype, has_edge, has_vertex,
-    is_directed, ne, nv, rem_edge!, rem_vertex!, src, vertices
+    is_directed, ne, nv, rem_edge!, rem_vertex!, reverse, src, vertices
 using ITensorBase: Index, LazyITensor, inds
-using ITensorNetworksNext: ITensorNetwork, has_ind, linkaxes, linkinds, linknames, siteaxes,
-    siteinds, sitenames, tensornetwork
+using ITensorNetworksNext: ITensorNetwork, externalaxes, externalinds, externalnames,
+    has_ind, internalaxes, internalinds, internalnames, tensornetwork
 using NamedGraphs: convert_vertextype, incident_edges, named_grid, named_path_graph,
     similar_graph, subgraph, vertextype
 using Test: @test, @test_throws, @testset
@@ -105,18 +106,73 @@ using Test: @test, @test_throws, @testset
         end
 
         E = edgetype(tn)
-        @test linkinds(tn, 1 => 2) == [l[E(1 => 2)]]
-        @test linkinds(tn, E(1 => 2)) == [l[E(1 => 2)]]
+        @test internalinds(tn, 1 => 2) == [l[E(1 => 2)]]
+        @test internalinds(tn, E(1 => 2)) == [l[E(1 => 2)]]
 
-        @test linkaxes(tn, 1 => 2) == [l[E(1 => 2)]]
-        @test linkaxes(tn, E(1 => 2)) == [l[E(1 => 2)]]
+        @test internalaxes(tn, 1 => 2) == [l[E(1 => 2)]]
+        @test internalaxes(tn, E(1 => 2)) == [l[E(1 => 2)]]
 
-        @test linknames(tn, 1 => 2) == [l[E(1 => 2)].name]
-        @test linknames(tn, E(1 => 2)) == [l[E(1 => 2)].name]
+        @test internalnames(tn, 1 => 2) == [l[E(1 => 2)].name]
+        @test internalnames(tn, E(1 => 2)) == [l[E(1 => 2)].name]
 
-        @test siteinds(tn, 1) == [s[1]]
-        @test siteaxes(tn, 2) == [s[2]]
-        @test sitenames(tn, 3) == [s[3].name]
+        @test externalinds(tn, 1) == [s[1]]
+        @test externalaxes(tn, 2) == [s[2]]
+        @test externalnames(tn, 3) == [s[3].name]
+
+        # Whole-network forms: a vertex-data graph keeping `tn`'s connectivity, and a
+        # directed edge-data graph whose two arrows hold the two ends of each bond.
+        ext = externalinds(tn)
+        @test !is_directed(ext)
+        @test issetequal(vertices(ext), vertices(tn))
+        @test issetequal(edges(ext), edges(tn))
+        for v in vertices(tn)
+            @test ext[v] == externalinds(tn, v)
+        end
+
+        int = internalinds(tn)
+        @test !is_directed(int)
+        @test ne(int) == ne(tn)
+        # `NamedEdge` equality is arrow-sensitive, so two undirected graphs holding the same
+        # bonds compare unequal whenever they picked opposite arrows.
+        @test all(e -> has_edge(tn, e), edges(int))
+        @test all(e -> has_edge(int, e), edges(tn))
+        for e in edges(tn)
+            @test int[e] == internalinds(tn, e)
+            @test int[reverse(e)] == internalinds(tn, reverse(e))
+        end
+    end
+
+    @testset "dual internal indices" begin
+        g = named_path_graph(4)
+        r = gradedrange([U1(0) => 1, U1(1) => 1])
+        bonds = Dict(e => Index(r) for e in edges(g))
+        tn = tensornetwork(vertices(g)) do v
+            is = [
+                v == src(e) ? bonds[e] : conj(bonds[e])
+                    for e in edges(g) if v in (src(e), dst(e))
+            ]
+            return randn((Index(r), is...))
+        end
+
+        int = internalinds(tn)
+        @test ne(int) == ne(tn)
+        @test all(e -> has_edge(tn, e), edges(int))
+        @test all(e -> has_edge(int, e), edges(tn))
+        for e in edges(g)
+            # `==` on `Index` ignores the dual flag, so only `isdual` sees which arrow of the
+            # bond an entry holds.
+            @test isdual.(int[e]) == isdual.(internalinds(tn, e)) == [false]
+            @test isdual.(int[reverse(e)]) == isdual.(internalinds(tn, reverse(e))) ==
+                [true]
+        end
+
+        # Writing either arrow writes through to the one stored copy.
+        e = first(edges(g))
+        i = Index(gradedrange([U1(0) => 2, U1(1) => 2]))
+        int[reverse(e)] = [conj(i)]
+        @test int[e] == [i]
+        @test isdual.(int[e]) == [false]
+        @test isdual.(int[reverse(e)]) == [true]
     end
 
     @testset "`subgraph`" begin

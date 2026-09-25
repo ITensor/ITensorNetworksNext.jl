@@ -202,10 +202,10 @@ function similar_message_environment(nn::NormNetwork)
             braview = BraView(nn)
             ketview = KetView(nn)
 
-            ketnames = linknames(ketview, edge)
-            ketaxis = unnamed.(linkaxes(ketview, edge))
+            ketnames = internalnames(ketview, edge)
+            ketaxis = unnamed.(internalaxes(ketview, edge))
 
-            branames = linknames(braview, edge)
+            branames = internalnames(braview, edge)
 
             # Bond leg (ket) = operator output, bra-layer leg = input. Built on the src-side ket
             # axis, whose arrow is opposite the dst endpoint's bond, so the gauge contracts back

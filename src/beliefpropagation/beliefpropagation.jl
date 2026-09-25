@@ -277,7 +277,8 @@ end
 function message_update!(algorithm::SimpleMessageUpdate, cache, factors::NormNetwork, edge)
     new_tensor = updated_message(algorithm, cache, factors, edge)
     new_message = operator(
-        new_tensor, linknames(KetView(factors), edge), linknames(BraView(factors), edge)
+        new_tensor, internalnames(KetView(factors), edge),
+        internalnames(BraView(factors), edge)
     )
     if algorithm.normalize
         message_norm = tr(new_message)

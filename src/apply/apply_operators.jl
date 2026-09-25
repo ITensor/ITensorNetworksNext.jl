@@ -240,7 +240,7 @@ function apply_gate_bp!(
         state::AbstractITensorNetwork, env; kwargs...
     )
     op_in = inputnames(op)
-    vs = [v for v in vertices(state) if !isempty(intersect(op_in, sitenames(state, v)))]
+    vs = [v for v in vertices(state) if !isempty(intersect(op_in, externalnames(state, v)))]
     isempty(vs) && throw(
         ArgumentError("operator shares no indices with the tensor network")
     )

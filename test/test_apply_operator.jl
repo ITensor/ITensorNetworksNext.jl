@@ -1,7 +1,7 @@
 using GradedArrays: U1, gradedrange
 using Graphs: dst, edges, src, vertices
 using ITensorBase: ITensorBase as ITB, Index, name, operator, setname, uniquename
-using ITensorNetworksNext: NormNetwork, apply_operator, apply_operators, insertlink!,
+using ITensorNetworksNext: NormNetwork, apply_operator, apply_operators, insertinternalind!,
     message_environment, tensornetwork
 using MatrixAlgebraKit: svd_trunc, truncrank
 using NamedGraphs: named_cycle_graph, named_path_graph
@@ -31,7 +31,7 @@ function random_state(rng::AbstractRNG, elt::Type, g, site_axes; nlayers, trunc)
     end
 
     for edge in edges(g)
-        insertlink!(network, edge)
+        insertinternalind!(network, edge)
     end
 
     env = message_environment(one, NormNetwork(network))

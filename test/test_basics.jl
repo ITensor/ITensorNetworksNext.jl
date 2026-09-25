@@ -1,7 +1,7 @@
 using Dictionaries: Indices
 using Graphs: dst, edges, has_edge, ne, nv, src, vertices
 using ITensorBase: Index, dimnames
-using ITensorNetworksNext: ITensorNetwork, linkinds, siteinds, tensornetwork
+using ITensorNetworksNext: ITensorNetwork, externalinds, internalinds, tensornetwork
 using NamedGraphs: arranged_edges, incident_edges, named_grid
 using Test: @test, @testset
 
@@ -17,7 +17,7 @@ using Test: @test, @testset
         @test ne(tn) == 0 # zero link indices
         @test issetequal(vertices(tn), vertices(g))
         for v in vertices(tn)
-            @test issetequal(siteinds(tn, v), [s[v]])
+            @test issetequal(externalinds(tn, v), [s[v]])
         end
     end
     @testset "Construct ITensorNetwork partition function" begin
@@ -34,17 +34,17 @@ using Test: @test, @testset
         @test issetequal(vertices(tn), vertices(g))
         @test issetequal(arranged_edges(tn), arranged_edges(g))
         for v in vertices(tn)
-            @test isempty(siteinds(tn, v))
+            @test isempty(externalinds(tn, v))
         end
         for v1 in vertices(tn)
             for v2 in vertices(tn)
                 v1 == v2 && continue
-                haslink = !isempty(linkinds(tn, v1 => v2))
+                haslink = !isempty(internalinds(tn, v1 => v2))
                 @test haslink == has_edge(tn, v1 => v2)
             end
         end
         for e in edges(tn)
-            @test only(linkinds(tn, e)) == l[e]
+            @test only(internalinds(tn, e)) == l[e]
         end
     end
 end

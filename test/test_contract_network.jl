@@ -2,7 +2,7 @@ using Graphs: edges, vertices
 using ITensorBase:
     Greedy, Index, NamedTensorOperator, inputnames, operator, outputnames, state
 using ITensorNetworksNext: Exact, ITensorNetwork, LeftAssociative, contract_network,
-    linkinds, siteinds, tensornetwork
+    externalinds, internalinds, tensornetwork
 using NamedGraphs: incident_edges, named_grid
 using OMEinsumContractionOrders: ExhaustiveSearch, GreedyMethod, TreeSA
 using Test: @test, @testset
