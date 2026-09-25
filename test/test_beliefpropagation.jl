@@ -2,19 +2,22 @@ import AlgorithmsInterface as AI
 using Base.Broadcast: materialize
 using DataGraphs: DataGraphs, DataGraph, edge_data, edge_data_type
 using Dictionaries: Dictionary, dictionary, set!
-using GradedArrays: U1, gradedrange
+using GradedArrays: U1, gradedrange, isdual
 using Graphs: AbstractGraph, add_vertex!, dst, edges, has_edge, has_vertex, nv, rem_edge!,
     src, vertices
-using ITensorBase: Greedy, ITensor, Index, inds, name, noprime, outputnames, prime
+using ITensorBase:
+    Greedy, ITensor, Index, apply, inds, name, noprime, outputnames, prime, state
 using ITensorNetworksNext: ITensorNetworksNext, Exact, ITensorNetwork, MessageCache,
     NormNetwork, SimpleMessageUpdate, StopWhenConverged, beliefpropagation,
-    bethe_free_energy, contract_network, contraction_order, edge_scalar, factor_tensors,
-    incoming_messages, insertlink!, linkinds, message_environment, messagecache,
-    region_scalar, subgraph, tensornetwork, updated_message, vertex_scalar, vertex_scalars
-using LinearAlgebra: LinearAlgebra
+    bethe_free_energy, bratensor, contract_network, contraction_order, edge_scalar,
+    factor_tensors, incoming_messages, insertlink!, kettensor, linkaxes, linkinds,
+    message_environment, messagecache, region_scalar, subgraph, tensornetwork,
+    updated_message, vertex_scalar, vertex_scalars
+using LinearAlgebra: LinearAlgebra, norm, tr
 using NamedGraphs: NamedEdge, all_edges, incident_edges, named_comb_tree, named_grid,
     named_path_graph, vertextype
 using StableRNGs: StableRNG
+using TensorAlgebra.MatrixAlgebra: sqrth_invsqrth_safe
 using TensorKitSectors: FermionParity
 using Test: @test, @testset
 
@@ -286,6 +289,26 @@ end
             z_exact = (ket * conj(ket))[]
             z_bp = exp(bethe_free_energy(nn, cache))
             @test z_bp ≈ z_exact rtol = eps(real(T))^(1 / 3)
+
+            for edge in edges(cache)
+                msg = cache[edge]
+                @test real(tr(msg)) > 0
+                sqrt_msg, invsqrt_msg = sqrth_invsqrth_safe(msg)
+                v = dst(edge)
+                @test apply(invsqrt_msg, apply(sqrt_msg, network[v])) ≈ network[v] rtol =
+                    eps(real(T))^(1 / 3)
+            end
+
+            @test isdual(only(linkaxes(network, 1 => 2))) !=
+                isdual(only(linkaxes(network, 4 => 3)))
+            ones = message_environment(one, nn)
+            for (edge, rest) in ((1 => 2, 2:4), (4 => 3, 1:3))
+                layers =
+                    [[kettensor(nn, v) for v in rest]; [bratensor(nn, v) for v in rest]]
+                z_rest = contract_network([state(ones[edge]); layers])[]
+                @test z_rest ≈ norm(prod([network[v] for v in rest]))^2 rtol =
+                    eps(real(T))^(1 / 3)
+            end
         end
     end
 

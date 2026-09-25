@@ -203,14 +203,12 @@ function similar_message_environment(nn::NormNetwork)
             ketview = KetView(nn)
 
             ketnames = linknames(ketview, edge)
-            ketaxis = unnamed.(linkaxes(ketview, edge))
-
             branames = linknames(braview, edge)
+            braaxis = unnamed.(linkaxes(braview, edge))
 
-            # Bond leg (ket) = operator output, bra-layer leg = input. Built on the src-side ket
-            # axis, whose arrow is opposite the dst endpoint's bond, so the gauge contracts back
-            # into the destination state.
-            message = similar_operator(ketview[vertex], ketaxis, ketnames, branames)
+            # Bra leg = operator output, ket leg = input, the bipartition in which the message
+            # is positive semidefinite.
+            message = similar_operator(ketview[vertex], braaxis, branames, ketnames)
 
             return edge => message
         end
