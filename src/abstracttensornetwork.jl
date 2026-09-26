@@ -4,7 +4,8 @@ using DataGraphs: DataGraphs, AbstractDataGraph, AbstractVertexDataGraph, edge_d
 using Dictionaries: Dictionary
 using Graphs: Graphs, AbstractEdge, AbstractGraph, add_edge!, add_vertex!, dst, edges,
     edgetype, ne, neighbors, nv, rem_edge!, src, vertices
-using ITensorBase: dimnames, inds, name, named, nametype, prime, uniquename, unnamedtype
+using ITensorBase:
+    NamedUnitRange, inds, name, names, nametype, prime, uniquename, unnamedtype
 using LinearAlgebra: LinearAlgebra
 using MacroTools: @capture
 using NamedGraphs:
@@ -68,7 +69,7 @@ function linknames(tn::AbstractGraph, edge::Pair)
     return linknames(tn, edgetype(tn)(edge))
 end
 function linknames(tn::AbstractGraph, edge::AbstractEdge)
-    return dimnames(tn[src(edge)]) ∩ dimnames(tn[dst(edge)])
+    return names(tn[src(edge)]) ∩ names(tn[dst(edge)])
 end
 
 function siteinds(tn::AbstractGraph, v)
@@ -86,9 +87,9 @@ function siteaxes(tn::AbstractGraph, v)
     return s
 end
 function sitenames(tn::AbstractGraph, v)
-    s = dimnames(tn[v])
+    s = names(tn[v])
     for v′ in neighbors(tn, v)
-        s = setdiff(s, dimnames(tn[v′]))
+        s = setdiff(s, names(tn[v′]))
     end
     return s
 end
@@ -98,7 +99,7 @@ function dimnamevertices(tn::AbstractGraph, name)
     sites = vertextype(tn)[]
 
     for v in vertices(tn)
-        if name ∈ dimnames(tn[v])
+        if name ∈ names(tn[v])
             push!(sites, v)
         end
     end
@@ -108,7 +109,7 @@ end
 
 function has_dimname(tn::AbstractGraph, name)
     for v in vertices(tn)
-        if name ∈ dimnames(tn[v])
+        if name ∈ names(tn[v])
             return true
         end
     end
@@ -120,7 +121,7 @@ has_ind(tn::AbstractGraph, ind) = has_dimname(tn, name(ind))
 function insertlink!(tn::AbstractGraph, e)
     T = eltype(inds(tn[src(e)]))
 
-    linkind = named(trivialrange(unnamedtype(T)), uniquename(nametype(T)))
+    linkind = NamedUnitRange(trivialrange(unnamedtype(T)), uniquename(nametype(T)))
 
     x = similar(tn[src(e)], (linkind,))
     fill!(x, true)

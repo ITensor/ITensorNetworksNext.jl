@@ -4,8 +4,7 @@ using DataGraphs: DataGraphs, AbstractDataGraph, DataGraph, edge_data, get_verti
     vertex_data, vertex_data_type
 using Dictionaries: Dictionaries, AbstractDictionary, Indices, dictionary, set!, unset!
 using Graphs: AbstractSimpleGraph, has_vertex, rem_edge!, rem_vertex!
-using ITensorBase:
-    ITensorBase, AbstractITensor, dim, dimnames, dimnametype, name, unnamedtype
+using ITensorBase: ITensorBase, AbstractITensor, dim, name, names, nametype, unnamedtype
 using NamedGraphs: NamedGraphs, NamedEdge, NamedGraph, decoded_vertex, encoded_graph,
     encoded_vertex, vertextype
 using SplitApplyCombine: mapview
@@ -27,19 +26,19 @@ function ITensorNetwork{T}(undef::UndefInitializer, vertices) where {T}
 end
 
 function ITensorNetwork{T, V}(undef::UndefInitializer, vertices) where {T, V}
-    return ITensorNetwork{T, V, dimnametype(T)}(undef, vertices)
+    return ITensorNetwork{T, V, nametype(T)}(undef, vertices)
 end
 
 ITensorNetwork(tensors) = ITensorNetwork{valtype(tensors)}(tensors)
 ITensorNetwork{T}(tensors) where {T} = ITensorNetwork{T, keytype(tensors)}(tensors)
 function ITensorNetwork{T, V}(tensors) where {T, V}
-    I = dimnametype(T)
+    I = nametype(T)
     tn = ITensorNetwork{T, V, I}(undef, keys(tensors))
     copyto!(tn, tensors)
     return tn
 end
 
-ITensorBase.dimnametype(::Type{<:ITensorNetwork{T, V, I}}) where {T, V, I} = I
+ITensorBase.nametype(::Type{<:ITensorNetwork{T, V, I}}) where {T, V, I} = I
 
 Graphs.vertices(tn::ITensorNetwork) = vertices(tn.underlying_graph)
 
@@ -63,7 +62,7 @@ function Graphs.rem_vertex!(tn::ITensorNetwork, vertex)
 
     tensor = tn.tensors[vertex]
 
-    for name in dimnames(tensor)
+    for name in names(tensor)
 
         # If `ind` is associated with an edge, remove the edge.
         delete_ind_edge!(tn, name)
@@ -129,9 +128,9 @@ end
 
 # "upsert"
 function set!_tensornetwork(tn::ITensorNetwork, vertex, tensor)
-    newinds = dimnames(tensor)
+    newinds = names(tensor)
 
-    oldinds = get(mapview(dimnames, tn.tensors), vertex, Set())
+    oldinds = get(mapview(names, tn.tensors), vertex, Set())
 
     # Only have to deal with the indices that aren't shared.
     for ind in symdiff(oldinds, newinds)

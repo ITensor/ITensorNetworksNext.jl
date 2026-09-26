@@ -2,7 +2,7 @@ using .AlgorithmsInterfaceExtensions: AlgorithmsInterfaceExtensions as AIE
 using AlgorithmsInterface: AlgorithmsInterface as AI
 using Base: @kwdef
 using Graphs: dst, src, vertices
-using ITensorBase: AbstractITensor, apply, dimnames, inputnames, operator, replacedimnames
+using ITensorBase: AbstractITensor, apply, inputnames, names, operator, rename
 using LinearAlgebra: norm
 using MatrixAlgebraKit: project_hermitian, qr_compact, svd_trunc
 using NamedGraphs: boundary_edges
@@ -258,26 +258,26 @@ function apply_gate_bp_nsite!(
     ψ_v1 = foldl((ψ, m) -> apply(m, ψ), sqrt_messages_v1; init = state[v1])
     ψ_v2 = foldl((ψ, m) -> apply(m, ψ), sqrt_messages_v2; init = state[v2])
 
-    Q_v1, R_v1 = qr_compact(ψ_v1, setdiff(dimnames(ψ_v1), dimnames(ψ_v2), dimnames(op)))
-    Q_v2, R_v2 = qr_compact(ψ_v2, setdiff(dimnames(ψ_v2), dimnames(ψ_v1), dimnames(op)))
+    Q_v1, R_v1 = qr_compact(ψ_v1, setdiff(names(ψ_v1), names(ψ_v2), names(op)))
+    Q_v2, R_v2 = qr_compact(ψ_v2, setdiff(names(ψ_v2), names(ψ_v1), names(op)))
     op_R_v1v2 = apply(op, R_v1 * R_v2)
-    U_v1, S, U_v2 = svd_trunc(op_R_v1v2, setdiff(dimnames(R_v1), dimnames(R_v2)); trunc)
+    U_v1, S, U_v2 = svd_trunc(op_R_v1v2, setdiff(names(R_v1), names(R_v2)); trunc)
     if normalize
         S = S / norm(S)
     end
-    name_v1, name_v2 = dimnames(S)
+    name_v1, name_v2 = names(S)
     sqrt_S = sqrth_safe(S, (name_v1,), (name_v2,); atol = 0, rtol = 0)
-    R_v1 = replacedimnames(U_v1 * sqrt_S, name_v2 => name_v1)
+    R_v1 = rename(U_v1 * sqrt_S, name_v2 => name_v1)
     R_v2 = sqrt_S * U_v2
 
     dest[v1] = foldl((ψ, m) -> apply(m, ψ), invsqrt_messages_v1; init = Q_v1 * R_v1)
     dest[v2] = foldl((ψ, m) -> apply(m, ψ), invsqrt_messages_v2; init = Q_v2 * R_v2)
 
     env[v1 => v2] = operator(
-        replacedimnames(conj(R_v1), name_v1 => name_v2) * R_v1, (name_v2,), (name_v1,)
+        rename(conj(R_v1), name_v1 => name_v2) * R_v1, (name_v2,), (name_v1,)
     )
     env[v2 => v1] = operator(
-        replacedimnames(conj(R_v2), name_v1 => name_v2) * R_v2, (name_v2,), (name_v1,)
+        rename(conj(R_v2), name_v1 => name_v2) * R_v2, (name_v2,), (name_v1,)
     )
     return dest
 end

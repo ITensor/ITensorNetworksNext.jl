@@ -1,6 +1,5 @@
 using Dictionaries: Dictionary
-using ITensorBase:
-    LazyNamedTensor, lazy, replacedimnames, setname, similar_operator, uniquename
+using ITensorBase: LazyNamedTensor, lazy, rename, setname, similar_operator, uniquename
 using ITensorNetworksNext
 
 """
@@ -76,7 +75,7 @@ indmap(nn::NormNetwork, ind) = setname(conj(ind), braname(nn, name(ind)))
 
 kettensor(nn::NormNetwork, vertex) = nn.ket[vertex]
 function conj_bratensor(nn::NormNetwork, vertex)
-    return replacedimnames(n -> braname(nn, n), kettensor(nn, vertex))
+    return rename(n -> braname(nn, n), kettensor(nn, vertex))
 end
 
 bratensor(nn::NormNetwork, vertex) = conj(conj_bratensor(nn, vertex))

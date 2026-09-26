@@ -1,7 +1,7 @@
 using Base.Broadcast: materialize
 using Base: @kwdef
 using ITensorBase: EvaluationOrderAlgorithm, Greedy, Mul, lazy, optimize_evaluation_order,
-    substitute, symnameddims
+    substitute, symnamedtensor
 
 # `contract_network`
 @kwdef struct Exact{Order, OrderAlg}
@@ -26,7 +26,8 @@ function get_order(alg::Exact, tn)
     end
     # Contraction order may or may not have indices attached, canonicalize the format
     # by attaching indices.
-    subs = Dict(symnameddims(i) => symnameddims(i, Tuple(axes(t))) for (i, t) in pairs(tn))
+    subs =
+        Dict(symnamedtensor(i) => symnamedtensor(i, Tuple(axes(t))) for (i, t) in pairs(tn))
     return substitute(order, subs)
 end
 # Promote the operands to their common type before lowering to the lazy expression, so every lazy
@@ -38,7 +39,7 @@ function contract_network(alg::Exact, tn)
     order = get_order(alg, tn)
     T = mapreduce(typeof, promote_type, tn)
     syms_to_ts = Dict(
-        symnameddims(i, Tuple(axes(t))) => lazy(convert(T, t)) for (i, t) in pairs(tn)
+        symnamedtensor(i, Tuple(axes(t))) => lazy(convert(T, t)) for (i, t) in pairs(tn)
     )
     tn_expression = substitute(order, syms_to_ts)
     return materialize(tn_expression)
@@ -53,12 +54,12 @@ end
 struct Flat end
 function contraction_order(alg::Flat, tn)
     # Same as: `reduce((a, b) -> *(a, b; flatten = true), syms)`.
-    syms = vec([symnameddims(i, Tuple(axes(tn[i]))) for i in keys(tn)])
+    syms = vec([symnamedtensor(i, Tuple(axes(tn[i]))) for i in keys(tn)])
     return lazy(Mul(syms))
 end
 struct LeftAssociative end
 function contraction_order(alg::LeftAssociative, tn)
-    return prod(i -> symnameddims(i, Tuple(axes(tn[i]))), keys(tn))
+    return prod(i -> symnamedtensor(i, Tuple(axes(tn[i]))), keys(tn))
 end
 # Internal implementation shared with the OMEinsumContractionOrders extension.
 function _contraction_order(alg, tn)
