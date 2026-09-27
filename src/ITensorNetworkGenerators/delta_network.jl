@@ -1,6 +1,6 @@
 using ..ITensorNetworksNext: tensornetwork
 using Graphs: AbstractGraph, vertices
-using ITensorBase: NamedUnitRange, name, nameddims, unnamed
+using ITensorBase: NamedTensor, NamedUnitRange, name, unnamed
 using NamedGraphs: incident_edges
 
 diaglength(a::AbstractArray) = minimum(size(a))
@@ -29,7 +29,7 @@ function diagonaltensor(
         diag::AbstractVector,
         is::Tuple{NamedUnitRange, Vararg{NamedUnitRange}}
     )
-    return nameddims(diagonaltensor(diag, unnamed.(is)), name.(is))
+    return NamedTensor(diagonaltensor(diag, unnamed.(is)), name.(is))
 end
 
 delta(elt::Type, is) = diagonaltensor(ones(elt, minimum(length ∘ unnamed, is)), is)

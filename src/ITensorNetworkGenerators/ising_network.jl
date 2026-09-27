@@ -1,6 +1,6 @@
 using ..ITensorNetworksNext
 using Graphs: degree, dst, edges, src
-using ITensorBase: name, nameddims, uniquename
+using ITensorBase: NamedTensor, name, uniquename
 using LinearAlgebra: Diagonal, eigen
 using NamedGraphs: vertextype
 
@@ -45,7 +45,7 @@ function ising_network(
         m = sqrt_ising_bond(β; J, h, deg1, deg2)
         # Split the Ising bond as √b on each endpoint, contracting the delta-network bond
         # name `fp(e)` and renaming the shared bond to the requested name `f(e)`.
-        b = nameddims(m, (name(fp(e)), name(f(e))))
+        b = NamedTensor(m, (name(fp(e)), name(f(e))))
         tn[v1] = b * tn[v1]
         tn[v2] = b * tn[v2]
     end

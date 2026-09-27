@@ -120,14 +120,14 @@ function incoming_messages(cache::AbstractGraph, pair::Pair)
     return incoming_messages(cache, edge)
 end
 function incoming_messages(cache::AbstractGraph, edge::AbstractEdge)
-    dimnames = Indices(in_incident_edges(cache, src(edge)))
-    return getindices(cache, filter(e -> e != reverse(edge), dimnames))
+    in_edges = Indices(in_incident_edges(cache, src(edge)))
+    return getindices(cache, filter(e -> e != reverse(edge), in_edges))
 end
 
 # TODO: maybe this should be defined in `DataGraphs`.
 function incoming_edge_data(cache::AbstractGraph, vertices)
-    dimnames = Indices(boundary_edges(cache, vertices; dir = :in))
-    return getindices(cache, dimnames)
+    in_edges = Indices(boundary_edges(cache, vertices; dir = :in))
+    return getindices(cache, in_edges)
 end
 
 function vertex_scalar(factors, messages, vertex; kwargs...)
