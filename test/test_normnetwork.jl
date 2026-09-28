@@ -2,10 +2,11 @@ using DataGraphs: is_vertex_assigned
 using Dictionaries: isinsertable, issettable
 using Graphs: edges, vertices
 using ITensorBase:
-    ITensor, Index, IndexName, LazyITensor, conj, inds, name, setname, uniquename
+    ITensor, Index, IndexName, LazyITensor, conj, inds, name, names, setname, uniquename
 using ITensorNetworksNext: ITensorNetworksNext, BraView, Exact, ITensorNetwork, NormGramian,
     NormNetwork, braname, branetwork, bratensor, conj_bratensor, contract_network,
-    contraction_order, indmap, ketnetwork, kettensor, normnetwork, tensornetwork
+    contraction_order, dimnamevertices, indmap, ketnetwork, kettensor, linkaxes, linkinds,
+    linknames, normnetwork, siteaxes, siteinds, sitenames, tensornetwork
 using LinearAlgebra: norm
 using NamedGraphs: NamedEdge, incident_edges, named_grid, named_path_graph
 using Test: @test, @test_throws, @testset
@@ -134,6 +135,28 @@ end
         @test keys(ITensorNetworksNext.layertensors(gram)) == (:ket, :bra)
         # Contracting a Gramian contracts its layers.
         @test contract_network([gram]) ≈ kettensor(gram) * bratensor(gram)
+        # A Gramian's indices are those its ket and bra layers do not share.
+        @test issetequal(inds(gram), inds(kettensor(gram) * bratensor(gram)))
+        @test names(gram) == name.(inds(gram))
+        @test axes(gram) == Tuple(inds(gram))
+    end
+
+    @testset "index queries on a `NormNetwork`" begin
+        g = named_path_graph(3)
+        tn, l, s = random_state(Float64, g)
+        nn = NormNetwork(tn)
+        e = NamedEdge(1 => 2)
+        lname = name(l[e])
+
+        # A link of the norm network is the ket link together with its bra-layer copy.
+        @test issetequal(linknames(nn, e), [lname, braname(nn, lname)])
+        @test issetequal(name.(linkinds(nn, e)), linknames(nn, e))
+        @test issetequal(name.(linkaxes(nn, e)), linknames(nn, e))
+        @test issetequal(dimnamevertices(nn, lname), [1, 2])
+        # The site index contracts between the layers, so no vertex has a site index.
+        @test isempty(siteinds(nn, 2))
+        @test isempty(sitenames(nn, 2))
+        @test isempty(siteaxes(nn, 2))
     end
 
     @testset "`contraction_order` on a `NormNetwork`" begin

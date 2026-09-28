@@ -82,6 +82,12 @@ identity_operator(g, s; d = 2) = product_operator(v -> Matrix(1.0I, d, d), g, s;
         @test keys(ITensorNetworksNext.layertensors(gram)) == (:ket, :operator, :bra)
         @test contract_network([gram]) ≈
             kettensor(gram) * operatortensor(gram) * bratensor(gram)
+        # A Gramian's indices are those no two of its layers share.
+        @test issetequal(
+            inds(gram), inds(kettensor(gram) * operatortensor(gram) * bratensor(gram))
+        )
+        @test names(gram) == name.(inds(gram))
+        @test axes(gram) == Tuple(inds(gram))
     end
 
     @testset "crossing operator pair" begin
@@ -95,6 +101,13 @@ identity_operator(g, s; d = 2) = product_operator(v -> Matrix(1.0I, d, d), g, s;
 
         @test braname(qf, name(s[2])) in names(operatortensor(qf[1]))
         @test braname(qf, name(s[1])) in names(operatortensor(qf[2]))
+        # Both bra site names dangle at vertex 1: one from the operator, one from the bra.
+        @test braname(qf, name(s[2])) in names(qf[1])
+        @test braname(qf, name(s[1])) in names(qf[1])
+        gram = qf[1]
+        @test issetequal(
+            inds(gram), inds(kettensor(gram) * operatortensor(gram) * bratensor(gram))
+        )
 
         psi = prod(tn)
         bra = rename(conj(psi), name(s[2]) => name(out1), name(s[1]) => name(out2))

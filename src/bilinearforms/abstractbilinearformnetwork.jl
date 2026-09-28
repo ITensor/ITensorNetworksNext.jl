@@ -1,7 +1,7 @@
 using DataGraphs: DataGraphs, get_vertex_data, is_vertex_assigned
 using Dictionaries: Dictionaries, isinsertable, issettable
 using Graphs: Graphs, edges, vertices
-using ITensorBase: conj, name, rename, setname
+using ITensorBase: ITensorBase, conj, inds, name, rename, setname
 using NamedGraphs: NamedGraphs, decoded_vertex, encoded_graph, encoded_vertex
 
 """
@@ -22,8 +22,9 @@ abstract type AbstractBilinearFormNetwork{T, V, I} <: AbstractITensorNetwork{T, 
     abstract type AbstractGramian
 
 The layers of an `AbstractBilinearFormNetwork` at one vertex. A subtype implements
-[`kettensor`](@ref), [`braname`](@ref) and `layertensors`; the bra tensor is built from the ket
-tensor and the name map each time it is requested.
+[`kettensor`](@ref), [`braname`](@ref), `layertensors` and `layerinds`; the bra tensor is built
+from the ket tensor and the name map each time it is requested. Its `inds`, `names` and `axes`
+are the indices of its layers that no other layer shares, those the layer product leaves open.
 """
 abstract type AbstractGramian end
 
@@ -73,6 +74,17 @@ The bra-layer tensor at `vertex`.
 """
 bratensor(g::AbstractGramian) = conj(conj_bratensor(g))
 bratensor(bn::AbstractBilinearFormNetwork, vertex) = bratensor(bn[vertex])
+
+# Read from `conj_bratensor`, which only renames, so the tensor data is not conjugated.
+brainds(g::AbstractGramian) = conj.(inds(conj_bratensor(g)))
+
+function ITensorBase.inds(g::AbstractGramian)
+    layer_inds = reduce(vcat, collect.(layerinds(g)))
+    layer_names = name.(layer_inds)
+    return [i for i in layer_inds if count(==(name(i)), layer_names) == 1]
+end
+ITensorBase.names(g::AbstractGramian) = name.(inds(g))
+Base.axes(g::AbstractGramian) = Tuple(inds(g))
 
 """
     ketnetwork(bn::AbstractBilinearFormNetwork)

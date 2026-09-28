@@ -40,6 +40,7 @@ end
 kettensor(g::NormGramian) = g.ket
 braname(g::NormGramian, name) = get(g.braname, name, name)
 layertensors(g::NormGramian) = (; ket = kettensor(g), bra = bratensor(g))
+layerinds(g::NormGramian) = (inds(kettensor(g)), brainds(g))
 
 Base.eltype(::Type{<:NormNetwork{T, V, I}}) where {T, V, I} = NormGramian{T, I}
 

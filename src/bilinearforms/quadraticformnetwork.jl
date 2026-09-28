@@ -61,6 +61,9 @@ braname(g::QuadraticFormGramian, name) = get(g.braname, name, name)
 function layertensors(g::QuadraticFormGramian)
     return (; ket = kettensor(g), operator = operatortensor(g), bra = bratensor(g))
 end
+function layerinds(g::QuadraticFormGramian)
+    return (inds(kettensor(g)), inds(operatortensor(g)), brainds(g))
+end
 
 function Base.eltype(
         ::Type{<:QuadraticFormNetwork{T, V, I, O}}
