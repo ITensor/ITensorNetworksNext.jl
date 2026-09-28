@@ -36,8 +36,10 @@ Dictionaries.isinsertable(::AbstractBilinearFormNetwork) = false
 
 """
     braname(bn::AbstractBilinearFormNetwork, name)
+    braname(g::AbstractGramian, name)
 
-The bra-layer index name corresponding to the ket-layer index name `name`.
+The bra-layer index name corresponding to the ket-layer index name `name`. The `AbstractGramian`
+form maps a name absent from its name map to itself, without checking it belongs to the network.
 """
 function braname end
 

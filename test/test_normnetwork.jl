@@ -3,9 +3,9 @@ using Dictionaries: isinsertable, issettable
 using Graphs: edges, vertices
 using ITensorBase:
     ITensor, Index, IndexName, LazyITensor, conj, inds, name, setname, uniquename
-using ITensorNetworksNext: ITensorNetworksNext, BraView, ITensorNetwork, NormGramian,
-    NormNetwork, braname, branetwork, bratensor, conj_bratensor, contract_network, indmap,
-    ketnetwork, kettensor, normnetwork, tensornetwork
+using ITensorNetworksNext: ITensorNetworksNext, BraView, Exact, ITensorNetwork, NormGramian,
+    NormNetwork, braname, branetwork, bratensor, conj_bratensor, contract_network,
+    contraction_order, indmap, ketnetwork, kettensor, normnetwork, tensornetwork
 using LinearAlgebra: norm
 using NamedGraphs: NamedEdge, incident_edges, named_grid, named_path_graph
 using Test: @test, @test_throws, @testset
@@ -134,6 +134,17 @@ end
         @test keys(ITensorNetworksNext.layertensors(gram)) == (:ket, :bra)
         # Contracting a Gramian contracts its layers.
         @test contract_network([gram]) ≈ kettensor(gram) * bratensor(gram)
+    end
+
+    @testset "`contraction_order` on a `NormNetwork`" begin
+        g = named_path_graph(3)
+        tn, l, s = random_state(Float64, g)
+        nn = NormNetwork(tn)
+
+        # `contraction_order` splits the Gramians before computing an order, so it does not
+        # throw trying to call `size` on a `NormGramian`.
+        order = contraction_order(nn)
+        @test contract_network(nn; alg = Exact(; order))[] ≈ contract_network(nn)[]
     end
 
     @testset "contraction / physics" begin

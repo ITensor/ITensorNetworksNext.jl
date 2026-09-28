@@ -61,7 +61,7 @@ end
 # `contraction_order`
 function contraction_order end
 function contraction_order(tn; alg = Greedy())
-    return contraction_order(alg, tn)
+    return contraction_order(alg, split_gramians(tn))
 end
 # Convert the tensor network to a flat symbolic multiplication expression.
 struct Flat end
