@@ -1,5 +1,4 @@
 import AlgorithmsInterface as AI
-using Base.Broadcast: materialize
 using DataGraphs: DataGraphs, DataGraph, edge_data, edge_data_type
 using Dictionaries: Dictionary, dictionary, set!
 using GradedArrays: U1, gradedrange, isdual
@@ -10,9 +9,9 @@ using ITensorBase:
 using ITensorNetworksNext: ITensorNetworksNext, Exact, ITensorNetwork, MessageCache,
     NormNetwork, SimpleMessageUpdate, StopWhenConverged, beliefpropagation,
     bethe_free_energy, bethe_free_entropy, bratensor, contract_network, contraction_order,
-    edge_scalar, edge_scalars, factor_tensors, incoming_messages, insertlink!, kettensor,
-    linkaxes, linkinds, message_environment, messagecache, region_scalar, subgraph,
-    tensornetwork, updated_message, vertex_scalar, vertex_scalars
+    edge_scalar, edge_scalars, incoming_messages, insertlink!, kettensor, linkaxes,
+    linkinds, message_environment, messagecache, region_scalar, subgraph, tensornetwork,
+    updated_message, vertex_scalar, vertex_scalars
 using LinearAlgebra: LinearAlgebra, norm, tr
 using NamedGraphs: NamedEdge, all_edges, incident_edges, named_comb_tree, named_grid,
     named_path_graph, vertextype
@@ -369,11 +368,10 @@ end
             nn = NormNetwork(network)
             v = (2, 2)
 
-            # A doubled vertex splits into its two layers, and the split is faithful.
-            @test length(factor_tensors(nn, v)) == 2
-            @test prod(factor_tensors(nn, v)) ≈ contract_network([nn[v]])
-            # A single-layer network's factor is a single operand.
-            @test factor_tensors(network, v) == [network[v]]
+            # A doubled vertex is a Gramian whose layers contract to the multiplied-out vertex.
+            gram = nn[v]
+            doubled = kettensor(gram) * bratensor(gram)
+            @test contract_network([gram]) ≈ doubled
 
             # The message update passes the layers to `contract_network` as separate operands, so
             # the contraction order can interleave the incoming messages between them, and the
@@ -388,7 +386,7 @@ end
             message = updated_message(algorithm, cache, nn, edge)
             # `v` has degree 4, so 3 incoming messages plus the ket and bra layers.
             @test only(counts) == 5
-            @test message ≈ contract_network([messages; [nn[v]]])
+            @test message ≈ contract_network([messages; [doubled]])
         end
     end
 end
