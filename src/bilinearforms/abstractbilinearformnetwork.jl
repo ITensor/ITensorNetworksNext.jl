@@ -101,6 +101,9 @@ Base.parent(nnv::BraView) = nnv.parent
 # ==================================== DataGraphs.jl ===================================== #
 
 DataGraphs.get_vertex_data(nnv::BraView, vertex) = bratensor(parent(nnv), vertex)
+function DataGraphs.is_vertex_assigned(nnv::BraView, vertex)
+    return is_vertex_assigned(parent(nnv), vertex)
+end
 
 # ====================================== Graphs.jl ======================================= #
 
@@ -116,12 +119,6 @@ function NamedGraphs.decoded_vertex(nnv::BraView, code::Integer)
     return decoded_vertex(parent(nnv), code)
 end
 NamedGraphs.encoded_graph(nnv::BraView) = encoded_graph(parent(nnv))
-
-# ==================================== DataGraphs.jl ===================================== #
-
-function DataGraphs.is_vertex_assigned(nnv::BraView, vertex)
-    return is_vertex_assigned(parent(nnv), vertex)
-end
 
 # =================================== Dictionaries.jl ==================================== #
 
