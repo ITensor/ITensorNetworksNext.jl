@@ -2,10 +2,11 @@ using DataGraphs: is_vertex_assigned
 using Dictionaries: isinsertable, issettable
 using Graphs: edges, vertices
 using ITensorBase: ITensor, Index, IndexName, conj, inds, inputnames, name, names, operator,
-    outputnames, rename, setname, uniquename
-using ITensorNetworksNext: BraView, ITensorNetwork, NormNetwork, QuadraticFormNetwork,
-    braname, branetwork, bratensor, conj_bratensor, contract_network, indmap, ketnetwork,
-    kettensor, operatornetwork, operatortensor, quadraticformnetwork, tensornetwork
+    outputnames, rename, setname, state, uniquename
+using ITensorNetworksNext: ITensorNetworksNext, BraView, ITensorNetwork, NormNetwork,
+    QuadraticFormGramian, QuadraticFormNetwork, braname, branetwork, bratensor,
+    conj_bratensor, contract_network, indmap, ketnetwork, kettensor, operatornetwork,
+    operatortensor, quadraticformnetwork, tensornetwork
 using LinearAlgebra: I, norm
 using NamedGraphs: NamedEdge, incident_edges, named_grid, named_path_graph
 using Test: @test, @test_throws, @testset
@@ -65,6 +66,49 @@ identity_operator(g, s; d = 2) = product_operator(v -> Matrix(1.0I, d, d), g, s;
         g4 = named_path_graph(4)
         _, _, s4 = random_state(Float64, g4)
         @test_throws ErrorException QuadraticFormNetwork(tn, identity_operator(g4, s4))
+    end
+
+    @testset "`QuadraticFormGramian`" begin
+        g = named_path_graph(3)
+        tn, l, s = random_state(Float64, g)
+        op = identity_operator(g, s)
+        qf = QuadraticFormNetwork(tn, op)
+        gram = qf[2]
+
+        @test gram isa QuadraticFormGramian
+        @test eltype(qf) === typeof(gram)
+        @test kettensor(gram) === tn[2]
+        @test gram.operator === state(op)[2]
+        @test keys(ITensorNetworksNext.layertensors(gram)) == (:ket, :operator, :bra)
+        @test contract_network([gram]) ≈
+            kettensor(gram) * operatortensor(gram) * bratensor(gram)
+    end
+
+    @testset "crossing operator pair" begin
+        g = named_path_graph(2)
+        tn, l, s = random_state(Float64, g)
+        # Each output is paired with the input on the other vertex.
+        out1, out2 = Index(2), Index(2)
+        optn = ITensorNetwork(Dict(1 => randn((out1, s[1])), 2 => randn((out2, s[2]))))
+        op = operator(optn, [name(out1), name(out2)], [name(s[2]), name(s[1])])
+        qf = QuadraticFormNetwork(tn, op)
+
+        @test braname(qf, name(s[2])) in names(operatortensor(qf[1]))
+        @test braname(qf, name(s[1])) in names(operatortensor(qf[2]))
+
+        psi = prod(tn)
+        bra = rename(conj(psi), name(s[2]) => name(out1), name(s[1]) => name(out2))
+        @test contract_network(qf)[] ≈ (bra * (optn[1] * optn[2] * psi))[]
+    end
+
+    @testset "operator input outside the ket network" begin
+        g = named_path_graph(2)
+        tn, l, s = random_state(Float64, g)
+        stray = Index(2)
+        out1, out2 = Index(2), Index(2)
+        optn = ITensorNetwork(Dict(1 => randn((out1, stray)), 2 => randn((out2, s[2]))))
+        op = operator(optn, [name(out1), name(out2)], [name(stray), name(s[2])])
+        @test_throws ErrorException QuadraticFormNetwork(tn, op)
     end
 
     @testset "layer tensors and the name map" begin

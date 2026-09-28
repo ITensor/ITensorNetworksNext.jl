@@ -371,7 +371,7 @@ end
 
             # A doubled vertex splits into its two layers, and the split is faithful.
             @test length(factor_tensors(nn, v)) == 2
-            @test prod(factor_tensors(nn, v)) ≈ materialize(nn[v])
+            @test prod(factor_tensors(nn, v)) ≈ contract_network([nn[v]])
             # A single-layer network's factor is a single operand.
             @test factor_tensors(network, v) == [network[v]]
 
@@ -388,7 +388,7 @@ end
             message = updated_message(algorithm, cache, nn, edge)
             # `v` has degree 4, so 3 incoming messages plus the ket and bra layers.
             @test only(counts) == 5
-            @test message ≈ contract_network([messages; [nn[v]]])
+            @test message ≈ contract_network([messages; [contract_network([nn[v]])]])
         end
     end
 end

@@ -1,6 +1,5 @@
 using Dictionaries: Dictionary
-using ITensorBase:
-    LazyNamedTensor, inputnames, lazy, names, outputnames, rename, state, uniquename
+using ITensorBase: inputnames, names, outputnames, rename, state, uniquename
 using ITensorNetworksNext
 
 """
@@ -28,6 +27,9 @@ struct QuadraticFormNetwork{T, V, I, O <: ITensorNetworkOperator} <:
         if !issetequal(vertices(operator), vertices(ket))
             error("the operator layer must be defined on every vertex of the ket layer.")
         end
+        if !issubset(inputnames(operator), keys(ket.dimname_vertices))
+            error("every operator input name must be an index name of the ket layer.")
+        end
         acted = Set{I}(inputnames(operator))
         braname = Dictionary{I, I}()
         for (name, vertices) in pairs(ket.dimname_vertices)
@@ -39,7 +41,32 @@ struct QuadraticFormNetwork{T, V, I, O <: ITensorNetworkOperator} <:
     end
 end
 
-Base.eltype(::Type{<:QuadraticFormNetwork{T, V, I}}) where {T, V, I} = LazyNamedTensor{I, T}
+"""
+    struct QuadraticFormGramian{T, O, I} <: AbstractGramian
+
+The layers of a `QuadraticFormNetwork` at one vertex: the ket tensor, the operator network's tensor,
+the ket→bra name map and the operator's name pairing, from which the bra tensor and the renamed
+operator tensor are built when requested.
+"""
+struct QuadraticFormGramian{T, O, I} <: AbstractGramian
+    ket::T
+    operator::O
+    braname::Dictionary{I, I}
+    outputnames::Vector{I}
+    inputnames::Vector{I}
+end
+
+kettensor(g::QuadraticFormGramian) = g.ket
+braname(g::QuadraticFormGramian, name) = get(g.braname, name, name)
+function layertensors(g::QuadraticFormGramian)
+    return (; ket = kettensor(g), operator = operatortensor(g), bra = bratensor(g))
+end
+
+function Base.eltype(
+        ::Type{<:QuadraticFormNetwork{T, V, I, O}}
+    ) where {T, V, I, TO, O <: ITensorNetworkOperator{TO}}
+    return QuadraticFormGramian{T, TO, I}
+end
 
 function QuadraticFormNetwork(ket::ITensorNetwork, operator::ITensorNetworkOperator)
     return QuadraticFormNetwork(ket, operator, map(uniquename, keys(ket.dimname_vertices)))
@@ -62,12 +89,13 @@ NamedGraphs.encoded_graph(qf::QuadraticFormNetwork) = encoded_graph(qf.ket)
 
 # ==================================== DataGraphs.jl ===================================== #
 
-function DataGraphs.get_vertex_data(qf::QuadraticFormNetwork, vertex)
-    A = kettensor(qf, vertex)
-    O = operatortensor(qf, vertex)
-    B = conj_bratensor(qf, vertex)
-    # TODO: implement and use a lazy `conj` via `LazyNamedDimsArrays` here?
-    return lazy(A) * lazy(O) * lazy(conj(B))
+function DataGraphs.get_vertex_data(
+        qf::QuadraticFormNetwork{T, V, I, O}, vertex
+    ) where {T, V, I, TO, O <: ITensorNetworkOperator{TO}}
+    return QuadraticFormGramian{T, TO, I}(
+        qf.ket[vertex], state(qf.operator)[vertex], qf.braname,
+        outputnames(qf.operator), inputnames(qf.operator)
+    )
 end
 
 function DataGraphs.is_vertex_assigned(qf::QuadraticFormNetwork, vertex)
@@ -85,23 +113,20 @@ function braname(qf::QuadraticFormNetwork, name)
     return get(qf.braname, name, name)
 end
 
-kettensor(qf::QuadraticFormNetwork, vertex) = qf.ket[vertex]
 ketnetwork(qf::QuadraticFormNetwork) = qf.ket
 operatornetwork(qf::QuadraticFormNetwork) = qf.operator
 
 # Each output name is renamed to the bra name of the input name it is paired with, so the
 # operator's output legs meet the bra layer and its input legs meet the ket layer. The pairing
-# is read from the operator network rather than from `qf.operator[vertex]`, whose wrapper drops
-# a pair whose input sits on another vertex.
-function operatortensor(qf::QuadraticFormNetwork, vertex)
-    tensor = state(qf.operator)[vertex]
-    tensor_names = names(tensor)
+# is read from the operator network rather than from the operator network's per-vertex wrapper,
+# which drops a pair whose input sits on another vertex.
+function operatortensor(g::QuadraticFormGramian)
+    tensor_names = names(g.operator)
     replacements = [
-        output => braname(qf, input) for
-            (output, input) in zip(outputnames(qf.operator), inputnames(qf.operator))
-            if output in tensor_names
+        output => braname(g, input) for
+            (output, input) in zip(g.outputnames, g.inputnames) if output in tensor_names
     ]
-    return rename(tensor, replacements...)
+    return rename(g.operator, replacements...)
 end
 
 """

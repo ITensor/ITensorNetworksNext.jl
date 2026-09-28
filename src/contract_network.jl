@@ -1,5 +1,6 @@
 using Base.Broadcast: materialize
 using Base: @kwdef
+using Dictionaries: Dictionary
 using ITensorBase: EvaluationOrderAlgorithm, Greedy, Mul, lazy, optimize_evaluation_order,
     substitute, symnamedtensor
 
@@ -35,7 +36,25 @@ end
 # operator, so mixing operators and plain tensors is the common case) widens the symbolic `Mul`
 # container to a `UnionAll` it cannot construct. `promote_type`/`convert` keep an all-plain network
 # at the plain type (the promotion is a no-op), so its fast path is unchanged.
+# A Gramian enters the contraction as its separate layer tensors, so the contraction order can
+# absorb other operands into one layer before the layers are joined.
+function split_gramians(tn)
+    any(t -> t isa AbstractGramian, tn) || return tn
+    operands = Dictionary{Any, Any}()
+    for (key, t) in pairs(tn)
+        if t isa AbstractGramian
+            for (layer, tensor) in pairs(layertensors(t))
+                insert!(operands, (key, layer), tensor)
+            end
+        else
+            insert!(operands, key, t)
+        end
+    end
+    return operands
+end
+
 function contract_network(alg::Exact, tn)
+    tn = split_gramians(tn)
     order = get_order(alg, tn)
     T = mapreduce(typeof, promote_type, tn)
     syms_to_ts = Dict(

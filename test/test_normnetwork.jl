@@ -3,9 +3,9 @@ using Dictionaries: isinsertable, issettable
 using Graphs: edges, vertices
 using ITensorBase:
     ITensor, Index, IndexName, LazyITensor, conj, inds, name, setname, uniquename
-using ITensorNetworksNext: BraView, ITensorNetwork, NormNetwork, braname, branetwork,
-    bratensor, conj_bratensor, contract_network, indmap, ketnetwork, kettensor, normnetwork,
-    tensornetwork
+using ITensorNetworksNext: ITensorNetworksNext, BraView, ITensorNetwork, NormGramian,
+    NormNetwork, braname, branetwork, bratensor, conj_bratensor, contract_network, indmap,
+    ketnetwork, kettensor, normnetwork, tensornetwork
 using LinearAlgebra: norm
 using NamedGraphs: NamedEdge, incident_edges, named_grid, named_path_graph
 using Test: @test, @test_throws, @testset
@@ -117,6 +117,23 @@ end
         # The view inherits the (non-)mutability of its parent norm network.
         @test !issettable(bv)
         @test !isinsertable(bv)
+    end
+
+    @testset "`NormGramian`" begin
+        g = named_path_graph(3)
+        tn, l, s = random_state(Float64, g)
+        nn = NormNetwork(tn)
+        gram = nn[2]
+
+        @test gram isa NormGramian
+        @test eltype(nn) === typeof(gram)
+        # The Gramian holds the network's ket tensor and name map, not copies.
+        @test kettensor(gram) === tn[2]
+        @test gram.braname === nn.braname
+        @test inds(bratensor(gram)) == inds(conj_bratensor(gram))
+        @test keys(ITensorNetworksNext.layertensors(gram)) == (:ket, :bra)
+        # Contracting a Gramian contracts its layers.
+        @test contract_network([gram]) ≈ kettensor(gram) * bratensor(gram)
     end
 
     @testset "contraction / physics" begin

@@ -1,5 +1,5 @@
 using Dictionaries: Dictionary
-using ITensorBase: LazyNamedTensor, lazy, similar_operator, uniquename
+using ITensorBase: similar_operator, uniquename
 using ITensorNetworksNext
 
 """
@@ -26,7 +26,22 @@ struct NormNetwork{T, V, I} <: AbstractBilinearFormNetwork{T, V, I}
     end
 end
 
-Base.eltype(::Type{<:NormNetwork{T, V, I}}) where {T, V, I} = LazyNamedTensor{I, T}
+"""
+    struct NormGramian{T, I} <: AbstractGramian
+
+The layers of a `NormNetwork` at one vertex: the ket tensor and the network's ket→bra name map,
+from which the bra tensor is built when requested.
+"""
+struct NormGramian{T, I} <: AbstractGramian
+    ket::T
+    braname::Dictionary{I, I}
+end
+
+kettensor(g::NormGramian) = g.ket
+braname(g::NormGramian, name) = get(g.braname, name, name)
+layertensors(g::NormGramian) = (; ket = kettensor(g), bra = bratensor(g))
+
+Base.eltype(::Type{<:NormNetwork{T, V, I}}) where {T, V, I} = NormGramian{T, I}
 
 function NormNetwork(tn::ITensorNetwork)
     return NormNetwork(tn, map(uniquename, keys(tn.dimname_vertices)))
@@ -49,11 +64,8 @@ function DataGraphs.is_vertex_assigned(nn::NormNetwork, vertex)
     return isassigned(nn.ket, vertex)
 end
 
-function DataGraphs.get_vertex_data(nn::NormNetwork, vertex)
-    A = kettensor(nn, vertex)
-    B = conj_bratensor(nn, vertex)
-    # TODO: implement and use a lazy `conj` via `LazyNamedDimsArrays` here?
-    return lazy(A) * lazy(conj(B))
+function DataGraphs.get_vertex_data(nn::NormNetwork{T, V, I}, vertex) where {T, V, I}
+    return NormGramian{T, I}(nn.ket[vertex], nn.braname)
 end
 
 # ====================================== interface ======================================= #
@@ -67,7 +79,6 @@ function braname(nn::NormNetwork, name)
     return get(nn.braname, name, name)
 end
 
-kettensor(nn::NormNetwork, vertex) = nn.ket[vertex]
 ketnetwork(nn::NormNetwork) = nn.ket
 
 """

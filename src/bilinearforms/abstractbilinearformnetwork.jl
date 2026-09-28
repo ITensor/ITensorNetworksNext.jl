@@ -10,13 +10,22 @@ using NamedGraphs: NamedGraphs, decoded_vertex, encoded_graph, encoded_vertex
 Supertype of the lazy multi-layer networks built from a ket layer of type
 `ITensorNetwork{T, V, I}` and a ket→bra index name mapping.
 
-A subtype supplies its own graph structure and implements [`braname`](@ref) together with one
-accessor per layer: [`kettensor`](@ref), [`bratensor`](@ref) and, where the subtype has an
-operator layer, [`operatortensor`](@ref). `bratensor` has a default built from `kettensor`
-and `braname`. The layers as whole networks are returned by [`ketnetwork`](@ref),
+A subtype supplies its own graph structure, implements [`braname`](@ref), and returns an
+[`AbstractGramian`](@ref) from `getindex`. The per-vertex accessors [`kettensor`](@ref),
+[`bratensor`](@ref) and, where the subtype has an operator layer, [`operatortensor`](@ref) read
+from that Gramian. The layers as whole networks are returned by [`ketnetwork`](@ref),
 [`branetwork`](@ref) and [`operatornetwork`](@ref).
 """
 abstract type AbstractBilinearFormNetwork{T, V, I} <: AbstractITensorNetwork{T, V} end
+
+"""
+    abstract type AbstractGramian
+
+The layers of an `AbstractBilinearFormNetwork` at one vertex. A subtype implements
+[`kettensor`](@ref), [`braname`](@ref) and `layertensors`; the bra tensor is built from the ket
+tensor and the name map each time it is requested.
+"""
+abstract type AbstractGramian end
 
 # =================================== Dictionaries.jl ==================================== #
 
@@ -34,29 +43,34 @@ function braname end
 
 """
     kettensor(bn::AbstractBilinearFormNetwork, vertex)
+    kettensor(g::AbstractGramian)
 
 The ket-layer tensor at `vertex`.
 """
 function kettensor end
+kettensor(bn::AbstractBilinearFormNetwork, vertex) = kettensor(bn[vertex])
 
 """
     operatortensor(bn::AbstractBilinearFormNetwork, vertex)
+    operatortensor(g::AbstractGramian)
 
 The operator-layer tensor at `vertex`, with its index names renamed so that its input legs
 meet the ket layer and its output legs meet the bra layer.
 """
 function operatortensor end
+operatortensor(bn::AbstractBilinearFormNetwork, vertex) = operatortensor(bn[vertex])
 
-function conj_bratensor(bn::AbstractBilinearFormNetwork, vertex)
-    return rename(n -> braname(bn, n), kettensor(bn, vertex))
-end
+conj_bratensor(g::AbstractGramian) = rename(n -> braname(g, n), kettensor(g))
+conj_bratensor(bn::AbstractBilinearFormNetwork, vertex) = conj_bratensor(bn[vertex])
 
 """
     bratensor(bn::AbstractBilinearFormNetwork, vertex)
+    bratensor(g::AbstractGramian)
 
 The bra-layer tensor at `vertex`.
 """
-bratensor(bn::AbstractBilinearFormNetwork, vertex) = conj(conj_bratensor(bn, vertex))
+bratensor(g::AbstractGramian) = conj(conj_bratensor(g))
+bratensor(bn::AbstractBilinearFormNetwork, vertex) = bratensor(bn[vertex])
 
 """
     ketnetwork(bn::AbstractBilinearFormNetwork)
