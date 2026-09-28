@@ -78,7 +78,10 @@ identity_operator(g, s; d = 2) = product_operator(v -> Matrix(1.0I, d, d), g, s;
         @test gram isa QuadraticFormGramian
         @test eltype(qf) === typeof(gram)
         @test kettensor(gram) === tn[2]
-        @test gram.operator === state(op)[2]
+        # The Gramian holds the operator at its vertex, with that vertex's pairing.
+        @test state(gram.operator) === state(op)[2]
+        @test outputnames(gram.operator) == outputnames(op[2])
+        @test inputnames(gram.operator) == [name(s[2])]
         @test keys(ITensorNetworksNext.layertensors(gram)) == (:ket, :operator, :bra)
         @test contract_network([gram]) ≈
             kettensor(gram) * operatortensor(gram) * bratensor(gram)
@@ -88,30 +91,6 @@ identity_operator(g, s; d = 2) = product_operator(v -> Matrix(1.0I, d, d), g, s;
         )
         @test names(gram) == name.(inds(gram))
         @test axes(gram) == Tuple(inds(gram))
-    end
-
-    @testset "crossing operator pair" begin
-        g = named_path_graph(2)
-        tn, l, s = random_state(Float64, g)
-        # Each output is paired with the input on the other vertex.
-        out1, out2 = Index(2), Index(2)
-        optn = ITensorNetwork(Dict(1 => randn((out1, s[1])), 2 => randn((out2, s[2]))))
-        op = operator(optn, [name(out1), name(out2)], [name(s[2]), name(s[1])])
-        qf = QuadraticFormNetwork(tn, op)
-
-        @test braname(qf, name(s[2])) in names(operatortensor(qf[1]))
-        @test braname(qf, name(s[1])) in names(operatortensor(qf[2]))
-        # Both bra site names dangle at vertex 1: one from the operator, one from the bra.
-        @test braname(qf, name(s[2])) in names(qf[1])
-        @test braname(qf, name(s[1])) in names(qf[1])
-        gram = qf[1]
-        @test issetequal(
-            inds(gram), inds(kettensor(gram) * operatortensor(gram) * bratensor(gram))
-        )
-
-        psi = prod(tn)
-        bra = rename(conj(psi), name(s[2]) => name(out1), name(s[1]) => name(out2))
-        @test contract_network(qf)[] ≈ (bra * (optn[1] * optn[2] * psi))[]
     end
 
     @testset "operator input outside the ket network" begin

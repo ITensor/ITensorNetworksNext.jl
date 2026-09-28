@@ -13,9 +13,8 @@ The network equivalent of `ITensorBase.ITensorOperator`: a tensor network of typ
 where `outputnames[i]` is paired with `inputnames[i]`. Applying the operator contracts over
 the input names and leaves the output names.
 
-A pair may straddle two vertices, as it does for a swap or a translation. Indexing returns
-the vertex tensor wrapped as an `ITensorOperator` carrying only the pairs whose two halves
-both sit on that vertex; the remaining legs are dangling on the wrapper.
+The output and input of each pair must sit on the same vertex. Indexing returns the vertex
+tensor wrapped as an `ITensorOperator` carrying the pairs at that vertex.
 """
 struct ITensorNetworkOperator{T, V, I, P <: AbstractITensorNetwork{T, V}} <:
     AbstractITensorNetwork{T, V}
@@ -44,6 +43,16 @@ struct ITensorNetworkOperator{T, V, I, P <: AbstractITensorNetwork{T, V}} <:
                     ArgumentError(
                         "operator dim name $opname is associated with $nvertices vertices " *
                             "in the tensor network; an operator leg must be a dangling index."
+                    )
+                )
+            end
+        end
+        for (output, input) in zip(outputnames, inputnames)
+            if only(dimnamevertices(parent, output)) != only(dimnamevertices(parent, input))
+                throw(
+                    ArgumentError(
+                        "operator output $output and its paired input $input must sit on " *
+                            "the same vertex."
                     )
                 )
             end
@@ -77,15 +86,14 @@ NamedGraphs.encoded_graph(op::ITensorNetworkOperator) = encoded_graph(state(op))
 
 # ==================================== DataGraphs.jl ===================================== #
 
-# A pair whose two halves sit on different vertices has no bijection to give this vertex, so
-# only the pairs local to `vertex` become the wrapper's pairing and the rest stay dangling.
+# Both names of a pair sit on one vertex, so the pairs whose output is on `vertex` are its pairing.
 function DataGraphs.get_vertex_data(op::ITensorNetworkOperator, vertex)
     tensor = state(op)[vertex]
     tensor_names = names(tensor)
     outputs = similar(outputnames(op), 0)
     inputs = similar(inputnames(op), 0)
     for (output, input) in zip(outputnames(op), inputnames(op))
-        if output in tensor_names && input in tensor_names
+        if output in tensor_names
             push!(outputs, output)
             push!(inputs, input)
         end

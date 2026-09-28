@@ -1,5 +1,5 @@
 using Dictionaries: Dictionary
-using ITensorBase: inputnames, names, outputnames, rename, state, uniquename
+using ITensorBase: inputnames, outputnames, rename, state, uniquename
 using ITensorNetworksNext
 
 """
@@ -44,16 +44,14 @@ end
 """
     struct QuadraticFormGramian{T, O, I} <: AbstractGramian
 
-The layers of a `QuadraticFormNetwork` at one vertex: the ket tensor, the operator network's tensor,
-the ket→bra name map and the operator's name pairing, from which the bra tensor and the renamed
-operator tensor are built when requested.
+The layers of a `QuadraticFormNetwork` at one vertex: the ket tensor, the operator at that vertex
+and the ket→bra name map, from which the bra tensor and the renamed operator tensor are built
+when requested.
 """
 struct QuadraticFormGramian{T, O, I} <: AbstractGramian
     ket::T
     operator::O
     braname::Dictionary{I, I}
-    outputnames::Vector{I}
-    inputnames::Vector{I}
 end
 
 kettensor(g::QuadraticFormGramian) = g.ket
@@ -65,10 +63,8 @@ function layerinds(g::QuadraticFormGramian)
     return (inds(kettensor(g)), inds(operatortensor(g)), brainds(g))
 end
 
-function Base.eltype(
-        ::Type{<:QuadraticFormNetwork{T, V, I, O}}
-    ) where {T, V, I, TO, O <: ITensorNetworkOperator{TO}}
-    return QuadraticFormGramian{T, TO, I}
+function Base.eltype(::Type{<:QuadraticFormNetwork{T, V, I, O}}) where {T, V, I, O}
+    return QuadraticFormGramian{T, eltype(O), I}
 end
 
 function QuadraticFormNetwork(ket::ITensorNetwork, operator::ITensorNetworkOperator)
@@ -94,10 +90,9 @@ NamedGraphs.encoded_graph(qf::QuadraticFormNetwork) = encoded_graph(qf.ket)
 
 function DataGraphs.get_vertex_data(
         qf::QuadraticFormNetwork{T, V, I, O}, vertex
-    ) where {T, V, I, TO, O <: ITensorNetworkOperator{TO}}
-    return QuadraticFormGramian{T, TO, I}(
-        qf.ket[vertex], state(qf.operator)[vertex], qf.braname,
-        outputnames(qf.operator), inputnames(qf.operator)
+    ) where {T, V, I, O}
+    return QuadraticFormGramian{T, eltype(O), I}(
+        qf.ket[vertex], qf.operator[vertex], qf.braname
     )
 end
 
@@ -119,15 +114,15 @@ end
 ketnetwork(qf::QuadraticFormNetwork) = qf.ket
 operatornetwork(qf::QuadraticFormNetwork) = qf.operator
 
-# Each output name is renamed to the bra name of the input name it is paired with, using the
-# whole operator's pairing: the per-vertex wrapper drops a pair whose input sits on another vertex.
+# Each output name is renamed to the bra name of the input it is paired with, so the output legs
+# meet the bra layer and the input legs meet the ket layer.
 function operatortensor(g::QuadraticFormGramian)
-    tensor_names = names(g.operator)
+    op = g.operator
     replacements = [
         output => braname(g, input) for
-            (output, input) in zip(g.outputnames, g.inputnames) if output in tensor_names
+            (output, input) in zip(outputnames(op), inputnames(op))
     ]
-    return rename(g.operator, replacements...)
+    return rename(state(op), replacements...)
 end
 
 """
