@@ -17,8 +17,6 @@ include("itensornetworkoperator.jl")
 include("bilinearforms/abstractbilinearformnetwork.jl")
 include("bilinearforms/normnetwork.jl")
 include("bilinearforms/quadraticformnetwork.jl")
-include("bilinearforms/bilinearformnetworkview.jl")
-include("bilinearforms/abstractbilinearformnetworkview.jl")
 include("ITensorNetworkGenerators/ITensorNetworkGenerators.jl")
 include("contract_network.jl")
 
