@@ -3,9 +3,9 @@ using Dictionaries: isinsertable, issettable
 using Graphs: edges, vertices
 using ITensorBase: ITensor, Index, IndexName, conj, inds, inputnames, name, names, operator,
     outputnames, rename, setname, uniquename
-using ITensorNetworksNext: BraView, ITensorNetwork, KetView, NormNetwork, OperatorView,
-    QuadraticFormNetwork, braname, bratensor, conj_bratensor, contract_network, indmap,
-    kettensor, operatortensor, quadraticformnetwork, tensornetwork
+using ITensorNetworksNext: BraView, ITensorNetwork, NormNetwork, QuadraticFormNetwork,
+    braname, branetwork, bratensor, conj_bratensor, contract_network, indmap, ketnetwork,
+    kettensor, operatornetwork, operatortensor, quadraticformnetwork, tensornetwork
 using LinearAlgebra: I, norm
 using NamedGraphs: NamedEdge, incident_edges, named_grid, named_path_graph
 using Test: @test, @test_throws, @testset
@@ -129,31 +129,25 @@ identity_operator(g, s; d = 2) = product_operator(v -> Matrix(1.0I, d, d), g, s;
         @test braname(qf, sname) == custom[sname]
     end
 
-    @testset "`KetView` / `OperatorView` / `BraView`" begin
+    @testset "`ketnetwork` / `operatornetwork` / `branetwork`" begin
         g = named_path_graph(3)
         tn, l, s = random_state(Float64, g)
         op = identity_operator(g, s)
         qf = QuadraticFormNetwork(tn, op)
 
-        kv = KetView(qf)
-        ov = OperatorView(qf)
-        bv = BraView(qf)
+        # The ket and operator layers are the networks the quadratic form was built from.
+        @test ketnetwork(qf) === tn
+        @test operatornetwork(qf) === op
 
-        # Views share the graph structure of the ket layer.
-        for view in (kv, ov, bv)
-            @test issetequal(vertices(view), vertices(tn))
-            @test issetequal(edges(view), edges(tn))
-            @test !issettable(view)
-            @test !isinsertable(view)
-            @test is_vertex_assigned(view, 1)
-        end
-
-        # A `NormNetwork` has no operator layer, so `OperatorView` rejects one.
-        @test_throws ArgumentError OperatorView(NormNetwork(tn))
-
+        # The bra layer is not stored, so it is a view sharing the ket layer's graph structure.
+        bv = branetwork(qf)
+        @test bv isa BraView
+        @test issetequal(vertices(bv), vertices(tn))
+        @test issetequal(edges(bv), edges(tn))
+        @test !issettable(bv)
+        @test !isinsertable(bv)
+        @test is_vertex_assigned(bv, 1)
         for v in vertices(tn)
-            @test kv[v] === kettensor(qf, v)
-            @test inds(ov[v]) == inds(operatortensor(qf, v))
             @test inds(bv[v]) == inds(bratensor(qf, v))
         end
     end

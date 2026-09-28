@@ -193,16 +193,16 @@ bethe_free_energy(factors, messages) = -bethe_free_entropy(factors, messages)
 function similar_message_environment(nn::NormNetwork)
     messages = mapmany(vertices(nn)) do vertex
         return map(in_incident_edges(nn, vertex)) do edge
-            braview = BraView(nn)
-            ketview = KetView(nn)
+            bra = branetwork(nn)
+            ket = ketnetwork(nn)
 
-            ketnames = linknames(ketview, edge)
-            branames = linknames(braview, edge)
-            braaxis = unnamed.(linkaxes(braview, edge))
+            ketnames = linknames(ket, edge)
+            branames = linknames(bra, edge)
+            braaxis = unnamed.(linkaxes(bra, edge))
 
             # Bra leg = operator output, ket leg = input, the bipartition in which the message
             # is positive semidefinite.
-            message = similar_operator(ketview[vertex], braaxis, branames, ketnames)
+            message = similar_operator(ket[vertex], braaxis, branames, ketnames)
 
             return edge => message
         end

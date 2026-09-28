@@ -86,6 +86,8 @@ function braname(qf::QuadraticFormNetwork, name)
 end
 
 kettensor(qf::QuadraticFormNetwork, vertex) = qf.ket[vertex]
+ketnetwork(qf::QuadraticFormNetwork) = qf.ket
+operatornetwork(qf::QuadraticFormNetwork) = qf.operator
 
 # Each output name is renamed to the bra name of the input name it is paired with, so the
 # operator's output legs meet the bra layer and its input legs meet the ket layer. The pairing

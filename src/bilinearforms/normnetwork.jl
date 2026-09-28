@@ -68,6 +68,7 @@ function braname(nn::NormNetwork, name)
 end
 
 kettensor(nn::NormNetwork, vertex) = nn.ket[vertex]
+ketnetwork(nn::NormNetwork) = nn.ket
 
 """
     normnetwork(tn::ITensorNetwork, [braname]) -> NormNetwork

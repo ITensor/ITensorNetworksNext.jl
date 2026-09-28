@@ -3,8 +3,8 @@ using Dictionaries: isinsertable, issettable
 using Graphs: edges, vertices
 using ITensorBase:
     ITensor, Index, IndexName, LazyITensor, conj, inds, name, setname, uniquename
-using ITensorNetworksNext: BraView, ITensorNetwork, KetView, NormNetwork, braname,
-    bratensor, conj_bratensor, contract_network, indmap, kettensor, normnetwork,
+using ITensorNetworksNext: BraView, ITensorNetwork, NormNetwork, braname, branetwork,
+    bratensor, conj_bratensor, contract_network, indmap, ketnetwork, kettensor, normnetwork,
     tensornetwork
 using LinearAlgebra: norm
 using NamedGraphs: NamedEdge, incident_edges, named_grid, named_path_graph
@@ -96,32 +96,25 @@ end
         @test braname(nn, lname) in name.(inds(conj_bratensor(nn, 2)))
     end
 
-    @testset "`KetView` / `BraView`" begin
+    @testset "`ketnetwork` / `branetwork`" begin
         g = named_path_graph(3)
         tn, l, s = random_state(Float64, g)
         nn = NormNetwork(tn)
 
-        kv = KetView(nn)
-        bv = BraView(nn)
+        # The ket layer is the network the norm network was built from.
+        @test ketnetwork(nn) === tn
 
-        # Views share the graph structure of the underlying network.
-        @test issetequal(vertices(kv), vertices(tn))
+        # The bra layer is not stored, so it is a view sharing the ket layer's graph structure.
+        bv = branetwork(nn)
+        @test bv isa BraView
         @test issetequal(vertices(bv), vertices(tn))
-        @test issetequal(edges(kv), edges(tn))
         @test issetequal(edges(bv), edges(tn))
-
-        # The ket view exposes the bare ket tensors; the bra view exposes the bra tensors.
         for v in vertices(tn)
-            @test kv[v] === kettensor(nn, v)
             @test inds(bv[v]) == inds(bratensor(nn, v))
         end
-
-        @test is_vertex_assigned(kv, 1)
         @test is_vertex_assigned(bv, 1)
 
-        # Views inherit the (non-)mutability of their parent norm network.
-        @test !issettable(kv)
-        @test !isinsertable(kv)
+        # The view inherits the (non-)mutability of its parent norm network.
         @test !issettable(bv)
         @test !isinsertable(bv)
     end
