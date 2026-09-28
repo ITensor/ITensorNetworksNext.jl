@@ -4,8 +4,8 @@ using DataGraphs: DataGraphs, AbstractDataGraph, AbstractVertexDataGraph, edge_d
 using Dictionaries: Dictionary
 using Graphs: Graphs, AbstractEdge, AbstractGraph, add_edge!, add_vertex!, dst, edges,
     edgetype, ne, neighbors, nv, rem_edge!, src, vertices
-using ITensorBase:
-    NamedUnitRange, inds, name, names, nametype, prime, uniquename, unnamedtype
+using ITensorBase: ITensorOperator, NamedUnitRange, inds, inputnames, name, names, nametype,
+    prime, uniquename, unnamedtype
 using LinearAlgebra: LinearAlgebra
 using MacroTools: @capture
 using NamedGraphs:
@@ -130,4 +130,24 @@ function insertlink!(tn::AbstractGraph, e)
     tn[dst(e)] *= conj(x)
 
     return tn
+end
+
+function operator_support(tn::AbstractGraph, op::ITensorOperator)
+    support = Indices{vertextype(tn)}()
+
+    for name in inputnames(op)
+        vertices = dimnamevertices(tn, name)
+
+        if length(vertices) > 1
+            throw(
+                ArgumentError(
+                    "operator dim name $name associated with multiple vertices in tensor network."
+                )
+            )
+        end
+
+        union!(support, vertices)
+    end
+
+    return support
 end

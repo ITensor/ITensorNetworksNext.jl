@@ -8,6 +8,7 @@ if VERSION >= v"1.11.0-DEV.469"
     )
 end
 
+include("utils.jl")
 include("select_algorithm.jl")
 include("AlgorithmsInterfaceExtensions/AlgorithmsInterfaceExtensions.jl")
 include("abstracttensornetwork.jl")

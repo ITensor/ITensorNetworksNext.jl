@@ -2,8 +2,8 @@ using .AlgorithmsInterfaceExtensions: AlgorithmsInterfaceExtensions as AIE
 using AlgorithmsInterface: AlgorithmsInterface as AI
 using Base: @kwdef
 using Graphs: dst, src, vertices
-using ITensorBase: AbstractITensor, apply, inputnames, names, operator, rename
-using LinearAlgebra: norm
+using ITensorBase: AbstractITensor, apply, names, operator, rename
+using LinearAlgebra: norm, normalize!
 using MatrixAlgebraKit: project_hermitian, qr_compact, svd_trunc
 using NamedGraphs: boundary_edges
 using TensorAlgebra.MatrixAlgebra: sqrth_invsqrth_safe, sqrth_safe
@@ -208,12 +208,15 @@ function apply_gate_bp!(
         dest::AbstractITensorNetwork, op::AbstractITensor,
         state::AbstractITensorNetwork, env; kwargs...
     )
-    op_in = inputnames(op)
-    vs = [v for v in vertices(state) if !isempty(intersect(op_in, sitenames(state, v)))]
-    isempty(vs) && throw(
+    vertices = operator_support(state, op)
+
+    isempty(vertices) && throw(
         ArgumentError("operator shares no indices with the tensor network")
     )
-    return apply_gate_bp_nsite!(Val(length(vs)), dest, op, state, env, vs; kwargs...)
+
+    N = Val(length(vertices))
+
+    return apply_gate_bp_nsite!(N, dest, op, state, env, vertices; kwargs...)
 end
 
 function apply_gate_bp_nsite!(
@@ -225,29 +228,29 @@ end
 
 function apply_gate_bp_nsite!(
         ::Val{1}, dest::AbstractITensorNetwork, op::AbstractITensor,
-        state::AbstractITensorNetwork, env, vs;
+        state::AbstractITensorNetwork, env, vertices;
         normalize, kwargs...
     )
-    v = only(vs)
-    ψv = apply(op, state[v])
+    vertex = only(vertices)
+    ψv = apply(op, state[vertex])
     if normalize
         sqrt_messages = [
             sqrth_safe(project_hermitian(env[e])) for
-                e in boundary_edges(state, vs; dir = :in)
+                e in boundary_edges(state, vertices; dir = :in)
         ]
         ψv /= norm(foldl((ψ, m) -> apply(m, ψ), sqrt_messages; init = ψv))
     end
-    dest[v] = ψv
+    dest[vertex] = ψv
     return dest
 end
 
 function apply_gate_bp_nsite!(
         ::Val{2}, dest::AbstractITensorNetwork, op::AbstractITensor,
-        state::AbstractITensorNetwork, env, vs;
+        state::AbstractITensorNetwork, env, vertices;
         trunc, normalize
     )
-    v1, v2 = vs
-    edges_in = boundary_edges(state, vs; dir = :in)
+    v1, v2 = vertices
+    edges_in = boundary_edges(state, vertices; dir = :in)
     roots_v1 =
         [sqrth_invsqrth_safe(project_hermitian(env[e])) for e in edges_in if dst(e) == v1]
     roots_v2 =
@@ -262,9 +265,9 @@ function apply_gate_bp_nsite!(
     Q_v2, R_v2 = qr_compact(ψ_v2, setdiff(names(ψ_v2), names(ψ_v1), names(op)))
     op_R_v1v2 = apply(op, R_v1 * R_v2)
     U_v1, S, U_v2 = svd_trunc(op_R_v1v2, setdiff(names(R_v1), names(R_v2)); trunc)
-    if normalize
-        S = S / norm(S)
-    end
+
+    normalize && normalize!(S)
+
     name_v1, name_v2 = names(S)
     sqrt_S = sqrth_safe(S, (name_v1,), (name_v2,); atol = 0, rtol = 0)
     R_v1 = rename(U_v1 * sqrt_S, name_v2 => name_v1)
