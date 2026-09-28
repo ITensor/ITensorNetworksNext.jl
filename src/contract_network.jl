@@ -31,9 +31,8 @@ function get_order(alg::Exact, tn)
         Dict(symnamedtensor(i) => symnamedtensor(i, Tuple(axes(t))) for (i, t) in pairs(tn))
     return substitute(order, subs)
 end
-# A Gramian enters the contraction as its separate layer tensors, so the contraction order can
-# absorb other operands into one layer before the layers are joined. Every operand is keyed by a
-# `(key, layer)` tuple so all keys share one concrete type even when only some entries split.
+# A Gramian enters as its separate layer tensors, so the order can place other operands between
+# layers; every operand gets a `(key, layer)` key so all keys share one concrete type.
 function split_gramians(tn)
     any(t -> t isa AbstractGramian, tn) || return tn
     pairs_split = [
