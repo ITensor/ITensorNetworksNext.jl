@@ -30,13 +30,7 @@ struct QuadraticFormNetwork{T, V, I, O <: ITensorNetworkOperator} <:
         if !issubset(inputnames(operator), keys(ket.dimname_vertices))
             error("every operator input name must be an index name of the ket layer.")
         end
-        acted = Set{I}(inputnames(operator))
-        braname = Dictionary{I, I}()
-        for (name, vertices) in pairs(ket.dimname_vertices)
-            if length(vertices) == 2 || name in acted
-                insert!(braname, name, map[name])
-            end
-        end
+        braname = select_branames(ket, map, Set{I}(inputnames(operator)))
         return new{T, V, I, typeof(operator)}(ket, operator, braname)
     end
 end
@@ -55,7 +49,7 @@ struct QuadraticFormGramian{T, O, I} <: AbstractGramian
 end
 
 kettensor(g::QuadraticFormGramian) = g.ket
-braname(g::QuadraticFormGramian, name) = get(g.braname, name, name)
+branamemap(g::QuadraticFormGramian) = g.braname
 function layertensors(g::QuadraticFormGramian)
     return (; ket = kettensor(g), operator = operatortensor(g), bra = bratensor(g))
 end
@@ -71,21 +65,6 @@ function QuadraticFormNetwork(ket::ITensorNetwork, operator::ITensorNetworkOpera
     return QuadraticFormNetwork(ket, operator, map(uniquename, keys(ket.dimname_vertices)))
 end
 
-# ====================================== Graphs.jl ======================================= #
-
-Graphs.edges(qf::QuadraticFormNetwork) = edges(qf.ket)
-Graphs.vertices(qf::QuadraticFormNetwork) = vertices(qf.ket)
-
-# ==================================== NamedGraphs.jl ==================================== #
-
-function NamedGraphs.encoded_vertex(qf::QuadraticFormNetwork, vertex)
-    return encoded_vertex(qf.ket, vertex)
-end
-function NamedGraphs.decoded_vertex(qf::QuadraticFormNetwork, code::Integer)
-    return decoded_vertex(qf.ket, code)
-end
-NamedGraphs.encoded_graph(qf::QuadraticFormNetwork) = encoded_graph(qf.ket)
-
 # ==================================== DataGraphs.jl ===================================== #
 
 function DataGraphs.get_vertex_data(
@@ -97,21 +76,13 @@ function DataGraphs.get_vertex_data(
 end
 
 function DataGraphs.is_vertex_assigned(qf::QuadraticFormNetwork, vertex)
-    return isassigned(qf.ket, vertex) && isassigned(qf.operator, vertex)
+    return isassigned(ketnetwork(qf), vertex) && isassigned(operatornetwork(qf), vertex)
 end
 
 # ====================================== interface ======================================= #
 
-function braname(qf::QuadraticFormNetwork, name)
-    if !has_dimname(qf.ket, name)
-        error("index name $name not found underlying tensor network.")
-    end
-    # The indices not stored in `qf.braname` are the dangling ket indices the operator does
-    # not act on, which get mapped to themselves.
-    return get(qf.braname, name, name)
-end
-
 ketnetwork(qf::QuadraticFormNetwork) = qf.ket
+branamemap(qf::QuadraticFormNetwork) = qf.braname
 operatornetwork(qf::QuadraticFormNetwork) = qf.operator
 
 # Each output name is renamed to the bra name of the input it is paired with, so the output legs

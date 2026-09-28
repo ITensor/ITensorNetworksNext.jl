@@ -1,11 +1,10 @@
 using DataGraphs: is_vertex_assigned
 using Dictionaries: isinsertable, issettable
 using Graphs: edges, vertices
-using ITensorBase:
-    ITensor, Index, IndexName, LazyITensor, conj, inds, name, names, setname, uniquename
+using ITensorBase: ITensor, Index, IndexName, LazyITensor, inds, name, names, uniquename
 using ITensorNetworksNext: ITensorNetworksNext, BraView, Exact, ITensorNetwork, NormGramian,
     NormNetwork, braname, branetwork, bratensor, conj_bratensor, contract_network,
-    contraction_order, dimnamevertices, indmap, ketnetwork, kettensor, linkaxes, linkinds,
+    contraction_order, dimnamevertices, ketnetwork, kettensor, linkaxes, linkinds,
     linknames, normnetwork, siteaxes, siteinds, sitenames, tensornetwork
 using LinearAlgebra: norm
 using NamedGraphs: NamedEdge, incident_edges, named_grid, named_path_graph
@@ -55,30 +54,25 @@ end
         nn = NormNetwork(tn)
 
         # `kettensor` returns the underlying tensor untouched.
-        @test kettensor(nn, 2) === tn[2]
+        @test kettensor(nn[2]) === tn[2]
 
         # Site indices appear in a single tensor, so they are *not* renamed: the ket and
         # bra layers share them (they get contracted, forming the physical overlap).
         sname = name(s[2])
         @test braname(nn, sname) == sname
-        @test sname in name.(inds(kettensor(nn, 2)))
-        @test sname in name.(inds(conj_bratensor(nn, 2)))
+        @test sname in name.(inds(kettensor(nn[2])))
+        @test sname in name.(inds(conj_bratensor(nn[2])))
 
         # Link indices are shared by two tensors, so they *are* renamed in the bra layer
         # to keep the two layers' bonds distinct.
         lname = name(l[NamedEdge(1 => 2)])
         @test braname(nn, lname) != lname
-        @test lname in name.(inds(kettensor(nn, 2)))
-        @test !(lname in name.(inds(conj_bratensor(nn, 2))))
-        @test braname(nn, lname) in name.(inds(conj_bratensor(nn, 2)))
+        @test lname in name.(inds(kettensor(nn[2])))
+        @test !(lname in name.(inds(conj_bratensor(nn[2]))))
+        @test braname(nn, lname) in name.(inds(conj_bratensor(nn[2])))
 
         # `bra` is the elementwise conjugate of `conj_bratensor` and carries the same indices.
-        @test inds(bratensor(nn, 2)) == inds(conj_bratensor(nn, 2))
-
-        # `indmap` conjugates an index and renames it according to the name map.
-        ind = only(i for i in inds(kettensor(nn, 2)) if name(i) == lname)
-        @test name(indmap(nn, ind)) == braname(nn, name(ind))
-        @test indmap(nn, ind) == setname(conj(ind), braname(nn, name(ind)))
+        @test inds(bratensor(nn[2])) == inds(conj_bratensor(nn[2]))
 
         # Querying the name map with an index name absent from the network errors.
         @test_throws ErrorException braname(nn, name(Index(2)))
@@ -94,7 +88,7 @@ end
 
         lname = name(l[NamedEdge(1 => 2)])
         @test braname(nn, lname) == custom[lname]
-        @test braname(nn, lname) in name.(inds(conj_bratensor(nn, 2)))
+        @test braname(nn, lname) in name.(inds(conj_bratensor(nn[2])))
     end
 
     @testset "`ketnetwork` / `branetwork`" begin
@@ -111,7 +105,7 @@ end
         @test issetequal(vertices(bv), vertices(tn))
         @test issetequal(edges(bv), edges(tn))
         for v in vertices(tn)
-            @test inds(bv[v]) == inds(bratensor(nn, v))
+            @test inds(bv[v]) == inds(bratensor(nn[v]))
         end
         @test is_vertex_assigned(bv, 1)
 

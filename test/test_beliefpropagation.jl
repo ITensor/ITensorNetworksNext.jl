@@ -343,7 +343,7 @@ end
             ones = message_environment(one, nn)
             for (edge, rest) in ((1 => 2, 2:4), (4 => 3, 1:3))
                 layers =
-                    [[kettensor(nn, v) for v in rest]; [bratensor(nn, v) for v in rest]]
+                    [[kettensor(nn[v]) for v in rest]; [bratensor(nn[v]) for v in rest]]
                 z_rest = contract_network([state(ones[edge]); layers])[]
                 @test z_rest ≈ norm(prod([network[v] for v in rest]))^2 rtol =
                     eps(real(T))^(1 / 3)

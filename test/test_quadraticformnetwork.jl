@@ -2,10 +2,10 @@ using DataGraphs: is_vertex_assigned
 using Dictionaries: isinsertable, issettable
 using Graphs: edges, vertices
 using ITensorBase: ITensor, Index, IndexName, conj, inds, inputnames, name, names, operator,
-    outputnames, rename, setname, state, uniquename
+    outputnames, rename, state, uniquename
 using ITensorNetworksNext: ITensorNetworksNext, BraView, ITensorNetwork, NormNetwork,
     QuadraticFormGramian, QuadraticFormNetwork, braname, branetwork, bratensor,
-    conj_bratensor, contract_network, indmap, ketnetwork, kettensor, operatornetwork,
+    conj_bratensor, contract_network, ketnetwork, kettensor, operatornetwork,
     operatortensor, quadraticformnetwork, tensornetwork
 using LinearAlgebra: I, norm
 using NamedGraphs: NamedEdge, incident_edges, named_grid, named_path_graph
@@ -110,39 +110,34 @@ identity_operator(g, s; d = 2) = product_operator(v -> Matrix(1.0I, d, d), g, s;
         qf = QuadraticFormNetwork(tn, op)
 
         # `kettensor` returns the underlying tensor untouched.
-        @test kettensor(qf, 2) === tn[2]
+        @test kettensor(qf[2]) === tn[2]
 
         # Unlike the norm network, the site indices *are* renamed in the bra layer: the
         # operator sits between the two layers, so they no longer contract directly.
         sname = name(s[2])
         @test braname(qf, sname) != sname
-        @test sname in name.(inds(kettensor(qf, 2)))
-        @test !(sname in name.(inds(conj_bratensor(qf, 2))))
-        @test braname(qf, sname) in name.(inds(conj_bratensor(qf, 2)))
+        @test sname in name.(inds(kettensor(qf[2])))
+        @test !(sname in name.(inds(conj_bratensor(qf[2]))))
+        @test braname(qf, sname) in name.(inds(conj_bratensor(qf[2])))
 
         # Link indices are shared by two tensors, so they are renamed in the bra layer to
         # keep the two layers' bonds distinct.
         lname = name(l[NamedEdge(1 => 2)])
         @test braname(qf, lname) != lname
-        @test lname in name.(inds(kettensor(qf, 2)))
-        @test !(lname in name.(inds(conj_bratensor(qf, 2))))
-        @test braname(qf, lname) in name.(inds(conj_bratensor(qf, 2)))
+        @test lname in name.(inds(kettensor(qf[2])))
+        @test !(lname in name.(inds(conj_bratensor(qf[2]))))
+        @test braname(qf, lname) in name.(inds(conj_bratensor(qf[2])))
 
         # The operator's input name meets the ket and its output name is renamed to meet
         # the bra.
-        o = operatortensor(qf, 2)
+        o = operatortensor(qf[2])
         @test sname in names(o)
         @test braname(qf, sname) in names(o)
         @test inputnames(op) == [name(s[v]) for v in vertices(g)]
 
         # `bratensor` is the elementwise conjugate of `conj_bratensor` and carries the same
         # indices.
-        @test inds(bratensor(qf, 2)) == inds(conj_bratensor(qf, 2))
-
-        # `indmap` conjugates an index and renames it according to the name map.
-        ind = only(i for i in inds(kettensor(qf, 2)) if name(i) == lname)
-        @test name(indmap(qf, ind)) == braname(qf, name(ind))
-        @test indmap(qf, ind) == setname(conj(ind), braname(qf, name(ind)))
+        @test inds(bratensor(qf[2])) == inds(conj_bratensor(qf[2]))
 
         # Querying the name map with an index name absent from the ket layer errors.
         @test_throws ErrorException braname(qf, name(Index(2)))
@@ -159,7 +154,7 @@ identity_operator(g, s; d = 2) = product_operator(v -> Matrix(1.0I, d, d), g, s;
 
         lname = name(l[NamedEdge(1 => 2)])
         @test braname(qf, lname) == custom[lname]
-        @test braname(qf, lname) in name.(inds(conj_bratensor(qf, 2)))
+        @test braname(qf, lname) in name.(inds(conj_bratensor(qf[2])))
 
         sname = name(s[2])
         @test braname(qf, sname) == custom[sname]
@@ -184,7 +179,7 @@ identity_operator(g, s; d = 2) = product_operator(v -> Matrix(1.0I, d, d), g, s;
         @test !isinsertable(bv)
         @test is_vertex_assigned(bv, 1)
         for v in vertices(tn)
-            @test inds(bv[v]) == inds(bratensor(qf, v))
+            @test inds(bv[v]) == inds(bratensor(qf[v]))
         end
     end
 
