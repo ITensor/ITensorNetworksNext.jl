@@ -9,9 +9,9 @@ using ITensorBase:
     Greedy, ITensor, Index, apply, inds, name, noprime, outputnames, prime, state
 using ITensorNetworksNext: ITensorNetworksNext, Exact, ITensorNetwork, MessageCache,
     NormNetwork, SimpleMessageUpdate, StopWhenConverged, beliefpropagation,
-    bethe_free_energy, bratensor, contract_network, contraction_order, edge_scalar,
-    factor_tensors, incoming_messages, insertlink!, kettensor, linkaxes, linkinds,
-    message_environment, messagecache, region_scalar, subgraph, tensornetwork,
+    bethe_free_energy, bethe_free_entropy, bratensor, contract_network, contraction_order,
+    edge_scalar, factor_tensors, incoming_messages, insertlink!, kettensor, linkaxes,
+    linkinds, message_environment, messagecache, region_scalar, subgraph, tensornetwork,
     updated_message, vertex_scalar, vertex_scalars
 using LinearAlgebra: LinearAlgebra, norm, tr
 using NamedGraphs: NamedEdge, all_edges, incident_edges, named_comb_tree, named_grid,
@@ -145,6 +145,21 @@ end
             @test length(in_msgs) == 1
             @test only(in_msgs) == bpc[3 => 2]
         end
+        @testset "Bethe free entropy and free energy" begin
+            g = named_path_graph(2)
+            l = Index(2)
+            tn = tensornetwork(v -> randn(l), vertices(g))
+
+            bpc = messagecache(edge -> ones(Tuple(linkinds(tn, edge))), all_edges(g))
+            @test bethe_free_energy(tn, bpc) == -bethe_free_entropy(tn, bpc)
+
+            bpc = messagecache(all_edges(g)) do edge
+                return edge == NamedEdge(1 => 2) ? [1.0, 0.0][l] : [0.0, 1.0][l]
+            end
+            @test iszero(edge_scalar(bpc, 1 => 2))
+            @test bethe_free_entropy(tn, bpc) == -Inf
+            @test bethe_free_energy(tn, bpc) == Inf
+        end
 
         @testset "subgraph" begin
             g = named_grid((3,))
@@ -205,7 +220,7 @@ end
             cache = beliefpropagation(
                 tn, messages; stopping_criterion = (; maxiter = 1)
             )
-            z_bp = exp(bethe_free_energy(tn, cache))
+            z_bp = exp(bethe_free_entropy(tn, cache))
             z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
             @test z_bp ≈ z_exact rtol = eps(real(T))^(1 / 3)
 
@@ -227,7 +242,7 @@ end
             cache = beliefpropagation(
                 tn, messages; stopping_criterion = (; maxiter = 1)
             )
-            z_bp = exp(bethe_free_energy(tn, cache))
+            z_bp = exp(bethe_free_entropy(tn, cache))
             z_exact = reduce(*, [tn[v] for v in vertices(g)])[]
             @test z_bp ≈ z_exact rtol = eps(real(T))^(1 / 3)
 
@@ -248,7 +263,7 @@ end
                         stopping_criterion = (; maxiter = 10, tol = 1.0e-10)
                     )
 
-                    z_bp = exp(bethe_free_energy(tn, cache))
+                    z_bp = exp(bethe_free_entropy(tn, cache))
 
                     @test z_bp ≈ 1.5^(n^2)
                 end
@@ -287,7 +302,7 @@ end
             # Belief propagation is exact on a tree, including on the fermionic norm network.
             ket = prod(network)
             z_exact = (ket * conj(ket))[]
-            z_bp = exp(bethe_free_energy(nn, cache))
+            z_bp = exp(bethe_free_entropy(nn, cache))
             @test z_bp ≈ z_exact rtol = eps(real(T))^(1 / 3)
 
             for edge in edges(cache)

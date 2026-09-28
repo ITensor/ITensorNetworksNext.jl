@@ -189,7 +189,7 @@ function sumlog(terms)
 end
 
 # We need a graph structure here, so assume `factors` is a graph.
-function bethe_free_energy(factors, messages)
+function bethe_free_entropy(factors, messages)
     numerator_terms = vertex_scalars(factors, messages)
     denominator_terms = edge_scalars(messages)
 
@@ -199,6 +199,7 @@ function bethe_free_energy(factors, messages)
 
     return sumlog(numerator_terms) - sumlog(denominator_terms)
 end
+bethe_free_energy(factors, messages) = -bethe_free_entropy(factors, messages)
 
 # ===================================== NormNetwork ====================================== #
 
