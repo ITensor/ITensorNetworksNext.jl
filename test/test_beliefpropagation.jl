@@ -388,7 +388,7 @@ end
             message = updated_message(algorithm, cache, nn, edge)
             # `v` has degree 4, so 3 incoming messages plus the ket and bra layers.
             @test only(counts) == 5
-            @test message ≈ contract_network([messages; [contract_network([nn[v]])]])
+            @test message ≈ contract_network([messages; [nn[v]]])
         end
     end
 end

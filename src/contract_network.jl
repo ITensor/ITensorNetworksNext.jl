@@ -31,28 +31,23 @@ function get_order(alg::Exact, tn)
         Dict(symnamedtensor(i) => symnamedtensor(i, Tuple(axes(t))) for (i, t) in pairs(tn))
     return substitute(order, subs)
 end
+# A Gramian enters the contraction as its separate layer tensors, so the contraction order can
+# absorb other operands into one layer before the layers are joined. Every operand is keyed by a
+# `(key, layer)` tuple so all keys share one concrete type even when only some entries split.
+function split_gramians(tn)
+    any(t -> t isa AbstractGramian, tn) || return tn
+    pairs_split = [
+        (key, layer) => tensor for (key, t) in pairs(tn) for
+            (layer, tensor) in (t isa AbstractGramian ? pairs(layertensors(t)) : [:tensor => t])
+    ]
+    return Dictionary(first.(pairs_split), last.(pairs_split))
+end
+
 # Promote the operands to their common type before lowering to the lazy expression, so every lazy
 # operand shares one concrete type. Otherwise a network of mixed types (a plain tensor is a trivial
 # operator, so mixing operators and plain tensors is the common case) widens the symbolic `Mul`
 # container to a `UnionAll` it cannot construct. `promote_type`/`convert` keep an all-plain network
 # at the plain type (the promotion is a no-op), so its fast path is unchanged.
-# A Gramian enters the contraction as its separate layer tensors, so the contraction order can
-# absorb other operands into one layer before the layers are joined.
-function split_gramians(tn)
-    any(t -> t isa AbstractGramian, tn) || return tn
-    operands = Dictionary{Any, Any}()
-    for (key, t) in pairs(tn)
-        if t isa AbstractGramian
-            for (layer, tensor) in pairs(layertensors(t))
-                insert!(operands, (key, layer), tensor)
-            end
-        else
-            insert!(operands, key, t)
-        end
-    end
-    return operands
-end
-
 function contract_network(alg::Exact, tn)
     tn = split_gramians(tn)
     order = get_order(alg, tn)
