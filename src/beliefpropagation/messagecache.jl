@@ -148,25 +148,12 @@ function vertex_scalars(factors, messages, vertices)
     return narrow_map(v -> vertex_scalar(factors, messages, v), vertices)
 end
 
-function edge_scalar(cache, edge)
-    return (cache[edge] * cache[reverse(edge)])[]
+# Takes factors as an unused argument for consistency with `vertex_scalar`.
+edge_scalar(_factors, messages, edge) = (messages[edge] * messages[reverse(edge)])[]
+edge_scalars(factors, messages) = edge_scalars(factors, messages, edges(factors))
+function edge_scalars(factors, messages, edges)
+    return narrow_map(e -> edge_scalar(factors, messages, e), edges)
 end
-
-function edge_scalars(cache)
-    seen = Indices{keytype(cache)}()
-
-    unique_edges = filter(keys(cache)) do edge
-        if edge in seen || reverse(edge) in seen
-            return false
-        end
-        insert!(seen, edge)
-        return true
-    end
-
-    return edge_scalars(cache, unique_edges)
-end
-
-edge_scalars(cache, edges) = narrow_map(e -> edge_scalar(cache, e), edges)
 
 function region_scalar(factors, messages, region)
     return mapreduce(vertex -> vertex_scalar(factors, messages, vertex), *, region)
@@ -191,7 +178,7 @@ end
 # We need a graph structure here, so assume `factors` is a graph.
 function bethe_free_entropy(factors, messages)
     numerator_terms = vertex_scalars(factors, messages)
-    denominator_terms = edge_scalars(messages)
+    denominator_terms = edge_scalars(factors, messages)
 
     if any(iszero, denominator_terms)
         return -Inf

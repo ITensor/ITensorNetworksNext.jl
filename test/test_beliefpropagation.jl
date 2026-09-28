@@ -3,16 +3,16 @@ using Base.Broadcast: materialize
 using DataGraphs: DataGraphs, DataGraph, edge_data, edge_data_type
 using Dictionaries: Dictionary, dictionary, set!
 using GradedArrays: U1, gradedrange, isdual
-using Graphs: AbstractGraph, add_vertex!, dst, edges, has_edge, has_vertex, nv, rem_edge!,
-    src, vertices
+using Graphs: AbstractGraph, add_vertex!, dst, edges, has_edge, has_vertex, ne, nv,
+    rem_edge!, src, vertices
 using ITensorBase:
     Greedy, ITensor, Index, apply, inds, name, noprime, outputnames, prime, state
 using ITensorNetworksNext: ITensorNetworksNext, Exact, ITensorNetwork, MessageCache,
     NormNetwork, SimpleMessageUpdate, StopWhenConverged, beliefpropagation,
     bethe_free_energy, bethe_free_entropy, bratensor, contract_network, contraction_order,
-    edge_scalar, factor_tensors, incoming_messages, insertlink!, kettensor, linkaxes,
-    linkinds, message_environment, messagecache, region_scalar, subgraph, tensornetwork,
-    updated_message, vertex_scalar, vertex_scalars
+    edge_scalar, edge_scalars, factor_tensors, incoming_messages, insertlink!, kettensor,
+    linkaxes, linkinds, message_environment, messagecache, region_scalar, subgraph,
+    tensornetwork, updated_message, vertex_scalar, vertex_scalars
 using LinearAlgebra: LinearAlgebra, norm, tr
 using NamedGraphs: NamedEdge, all_edges, incident_edges, named_comb_tree, named_grid,
     named_path_graph, vertextype
@@ -128,7 +128,7 @@ end
 
             # Vertex/edge/region scalars.
             @test vertex_scalar(tn, bpc, 2) isa ComplexF64
-            @test edge_scalar(bpc, 1 => 2) isa Float64
+            @test edge_scalar(tn, bpc, 1 => 2) isa Float64
 
             @test region_scalar(tn, bpc, [1]) == vertex_scalar(tn, bpc, 1)
             @test region_scalar(tn, bpc, [2, 3]) == prod(vertex_scalars(tn, bpc, [2, 3]))
@@ -145,6 +145,31 @@ end
             @test length(in_msgs) == 1
             @test only(in_msgs) == bpc[3 => 2]
         end
+        @testset "Edge scalars" begin
+            rng = StableRNG(123)
+            g = named_path_graph(3)
+            l = Dict(e => Index(2) for e in edges(g))
+            l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
+
+            tn = tensornetwork(vertices(g)) do v
+                is = map(e -> l[e], incident_edges(g, v))
+                return randn(rng, Tuple(is))
+            end
+
+            bpc = messagecache(all_edges(g)) do edge
+                return randn(rng, Tuple(linkinds(tn, edge)))
+            end
+
+            @test edge_scalar(tn, bpc, 1 => 2) == (bpc[1 => 2] * bpc[2 => 1])[]
+            @test edge_scalar(tn, bpc, 1 => 2) ≈ edge_scalar(tn, bpc, 2 => 1)
+
+            scalars = edge_scalars(tn, bpc)
+            @test scalars isa Vector{Float64}
+            @test length(scalars) == ne(tn)
+            @test scalars == map(e -> edge_scalar(tn, bpc, e), edges(tn))
+
+            @test edge_scalars(tn, bpc, [2 => 3]) == [edge_scalar(tn, bpc, 2 => 3)]
+        end
         @testset "Bethe free entropy and free energy" begin
             g = named_path_graph(2)
             l = Index(2)
@@ -156,7 +181,7 @@ end
             bpc = messagecache(all_edges(g)) do edge
                 return edge == NamedEdge(1 => 2) ? [1.0, 0.0][l] : [0.0, 1.0][l]
             end
-            @test iszero(edge_scalar(bpc, 1 => 2))
+            @test iszero(edge_scalar(tn, bpc, 1 => 2))
             @test bethe_free_entropy(tn, bpc) == -Inf
             @test bethe_free_energy(tn, bpc) == Inf
         end
