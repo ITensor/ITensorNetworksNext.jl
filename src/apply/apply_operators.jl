@@ -2,8 +2,7 @@ using .AlgorithmsInterfaceExtensions: AlgorithmsInterfaceExtensions as AIE
 using AlgorithmsInterface: AlgorithmsInterface as AI
 using Base: @kwdef
 using Graphs: dst, src, vertices
-using ITensorBase: ITensorBase as ITB, AbstractITensor, apply, inputnames, names, operator,
-    outputnames, rename
+using ITensorBase: AbstractITensor, apply, names, operator, rename
 using LinearAlgebra: norm, normalize!
 using MatrixAlgebraKit: project_hermitian, qr_compact, svd_trunc
 using NamedGraphs: boundary_edges

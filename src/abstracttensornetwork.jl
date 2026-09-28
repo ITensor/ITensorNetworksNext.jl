@@ -4,8 +4,8 @@ using DataGraphs: DataGraphs, AbstractDataGraph, AbstractVertexDataGraph, edge_d
 using Dictionaries: Dictionary
 using Graphs: Graphs, AbstractEdge, AbstractGraph, add_edge!, add_vertex!, dst, edges,
     edgetype, ne, neighbors, nv, rem_edge!, src, vertices
-using ITensorBase: ITensorOperator, NamedUnitRange, inds, inputnames, name, names,
-    nametype, prime, uniquename, unnamedtype
+using ITensorBase: ITensorOperator, NamedUnitRange, inds, inputnames, name, names, nametype,
+    prime, uniquename, unnamedtype
 using LinearAlgebra: LinearAlgebra
 using MacroTools: @capture
 using NamedGraphs:
