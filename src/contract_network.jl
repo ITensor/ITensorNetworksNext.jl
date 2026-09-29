@@ -1,5 +1,6 @@
 using Base.Broadcast: materialize
 using Base: @kwdef
+using Dictionaries: Dictionary
 using ITensorBase: EvaluationOrderAlgorithm, Greedy, Mul, lazy, optimize_evaluation_order,
     substitute, symnamedtensor
 
@@ -30,12 +31,24 @@ function get_order(alg::Exact, tn)
         Dict(symnamedtensor(i) => symnamedtensor(i, Tuple(axes(t))) for (i, t) in pairs(tn))
     return substitute(order, subs)
 end
+# A Gramian enters as its separate layer tensors, so the order can place other operands between
+# layers; every operand gets a `(key, layer)` key so all keys share one concrete type.
+function split_gramians(tn)
+    any(t -> t isa AbstractGramian, tn) || return tn
+    pairs_split = [
+        (key, layer) => tensor for (key, t) in pairs(tn) for
+            (layer, tensor) in (t isa AbstractGramian ? pairs(layertensors(t)) : [:tensor => t])
+    ]
+    return Dictionary(first.(pairs_split), last.(pairs_split))
+end
+
 # Promote the operands to their common type before lowering to the lazy expression, so every lazy
 # operand shares one concrete type. Otherwise a network of mixed types (a plain tensor is a trivial
 # operator, so mixing operators and plain tensors is the common case) widens the symbolic `Mul`
 # container to a `UnionAll` it cannot construct. `promote_type`/`convert` keep an all-plain network
 # at the plain type (the promotion is a no-op), so its fast path is unchanged.
 function contract_network(alg::Exact, tn)
+    tn = split_gramians(tn)
     order = get_order(alg, tn)
     T = mapreduce(typeof, promote_type, tn)
     syms_to_ts = Dict(
@@ -48,7 +61,7 @@ end
 # `contraction_order`
 function contraction_order end
 function contraction_order(tn; alg = Greedy())
-    return contraction_order(alg, tn)
+    return contraction_order(alg, split_gramians(tn))
 end
 # Convert the tensor network to a flat symbolic multiplication expression.
 struct Flat end

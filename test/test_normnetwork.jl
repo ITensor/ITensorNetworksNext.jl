@@ -1,11 +1,11 @@
 using DataGraphs: is_vertex_assigned
 using Dictionaries: isinsertable, issettable
 using Graphs: edges, vertices
-using ITensorBase:
-    ITensor, Index, IndexName, LazyITensor, conj, inds, name, setname, uniquename
-using ITensorNetworksNext: BraView, ITensorNetwork, KetView, NormNetwork, braname,
-    bratensor, conj_bratensor, contract_network, indmap, kettensor, normnetwork,
-    tensornetwork
+using ITensorBase: ITensor, Index, IndexName, LazyITensor, inds, name, names, uniquename
+using ITensorNetworksNext: ITensorNetworksNext, BraView, Exact, ITensorNetwork, NormGramian,
+    NormNetwork, braname, branetwork, bratensor, conj_bratensor, contract_network,
+    contraction_order, dimnamevertices, ketnetwork, kettensor, linkaxes, linkinds,
+    linknames, normnetwork, siteaxes, siteinds, sitenames, tensornetwork
 using LinearAlgebra: norm
 using NamedGraphs: NamedEdge, incident_edges, named_grid, named_path_graph
 using Test: @test, @test_throws, @testset
@@ -54,30 +54,25 @@ end
         nn = NormNetwork(tn)
 
         # `kettensor` returns the underlying tensor untouched.
-        @test kettensor(nn, 2) === tn[2]
+        @test kettensor(nn[2]) === tn[2]
 
         # Site indices appear in a single tensor, so they are *not* renamed: the ket and
         # bra layers share them (they get contracted, forming the physical overlap).
         sname = name(s[2])
         @test braname(nn, sname) == sname
-        @test sname in name.(inds(kettensor(nn, 2)))
-        @test sname in name.(inds(conj_bratensor(nn, 2)))
+        @test sname in name.(inds(kettensor(nn[2])))
+        @test sname in name.(inds(conj_bratensor(nn[2])))
 
         # Link indices are shared by two tensors, so they *are* renamed in the bra layer
         # to keep the two layers' bonds distinct.
         lname = name(l[NamedEdge(1 => 2)])
         @test braname(nn, lname) != lname
-        @test lname in name.(inds(kettensor(nn, 2)))
-        @test !(lname in name.(inds(conj_bratensor(nn, 2))))
-        @test braname(nn, lname) in name.(inds(conj_bratensor(nn, 2)))
+        @test lname in name.(inds(kettensor(nn[2])))
+        @test !(lname in name.(inds(conj_bratensor(nn[2]))))
+        @test braname(nn, lname) in name.(inds(conj_bratensor(nn[2])))
 
         # `bra` is the elementwise conjugate of `conj_bratensor` and carries the same indices.
-        @test inds(bratensor(nn, 2)) == inds(conj_bratensor(nn, 2))
-
-        # `indmap` conjugates an index and renames it according to the name map.
-        ind = only(i for i in inds(kettensor(nn, 2)) if name(i) == lname)
-        @test name(indmap(nn, ind)) == braname(nn, name(ind))
-        @test indmap(nn, ind) == setname(conj(ind), braname(nn, name(ind)))
+        @test inds(bratensor(nn[2])) == inds(conj_bratensor(nn[2]))
 
         # Querying the name map with an index name absent from the network errors.
         @test_throws ErrorException braname(nn, name(Index(2)))
@@ -93,37 +88,80 @@ end
 
         lname = name(l[NamedEdge(1 => 2)])
         @test braname(nn, lname) == custom[lname]
-        @test braname(nn, lname) in name.(inds(conj_bratensor(nn, 2)))
+        @test braname(nn, lname) in name.(inds(conj_bratensor(nn[2])))
     end
 
-    @testset "`KetView` / `BraView`" begin
+    @testset "`ketnetwork` / `branetwork`" begin
         g = named_path_graph(3)
         tn, l, s = random_state(Float64, g)
         nn = NormNetwork(tn)
 
-        kv = KetView(nn)
-        bv = BraView(nn)
+        # The ket layer is the network the norm network was built from.
+        @test ketnetwork(nn) === tn
 
-        # Views share the graph structure of the underlying network.
-        @test issetequal(vertices(kv), vertices(tn))
+        # The bra layer is not stored, so it is a view sharing the ket layer's graph structure.
+        bv = branetwork(nn)
+        @test bv isa BraView
         @test issetequal(vertices(bv), vertices(tn))
-        @test issetequal(edges(kv), edges(tn))
         @test issetequal(edges(bv), edges(tn))
-
-        # The ket view exposes the bare ket tensors; the bra view exposes the bra tensors.
         for v in vertices(tn)
-            @test kv[v] === kettensor(nn, v)
-            @test inds(bv[v]) == inds(bratensor(nn, v))
+            @test inds(bv[v]) == inds(bratensor(nn[v]))
         end
-
-        @test is_vertex_assigned(kv, 1)
         @test is_vertex_assigned(bv, 1)
 
-        # Views inherit the (non-)mutability of their parent norm network.
-        @test !issettable(kv)
-        @test !isinsertable(kv)
+        # The view inherits the (non-)mutability of its parent norm network.
         @test !issettable(bv)
         @test !isinsertable(bv)
+    end
+
+    @testset "`NormGramian`" begin
+        g = named_path_graph(3)
+        tn, l, s = random_state(Float64, g)
+        nn = NormNetwork(tn)
+        gram = nn[2]
+
+        @test gram isa NormGramian
+        @test eltype(nn) === typeof(gram)
+        # The Gramian holds the network's ket tensor and name map, not copies.
+        @test kettensor(gram) === tn[2]
+        @test gram.braname === nn.braname
+        @test inds(bratensor(gram)) == inds(conj_bratensor(gram))
+        @test keys(ITensorNetworksNext.layertensors(gram)) == (:ket, :bra)
+        # Contracting a Gramian contracts its layers.
+        @test contract_network([gram]) ≈ kettensor(gram) * bratensor(gram)
+        # A Gramian's indices are those its ket and bra layers do not share.
+        @test issetequal(inds(gram), inds(kettensor(gram) * bratensor(gram)))
+        @test names(gram) == name.(inds(gram))
+        @test axes(gram) == Tuple(inds(gram))
+    end
+
+    @testset "index queries on a `NormNetwork`" begin
+        g = named_path_graph(3)
+        tn, l, s = random_state(Float64, g)
+        nn = NormNetwork(tn)
+        e = NamedEdge(1 => 2)
+        lname = name(l[e])
+
+        # A link of the norm network is the ket link together with its bra-layer copy.
+        @test issetequal(linknames(nn, e), [lname, braname(nn, lname)])
+        @test issetequal(name.(linkinds(nn, e)), linknames(nn, e))
+        @test issetequal(name.(linkaxes(nn, e)), linknames(nn, e))
+        @test issetequal(dimnamevertices(nn, lname), [1, 2])
+        # The site index contracts between the layers, so no vertex has a site index.
+        @test isempty(siteinds(nn, 2))
+        @test isempty(sitenames(nn, 2))
+        @test isempty(siteaxes(nn, 2))
+    end
+
+    @testset "`contraction_order` on a `NormNetwork`" begin
+        g = named_path_graph(3)
+        tn, l, s = random_state(Float64, g)
+        nn = NormNetwork(tn)
+
+        # `contraction_order` splits the Gramians before computing an order, so it does not
+        # throw trying to call `size` on a `NormGramian`.
+        order = contraction_order(nn)
+        @test contract_network(nn; alg = Exact(; order))[] ≈ contract_network(nn)[]
     end
 
     @testset "contraction / physics" begin

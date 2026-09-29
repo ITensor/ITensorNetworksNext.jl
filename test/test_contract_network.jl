@@ -1,8 +1,8 @@
 using Graphs: edges, vertices
 using ITensorBase:
     Greedy, Index, NamedTensorOperator, inputnames, operator, outputnames, state
-using ITensorNetworksNext: Exact, ITensorNetwork, LeftAssociative, contract_network,
-    linkinds, siteinds, tensornetwork
+using ITensorNetworksNext: ITensorNetworksNext, Exact, ITensorNetwork, LeftAssociative,
+    contract_network, linkinds, siteinds, tensornetwork
 using NamedGraphs: incident_edges, named_grid
 using OMEinsumContractionOrders: ExhaustiveSearch, GreedyMethod, TreeSA
 using Test: @test, @testset
@@ -16,6 +16,10 @@ using Test: @test, @testset
         B = [2.0, 1.0][i]
         C = [5.0, 1.0][j]
         D = [-2.0, 3.0, 4.0, 5.0, 1.0][k]
+
+        # A `Vector` of tensors holding no Gramian is returned unchanged.
+        ABCD = [A, B, C, D]
+        @test ITensorNetworksNext.split_gramians(ABCD) === ABCD
 
         ABCD_1 = contract_network([A, B, C, D]; alg = orderalg(LeftAssociative()))
         ABCD_2 = contract_network([A, B, C, D]; alg = orderalg(Greedy()))
@@ -36,6 +40,9 @@ using Test: @test, @testset
             is = map(e -> l[e], incident_edges(g, v))
             return randn(Tuple(is))
         end
+
+        # A plain `ITensorNetwork` holds no Gramian, so `split_gramians` returns it unchanged.
+        @test ITensorNetworksNext.split_gramians(tn) === tn
 
         z1 = contract_network(tn; alg = orderalg(LeftAssociative()))[]
         z2 = contract_network(tn; alg = orderalg(Greedy()))[]
