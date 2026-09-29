@@ -1,5 +1,5 @@
 using DataGraphs: DataGraphs, get_vertex_data, is_vertex_assigned
-using Dictionaries: Dictionaries
+using Dictionaries: Dictionaries, Dictionary
 using Graphs: Graphs, AbstractGraph, edges, vertices
 using ITensorBase: ITensorBase, NamedTensorOperator, inputnames, names, nametype, operator,
     outputnames, state
@@ -10,7 +10,7 @@ using NamedGraphs: NamedGraphs, decoded_vertex, encoded_graph, encoded_vertex
 
 The network equivalent of `ITensorBase.ITensorOperator`: a tensor network of type
 `P <: AbstractITensorNetwork{T, V}` together with a pairing of its dangling index names,
-where `outputnames[i]` is paired with `inputnames[i]`. Applying the operator contracts over
+stored as a map from each output name to its input name. Applying the operator contracts over
 the input names and leaves the output names.
 
 The output and input of each pair must sit on the same vertex. Indexing returns the vertex
@@ -19,8 +19,7 @@ tensor wrapped as an `ITensorOperator` carrying the pairs at that vertex.
 struct ITensorNetworkOperator{T, V, I, P <: AbstractITensorNetwork{T, V}} <:
     AbstractITensorNetwork{T, V}
     parent::P
-    outputnames::Vector{I}
-    inputnames::Vector{I}
+    pairing::Dictionary{I, I}
     function ITensorNetworkOperator(
             parent::AbstractITensorNetwork{T, V}, outputnames, inputnames
         ) where {T, V}
@@ -35,6 +34,9 @@ struct ITensorNetworkOperator{T, V, I, P <: AbstractITensorNetwork{T, V}} <:
                         "$(length(inputnames))."
                 )
             )
+        end
+        if !allunique(outputnames)
+            throw(ArgumentError("each operator output name must appear only once."))
         end
         for opname in Iterators.flatten((outputnames, inputnames))
             nvertices = length(dimnamevertices(parent, opname))
@@ -57,7 +59,8 @@ struct ITensorNetworkOperator{T, V, I, P <: AbstractITensorNetwork{T, V}} <:
                 )
             end
         end
-        return new{T, V, I, typeof(parent)}(parent, outputnames, inputnames)
+        pairing = Dictionary(outputnames, inputnames)
+        return new{T, V, I, typeof(parent)}(parent, pairing)
     end
 end
 
@@ -89,16 +92,8 @@ NamedGraphs.encoded_graph(op::ITensorNetworkOperator) = encoded_graph(state(op))
 # Both names of a pair sit on one vertex, so the pairs whose output is on `vertex` are its pairing.
 function DataGraphs.get_vertex_data(op::ITensorNetworkOperator, vertex)
     tensor = state(op)[vertex]
-    tensor_names = names(tensor)
-    outputs = similar(outputnames(op), 0)
-    inputs = similar(inputnames(op), 0)
-    for (output, input) in zip(outputnames(op), inputnames(op))
-        if output in tensor_names
-            push!(outputs, output)
-            push!(inputs, input)
-        end
-    end
-    return operator(tensor, outputs, inputs)
+    outputs = filter(name -> haskey(op.pairing, name), names(tensor))
+    return operator(tensor, outputs, [op.pairing[output] for output in outputs])
 end
 
 function DataGraphs.is_vertex_assigned(op::ITensorNetworkOperator, vertex)
@@ -114,8 +109,8 @@ Dictionaries.isinsertable(::ITensorNetworkOperator) = false
 
 ITensorBase.state(op::ITensorNetworkOperator) = op.parent
 Base.parent(op::ITensorNetworkOperator) = state(op)
-ITensorBase.outputnames(op::ITensorNetworkOperator) = op.outputnames
-ITensorBase.inputnames(op::ITensorNetworkOperator) = op.inputnames
+ITensorBase.outputnames(op::ITensorNetworkOperator) = collect(keys(op.pairing))
+ITensorBase.inputnames(op::ITensorNetworkOperator) = collect(op.pairing)
 
 function operator_support(tn::AbstractGraph, op::ITensorNetworkOperator)
     return operator_support_names(tn, inputnames(op))
