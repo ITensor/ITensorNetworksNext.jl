@@ -1,7 +1,6 @@
 using Adapt: Adapt, adapt
 using DataGraphs: DataGraphs, AbstractDataGraph, AbstractVertexDataGraph, edge_data,
     set_vertex_data!, underlying_graph, underlying_graph_type, vertex_data
-using Dictionaries: Dictionary
 using Graphs: Graphs, AbstractEdge, AbstractGraph, add_edge!, add_vertex!, dst, edges,
     edgetype, ne, neighbors, nv, rem_edge!, src, vertices
 using ITensorBase: ITensorOperator, NamedUnitRange, inds, inputnames, name, names, nametype,
@@ -18,17 +17,6 @@ abstract type AbstractITensorNetwork{T, V} <: AbstractVertexDataGraph{T, V} end
 
 # Need to be careful about removing edges from tensor networks in case there is a bond
 Graphs.rem_edge!(::AbstractITensorNetwork, _edge) = not_implemented()
-
-function Graphs.weights(graph::AbstractITensorNetwork)
-    V = vertextype(graph)
-    es = Tuple.(edges(graph))
-    ws = Dictionary{Tuple{V, V}, Float64}(es, undef)
-    for e in edges(graph)
-        w = log2(dim(linkinds(graph, e)))
-        ws[(src(e), dst(e))] = w
-    end
-    return ws
-end
 
 # Overload if needed
 Graphs.is_directed(::Type{<:AbstractITensorNetwork}) = false
