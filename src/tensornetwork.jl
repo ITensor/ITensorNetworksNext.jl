@@ -4,7 +4,7 @@ using DataGraphs: DataGraphs, AbstractDataGraph, DataGraph, edge_data, get_verti
     vertex_data, vertex_data_type
 using Dictionaries: Dictionaries, AbstractDictionary, Indices, dictionary, set!, unset!
 using Graphs: AbstractSimpleGraph, has_vertex, rem_edge!, rem_vertex!
-using ITensorBase: ITensorBase, AbstractITensor, dim, name, names, nametype, unnamedtype
+using ITensorBase: ITensorBase, AbstractITensor, name, names, nametype, unnamedtype
 using NamedGraphs: NamedGraphs, NamedEdge, NamedGraph, decoded_vertex, encoded_graph,
     encoded_vertex, vertextype
 using SplitApplyCombine: mapview
