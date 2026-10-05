@@ -1,5 +1,5 @@
-using Dictionaries: Dictionary
-using ITensorBase: LazyNamedTensor, lazy, rename, setname, similar_operator, uniquename
+using Dictionaries: Dictionary, dictionary
+using ITensorBase: rename, setname, similar_operator, uniquename
 using ITensorNetworksNext
 
 """
@@ -26,7 +26,11 @@ struct NormNetwork{T, V, I} <: AbstractITensorNetwork{T, V}
     end
 end
 
-Base.eltype(::Type{<:NormNetwork{T, V, I}}) where {T, V, I} = LazyNamedTensor{I, T}
+function Base.eltype(::Type{<:NormNetwork})
+    return error(
+        "`eltype` of a `NormNetwork` is not defined, since the double-layer tensor at a vertex has no representation of its own. Use `kettensor` and `bratensor` to reach the individual layers."
+    )
+end
 
 function NormNetwork(tn::ITensorNetwork)
     return NormNetwork(tn, map(uniquename, keys(tn.dimname_vertices)))
@@ -46,10 +50,9 @@ NamedGraphs.encoded_graph(nn::NormNetwork) = encoded_graph(nn.ket)
 # ==================================== DataGraphs.jl ===================================== #
 
 function DataGraphs.get_vertex_data(nn::NormNetwork, vertex)
-    A = kettensor(nn, vertex)
-    B = conj_bratensor(nn, vertex)
-    # TODO: implement and use a lazy `conj` via `LazyNamedDimsArrays` here?
-    return lazy(A) * lazy(conj(B))
+    return error(
+        "Indexing a `NormNetwork` is not defined, since the double-layer tensor at a vertex has no representation of its own. Use `kettensor` and `bratensor` to reach the individual layers."
+    )
 end
 
 function DataGraphs.is_vertex_assigned(nn::NormNetwork, vertex)
@@ -79,6 +82,29 @@ function conj_bratensor(nn::NormNetwork, vertex)
 end
 
 bratensor(nn::NormNetwork, vertex) = conj(conj_bratensor(nn, vertex))
+
+"""
+    flatten_network(nn::NormNetwork) -> ITensorNetwork
+
+Expand a norm network into a plain tensor network carrying one vertex per layer, so that vertex
+`v` of `nn` becomes the two vertices `(v, :ket)` and `(v, :bra)` and `nv` doubles. A vertex's
+two layers stay adjacent in the vertex order, ket first.
+
+The layers are better contracted as separate operands: the site index they share is invisible
+from outside a doubled vertex, so an order built over `nn` must form that vertex before
+absorbing anything else. Flattening is explicit rather than automatic because it changes the
+vertex set, and a contraction order is only meaningful against the vertices it was built for.
+"""
+function flatten_network(nn::NormNetwork)
+    return ITensorNetwork(
+        dictionary(
+            Iterators.flatten(
+                ((v, :ket) => kettensor(nn, v), (v, :bra) => bratensor(nn, v))
+                    for v in vertices(nn)
+            )
+        )
+    )
+end
 
 """
     normnetwork(tn::ITensorNetwork, [braname]) -> NormNetwork

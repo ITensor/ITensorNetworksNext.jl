@@ -1,15 +1,13 @@
 import AlgorithmsInterface as AI
-using Base.Broadcast: materialize
 using DataGraphs: DataGraphs, DataGraph, edge_data, edge_data_type
 using Dictionaries: Dictionary, dictionary, set!
 using GradedArrays: U1, gradedrange, isdual
 using Graphs: AbstractGraph, add_vertex!, dst, edges, has_edge, has_vertex, ne, nv,
     rem_edge!, src, vertices
-using ITensorBase:
-    Greedy, ITensor, Index, apply, inds, name, noprime, outputnames, prime, state
-using ITensorNetworksNext: ITensorNetworksNext, Exact, ITensorNetwork, MessageCache,
+using ITensorBase: ITensor, Index, apply, inds, name, noprime, outputnames, prime, state
+using ITensorNetworksNext: ITensorNetworksNext, Exact, Greedy, ITensorNetwork, MessageCache,
     NormNetwork, SimpleMessageUpdate, StopWhenConverged, beliefpropagation,
-    bethe_free_energy, bethe_free_entropy, bratensor, contract_network, contraction_order,
+    bethe_free_energy, bethe_free_entropy, bratensor, contract_network, contraction_tree,
     edge_scalar, edge_scalars, factor_tensors, incoming_messages, insertlink!, kettensor,
     linkaxes, linkinds, message_environment, messagecache, region_scalar, subgraph,
     tensornetwork, updated_message, vertex_scalar, vertex_scalars
@@ -47,9 +45,9 @@ end
 struct RecordOperands
     counts::Vector{Int}
 end
-function ITensorNetworksNext.contraction_order(alg::RecordOperands, tn)
+function ITensorNetworksNext.contraction_tree(alg::RecordOperands, tn)
     push!(alg.counts, length(tn))
-    return contraction_order(tn; alg = Greedy())
+    return contraction_tree(tn; alg = Greedy())
 end
 
 @testset "Belief propagation" begin
@@ -369,9 +367,8 @@ end
             nn = NormNetwork(network)
             v = (2, 2)
 
-            # A doubled vertex splits into its two layers, and the split is faithful.
-            @test length(factor_tensors(nn, v)) == 2
-            @test prod(factor_tensors(nn, v)) ≈ materialize(nn[v])
+            # A doubled vertex splits into its two layers.
+            @test factor_tensors(nn, v) == [kettensor(nn, v), bratensor(nn, v)]
             # A single-layer network's factor is a single operand.
             @test factor_tensors(network, v) == [network[v]]
 
@@ -380,7 +377,7 @@ end
             # result matches contracting the doubled vertex as one operand.
             counts = Int[]
             algorithm = SimpleMessageUpdate(;
-                contraction_alg = Exact(; order_alg = RecordOperands(counts))
+                contraction_alg = Exact(; tree_alg = RecordOperands(counts))
             )
             cache = message_environment(one, nn)
             edge = NamedEdge(v => (2, 3))
@@ -388,7 +385,8 @@ end
             message = updated_message(algorithm, cache, nn, edge)
             # `v` has degree 4, so 3 incoming messages plus the ket and bra layers.
             @test only(counts) == 5
-            @test message ≈ contract_network([messages; [nn[v]]])
+            @test message ≈
+                contract_network([messages; [kettensor(nn, v) * bratensor(nn, v)]])
         end
     end
 end

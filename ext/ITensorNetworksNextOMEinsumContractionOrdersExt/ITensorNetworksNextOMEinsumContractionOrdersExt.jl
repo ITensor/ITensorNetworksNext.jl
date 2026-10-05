@@ -1,10 +1,30 @@
 module ITensorNetworksNextOMEinsumContractionOrdersExt
 
-using ITensorNetworksNext: ITensorNetworksNext
-using OMEinsumContractionOrders: CodeOptimizer
+using ITensorBase: name
+using ITensorNetworksNext: ITensorNetworksNext, ContractionTree
+using OMEinsumContractionOrders:
+    OMEinsumContractionOrders, CodeOptimizer, EinCode, NestedEinsum, optimize_code
 
-function ITensorNetworksNext.contraction_order(alg::CodeOptimizer, tn)
-    return ITensorNetworksNext._contraction_order(alg, tn)
+# Rebuild a `ContractionTree` from an optimized `NestedEinsum`, mapping each leaf's
+# `tensorindex` back to the key it came from.
+function nested_einsum_to_tree(ks, code::NestedEinsum)
+    # A leaf holds the 1-based index of its input tensor; internal nodes hold `-1`.
+    code.tensorindex != -1 && return ContractionTree(ks[code.tensorindex])
+    return reduce(ContractionTree, map(Base.Fix1(nested_einsum_to_tree, ks), code.args))
+end
+
+# Find a contraction order with any OMEinsumContractionOrders optimizer (`GreedyMethod`,
+# `TreeSA`, `KaHyParBipartite`, ...) by forwarding to `optimize_code`.
+function ITensorNetworksNext.contraction_tree(alg::CodeOptimizer, tensors)
+    ks = collect(keys(tensors))
+    ixs = [map(name, collect(axes(tensors[k]))) for k in ks]
+    all_inds = reduce(vcat, ixs)
+    labels = unique(all_inds)
+    size_dict = Dict(name(ax) => length(ax) for k in ks for ax in axes(tensors[k]))
+    # Open indices (appearing on a single tensor) are the output of the network.
+    iy = filter(i -> count(==(i), all_inds) == 1, labels)
+    code = optimize_code(EinCode(ixs, iy), size_dict, alg)
+    return nested_einsum_to_tree(ks, code)
 end
 
 end

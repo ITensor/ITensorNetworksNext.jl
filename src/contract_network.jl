@@ -1,71 +1,35 @@
-using Base.Broadcast: materialize
 using Base: @kwdef
-using ITensorBase: EvaluationOrderAlgorithm, Greedy, Mul, lazy, optimize_evaluation_order,
-    substitute, symnamedtensor
 
-# `contract_network`
-@kwdef struct Exact{Order, OrderAlg}
-    order::Order = nothing
-    order_alg::OrderAlg = Greedy()
+"""
+    Exact(; contraction_tree = nothing, tree_alg = Greedy())
+
+Contract a network exactly, in the pairwise order given by `contraction_tree`. When no tree is
+supplied one is found with `tree_alg`.
+"""
+@kwdef struct Exact{Tree, TreeAlg}
+    contraction_tree::Tree = nothing
+    tree_alg::TreeAlg = Greedy()
 end
 
 function contract_network(alg, tn)
     return throw(ArgumentError("`contract_network` algorithm `$(alg)` not implemented."))
 end
-function contract_network(tn; alg = Exact())
-    return contract_network(alg, tn)
-end
+contract_network(tn; alg = Exact()) = contract_network(alg, tn)
 
-# `contract_network(::Exact, ...)`
-function get_order(alg::Exact, tn)
-    # Allow specifying either an explicit `order` or an `order_alg` to compute one.
-    order = if !isnothing(alg.order)
-        alg.order
-    else
-        contraction_order(tn; alg = alg.order_alg)
-    end
-    # Contraction order may or may not have indices attached, canonicalize the format
-    # by attaching indices.
-    subs =
-        Dict(symnamedtensor(i) => symnamedtensor(i, Tuple(axes(t))) for (i, t) in pairs(tn))
-    return substitute(order, subs)
-end
-# Promote the operands to their common type before lowering to the lazy expression, so every lazy
-# operand shares one concrete type. Otherwise a network of mixed types (a plain tensor is a trivial
-# operator, so mixing operators and plain tensors is the common case) widens the symbolic `Mul`
-# container to a `UnionAll` it cannot construct. `promote_type`/`convert` keep an all-plain network
-# at the plain type (the promotion is a no-op), so its fast path is unchanged.
 function contract_network(alg::Exact, tn)
-    order = get_order(alg, tn)
-    T = mapreduce(typeof, promote_type, tn)
-    syms_to_ts = Dict(
-        symnamedtensor(i, Tuple(axes(t))) => lazy(convert(T, t)) for (i, t) in pairs(tn)
-    )
-    tn_expression = substitute(order, syms_to_ts)
-    return materialize(tn_expression)
+    tree = @something alg.contraction_tree contraction_tree(tn; alg = alg.tree_alg)
+    return prod_tensors(tn, tree)
 end
 
-# `contraction_order`
-function contraction_order end
-function contraction_order(tn; alg = Greedy())
-    return contraction_order(alg, tn)
-end
-# Convert the tensor network to a flat symbolic multiplication expression.
-struct Flat end
-function contraction_order(alg::Flat, tn)
-    # Same as: `reduce((a, b) -> *(a, b; flatten = true), syms)`.
-    syms = vec([symnamedtensor(i, Tuple(axes(tn[i]))) for i in keys(tn)])
-    return lazy(Mul(syms))
-end
-struct LeftAssociative end
-function contraction_order(alg::LeftAssociative, tn)
-    return prod(i -> symnamedtensor(i, Tuple(axes(tn[i]))), keys(tn))
-end
-# Internal implementation shared with the OMEinsumContractionOrders extension.
-function _contraction_order(alg, tn)
-    s = contraction_order(Flat(), tn)
-    return optimize_evaluation_order(s; alg)
-end
-function contraction_order(alg::EvaluationOrderAlgorithm, tn)
-    return _contraction_order(alg, tn)
+# A `NormNetwork` has no tensor at a vertex, only the two layers that would form it, so it is
+# contracted through `flatten_network`. Supplying a tree alongside it is not meaningful, since the
+# tree would have to be keyed by the flattened vertices: pass `flatten_network(nn)` instead, and
+# the keys are its own vertices as for any other network.
+function contract_network(alg::Exact, nn::NormNetwork)
+    isnothing(alg.contraction_tree) || throw(
+        ArgumentError(
+            "A contraction tree cannot be keyed by the vertices of a `NormNetwork`, whose vertices carry no tensor. Contract `flatten_network(nn)` instead, whose vertices the tree can be built over."
+        )
+    )
+    return contract_network(alg, flatten_network(nn))
 end

@@ -238,10 +238,10 @@ end
 end
 
 # The tensors making up the factor at `vertex`, as separate operands for `contract_network`. A
-# `NormNetwork`'s factor is a lazy `ket * conj(bra)` product, and the contraction order sees each
-# operand as one node carrying only its outer axes — which hides the physical index the two layers
-# share, forcing the doubled vertex to be formed before any message is absorbed (χ^(2 * degree)
-# rather than the χ^(degree + 1) an interleaved order reaches).
+# `NormNetwork`'s factor is the product of its ket and bra layers. Handing that product over as one
+# operand would hide the physical index the two layers share, forcing the doubled vertex to be
+# formed before any message is absorbed (χ^(2 * degree) rather than the χ^(degree + 1) an
+# interleaved order reaches).
 factor_tensors(factors, vertex) = [factors[vertex]]
 function factor_tensors(factors::NormNetwork, vertex)
     return [kettensor(factors, vertex), bratensor(factors, vertex)]

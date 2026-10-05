@@ -16,6 +16,8 @@ include("tensornetwork.jl")
 include("normnetwork.jl")
 include("normnetworkview.jl")
 include("ITensorNetworkGenerators/ITensorNetworkGenerators.jl")
+include("contraction_tree.jl")
+include("prod_tensors.jl")
 include("contract_network.jl")
 
 include("beliefpropagation/messagecache.jl")

@@ -1,11 +1,10 @@
 using DataGraphs: is_vertex_assigned
 using Dictionaries: isinsertable, issettable
 using Graphs: edges, vertices
-using ITensorBase:
-    ITensor, Index, IndexName, LazyITensor, conj, inds, name, setname, uniquename
-using ITensorNetworksNext: BraView, ITensorNetwork, KetView, NormNetwork, braname,
-    bratensor, conj_bratensor, contract_network, indmap, kettensor, normnetwork,
-    tensornetwork
+using ITensorBase: ITensor, Index, IndexName, conj, inds, name, setname, uniquename
+using ITensorNetworksNext: BraView, Exact, ITensorNetwork, KetView, NormNetwork, braname,
+    bratensor, conj_bratensor, contract_network, contraction_tree, flatten_network, indmap,
+    kettensor, normnetwork, tensornetwork
 using LinearAlgebra: norm
 using NamedGraphs: NamedEdge, incident_edges, named_grid, named_path_graph
 using Test: @test, @test_throws, @testset
@@ -37,8 +36,10 @@ end
         @test issetequal(vertices(nn), vertices(tn))
         @test issetequal(edges(nn), edges(tn))
 
-        # `eltype` is the type of the (lazy double-layer) vertex data.
-        @test eltype(nn) === typeof(nn[1])
+        # The double-layer tensor at a vertex has no representation, so neither indexing nor
+        # `eltype` is defined.
+        @test_throws ErrorException nn[1]
+        @test_throws ErrorException eltype(nn)
 
         # Vertex data is assigned wherever the underlying network is.
         @test is_vertex_assigned(nn, 1)
@@ -124,6 +125,33 @@ end
         @test !isinsertable(kv)
         @test !issettable(bv)
         @test !isinsertable(bv)
+    end
+
+    @testset "`flatten_network`" begin
+        g = named_path_graph(3)
+        tn, l, s = random_state(Float64, g)
+        nn = NormNetwork(tn)
+        flat = flatten_network(nn)
+
+        # One vertex per layer, so the vertex count doubles and each carries its layer's tensor.
+        @test length(vertices(flat)) == 2 * length(vertices(nn))
+        # Each vertex's two layers stay adjacent, in ket-then-bra order.
+        @test collect(vertices(flat)) ==
+            collect(Iterators.flatten(((v, :ket), (v, :bra)) for v in vertices(nn)))
+        @test flat[(2, :ket)] === kettensor(nn, 2)
+        @test flat[(2, :bra)] == bratensor(nn, 2)
+
+        # Contracting the norm network goes through the flattened one.
+        @test contract_network(nn)[] ≈ contract_network(flat)[]
+
+        # A tree is keyed by the vertices of the network it was built over, so the flattened
+        # network accepts one and the norm network cannot.
+        tree = contraction_tree(flat)
+        @test contract_network(flat; alg = Exact(; contraction_tree = tree))[] ≈
+            contract_network(flat)[]
+        @test_throws ArgumentError contract_network(
+            nn; alg = Exact(; contraction_tree = tree)
+        )
     end
 
     @testset "contraction / physics" begin

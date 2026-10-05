@@ -1,14 +1,13 @@
 using Graphs: edges, vertices
-using ITensorBase:
-    Greedy, Index, NamedTensorOperator, inputnames, operator, outputnames, state
-using ITensorNetworksNext: Exact, ITensorNetwork, LeftAssociative, contract_network,
+using ITensorBase: Index, NamedTensorOperator, inputnames, operator, outputnames, state
+using ITensorNetworksNext: Exact, Greedy, ITensorNetwork, LeftAssociative, contract_network,
     linkinds, siteinds, tensornetwork
 using NamedGraphs: incident_edges, named_grid
 using OMEinsumContractionOrders: ExhaustiveSearch, GreedyMethod, TreeSA
 using Test: @test, @testset
 
 @testset "contract_network" begin
-    orderalg = order_alg -> Exact(; order_alg)
+    treealg = tree_alg -> Exact(; tree_alg)
 
     @testset "Contract Vectors of ITensors" begin
         i, j, k = Index(2), Index(2), Index(5)
@@ -17,11 +16,11 @@ using Test: @test, @testset
         C = [5.0, 1.0][j]
         D = [-2.0, 3.0, 4.0, 5.0, 1.0][k]
 
-        ABCD_1 = contract_network([A, B, C, D]; alg = orderalg(LeftAssociative()))
-        ABCD_2 = contract_network([A, B, C, D]; alg = orderalg(Greedy()))
-        ABCD_3 = contract_network([A, B, C, D]; alg = orderalg(ExhaustiveSearch()))
-        ABCD_4 = contract_network([A, B, C, D]; alg = orderalg(GreedyMethod()))
-        ABCD_5 = contract_network([A, B, C, D]; alg = orderalg(TreeSA()))
+        ABCD_1 = contract_network([A, B, C, D]; alg = treealg(LeftAssociative()))
+        ABCD_2 = contract_network([A, B, C, D]; alg = treealg(Greedy()))
+        ABCD_3 = contract_network([A, B, C, D]; alg = treealg(ExhaustiveSearch()))
+        ABCD_4 = contract_network([A, B, C, D]; alg = treealg(GreedyMethod()))
+        ABCD_5 = contract_network([A, B, C, D]; alg = treealg(TreeSA()))
         @test ABCD_1 == ABCD_2 == ABCD_3
         @test ABCD_1 ≈ ABCD_4
         @test ABCD_1 ≈ ABCD_5
@@ -37,11 +36,11 @@ using Test: @test, @testset
             return randn(Tuple(is))
         end
 
-        z1 = contract_network(tn; alg = orderalg(LeftAssociative()))[]
-        z2 = contract_network(tn; alg = orderalg(Greedy()))[]
-        z3 = contract_network(tn; alg = orderalg(ExhaustiveSearch()))[]
-        z4 = contract_network(tn; alg = orderalg(GreedyMethod()))[]
-        z5 = contract_network(tn; alg = orderalg(TreeSA()))[]
+        z1 = contract_network(tn; alg = treealg(LeftAssociative()))[]
+        z2 = contract_network(tn; alg = treealg(Greedy()))[]
+        z3 = contract_network(tn; alg = treealg(ExhaustiveSearch()))[]
+        z4 = contract_network(tn; alg = treealg(GreedyMethod()))[]
+        z5 = contract_network(tn; alg = treealg(TreeSA()))[]
 
         @test abs(z1 - z2) / abs(z1) <= 1.0e3 * eps(Float64)
         @test abs(z1 - z3) / abs(z1) <= 1.0e3 * eps(Float64)

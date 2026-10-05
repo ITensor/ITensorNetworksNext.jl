@@ -1,4 +1,5 @@
 [deps]
+AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
 AlgorithmsInterface = "d1e3940c-cd12-4505-8585-b0a4b322527d"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 DataGraphs = "b5a273c3-7e6c-41f6-98bd-8d7f1525a36a"
@@ -23,14 +24,15 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 path = ".."
 
 [compat]
+AbstractTrees = "0.4.5"
 AlgorithmsInterface = "0.1"
 Aqua = "0.8.14"
 DataGraphs = "0.6"
 Dictionaries = "0.4.5"
 GradedArrays = "0.17"
 Graphs = "1.13.1"
-ITensorBase = "0.15.5"
-ITensorNetworksNext = "0.10"
+ITensorBase = "0.16"
+ITensorNetworksNext = "0.11"
 ITensorPkgSkeleton = "0.3.42"
 MatrixAlgebraKit = "0.6"
 NamedGraphs = "0.14"
