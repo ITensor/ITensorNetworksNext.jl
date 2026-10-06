@@ -1,5 +1,4 @@
 using AbstractTrees: AbstractTrees
-using WrappedUnions: @wrapped, unwrap
 
 """
     Branch(left, right)
@@ -21,8 +20,8 @@ Branch(left, right) = Branch((left, right))
 A binary tree representing a contraction order over leaf labels of type `V`. A node is either a
 leaf holding one label or a [`Branch`](@ref) holding its two child trees.
 """
-@wrapped struct ContractionTree{V}
-    union::Union{V, Branch{ContractionTree{V}}}
+struct ContractionTree{V}
+    node::Union{V, Branch{ContractionTree{V}}}
 end
 
 function ContractionTree(children::Branch{ContractionTree{V}}) where {V}
@@ -32,15 +31,15 @@ function ContractionTree(left::ContractionTree{V}, right::ContractionTree{V}) wh
     return ContractionTree{V}(Branch(left, right))
 end
 
-isleaf(t::ContractionTree) = !(unwrap(t) isa Branch)
+isleaf(t::ContractionTree) = !(t.node isa Branch)
 
-AbstractTrees.nodevalue(t::ContractionTree) = unwrap(t)
-AbstractTrees.children(t::ContractionTree) = isleaf(t) ? () : unwrap(t).children
+AbstractTrees.nodevalue(t::ContractionTree) = t.node
+AbstractTrees.children(t::ContractionTree) = isleaf(t) ? () : t.node.children
 
-Base.getindex(t::ContractionTree, i::Int) = unwrap(t).children[i]
+Base.getindex(t::ContractionTree, i::Int) = t.node.children[i]
 
-Base.:(==)(a::ContractionTree, b::ContractionTree) = unwrap(a) == unwrap(b)
-Base.hash(t::ContractionTree, h::UInt) = hash(unwrap(t), hash(:ContractionTree, h))
+Base.:(==)(a::ContractionTree, b::ContractionTree) = a.node == b.node
+Base.hash(t::ContractionTree, h::UInt) = hash(t.node, hash(:ContractionTree, h))
 
 function Base.show(io::IO, t::ContractionTree)
     if isleaf(t)

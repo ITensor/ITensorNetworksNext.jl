@@ -89,11 +89,6 @@ bratensor(nn::NormNetwork, vertex) = conj(conj_bratensor(nn, vertex))
 Expand a norm network into a plain tensor network carrying one vertex per layer, so that vertex
 `v` of `nn` becomes the two vertices `(v, :ket)` and `(v, :bra)` and `nv` doubles. A vertex's
 two layers stay adjacent in the vertex order, ket first.
-
-The layers are better contracted as separate operands: the site index they share is invisible
-from outside a doubled vertex, so an order built over `nn` must form that vertex before
-absorbing anything else. Flattening is explicit rather than automatic because it changes the
-vertex set, and a contraction order is only meaningful against the vertices it was built for.
 """
 function flatten_network(nn::NormNetwork)
     return ITensorNetwork(
