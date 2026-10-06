@@ -1,7 +1,7 @@
 using DataGraphs: DataGraphs, get_vertex_data, is_vertex_assigned
 using Dictionaries: Dictionaries, Dictionary, isinsertable, issettable
 using Graphs: Graphs, edges, vertices
-using ITensorBase: ITensorBase, conj, nametype, rename
+using ITensorBase: ITensorBase, conj, inds, nametype, rename
 using NamedGraphs: NamedGraphs, decoded_vertex, encoded_graph, encoded_vertex
 
 """
@@ -154,6 +154,12 @@ Base.parent(nnv::BraView) = nnv.parent
 DataGraphs.get_vertex_data(nnv::BraView, vertex) = bratensor(parent(nnv), vertex)
 function DataGraphs.is_vertex_assigned(nnv::BraView, vertex)
     return is_vertex_assigned(parent(nnv), vertex)
+end
+
+# ==================================== ITensorBase.jl ==================================== #
+
+function ITensorBase.inds(nnv::BraView, vertex)
+    return conj.(inds(conj_bratensor(parent(nnv), vertex)))
 end
 
 # ====================================== Graphs.jl ======================================= #

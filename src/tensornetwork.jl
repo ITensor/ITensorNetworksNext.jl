@@ -146,7 +146,7 @@ function DataGraphs.set_vertex_data!(tn::ITensorNetwork, tensor, vertex)
 end
 
 function update_tensornetwork_metadata!(tn, vertex, tensor)
-    oldnames = isassigned(tn, vertex) ? names(tn[vertex]) : Set{nametype(tn)}()
+    oldnames = isassigned(tn, vertex) ? names(tn, vertex) : Set{nametype(tn)}()
     newnames = names(tensor)
 
     update_tensornetwork_metadata!(tn, vertex, oldnames, newnames)
