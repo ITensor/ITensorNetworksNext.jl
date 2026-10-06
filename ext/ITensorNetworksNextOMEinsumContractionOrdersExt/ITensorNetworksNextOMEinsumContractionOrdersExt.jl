@@ -1,7 +1,8 @@
 module ITensorNetworksNextOMEinsumContractionOrdersExt
 
 using ITensorBase: name
-using ITensorNetworksNext: ITensorNetworksNext, ContractionTree
+using ITensorNetworksNext:
+    ITensorNetworksNext, ContractionTree, contraction_tree, prod_tensors
 using OMEinsumContractionOrders:
     OMEinsumContractionOrders, CodeOptimizer, EinCode, NestedEinsum, optimize_code
 
@@ -25,6 +26,12 @@ function ITensorNetworksNext.contraction_tree(alg::CodeOptimizer, tensors)
     iy = filter(i -> count(==(i), all_inds) == 1, labels)
     code = optimize_code(EinCode(ixs, iy), size_dict, alg)
     return nested_einsum_to_tree(ks, code)
+end
+
+# `CodeOptimizer` cannot subtype `ContractionTreeAlgorithm`, so the order-taking form of
+# `prod_tensors` is extended for it here.
+function ITensorNetworksNext.prod_tensors(tensors, alg::CodeOptimizer)
+    return prod_tensors(tensors, contraction_tree(alg, tensors))
 end
 
 end

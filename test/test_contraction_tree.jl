@@ -1,8 +1,8 @@
 using AbstractTrees: AbstractTrees, Leaves
 using Graphs: edges, vertices
 using ITensorBase: Index
-using ITensorNetworksNext: ContractionTree, Greedy, LeftAssociative, contraction_tree,
-    isleaf, prod_tensors, tensornetwork
+using ITensorNetworksNext: Branch, ContractionTree, Greedy, contraction_tree, isleaf,
+    left_associative_tree, prod_tensors, tensornetwork
 using NamedGraphs: incident_edges, named_grid
 using OMEinsumContractionOrders: GreedyMethod, TreeSA
 using Test: @test, @testset
@@ -28,9 +28,15 @@ using Test: @test, @testset
         @test AbstractTrees.nodevalue(t[2][2]) == :c
     end
 
-    @testset "tuple constructor equals splatted" begin
+    @testset "a branch comes from `Branch`, never from a bare tuple" begin
         a, b = ContractionTree(1), ContractionTree(2)
-        @test ContractionTree((a, b)) == ContractionTree(a, b)
+        @test ContractionTree(Branch(a, b)) == ContractionTree(a, b)
+        @test !isleaf(ContractionTree(Branch(a, b)))
+
+        # A bare 2-tuple is a label, even when its entries are themselves trees. This is what
+        # keeps a tuple-valued vertex label from being read as children.
+        @test isleaf(ContractionTree((a, b)))
+        @test AbstractTrees.nodevalue(ContractionTree((a, b))) == (a, b)
     end
 
     @testset "equality and hashing" begin
@@ -59,8 +65,8 @@ using Test: @test, @testset
     end
 
     @testset "tuple-valued vertex labels are leaves, not branches" begin
-        # A `Tuple`-valued label (e.g. grid coordinates) must not be mistaken for a branch: the
-        # branch arm is `NTuple{2, ContractionTree{V}}`, not any 2-tuple.
+        # A `Tuple`-valued label (e.g. grid coordinates) must not be mistaken for a branch.
+        # Leaves and branches are separate types, so a label can never be read as children.
         l = ContractionTree((1, 2))
         @test isleaf(l)
         @test AbstractTrees.nodevalue(l) == (1, 2)
@@ -90,7 +96,8 @@ using Test: @test, @testset
         ts = [A, B, C, D]
 
         leaves = map(ContractionTree, 1:4)
-        left = reduce(ContractionTree, leaves)
+        left = left_associative_tree(1:4)
+        @test left == reduce(ContractionTree, leaves)
         balanced = ContractionTree(
             ContractionTree(leaves[1], leaves[2]), ContractionTree(leaves[3], leaves[4])
         )
@@ -106,12 +113,12 @@ using Test: @test, @testset
             return randn(Tuple(map(e -> l[e], incident_edges(g, v))))
         end
 
-        for alg in (Greedy(), LeftAssociative(), GreedyMethod(), TreeSA())
+        for alg in (Greedy(), GreedyMethod(), TreeSA())
             tree = contraction_tree(tn; alg)
             # Every vertex is contracted exactly once, under its own key.
             @test length(collect(Leaves(tree))) == length(vertices(g))
             @test issetequal(map(AbstractTrees.nodevalue, Leaves(tree)), vertices(g))
-            @test prod_tensors(tn, tree)[] ≈ prod_tensors(tn, contraction_tree(tn))[]
+            @test prod_tensors(tn, tree)[] ≈ prod_tensors(tn, Greedy())[]
         end
 
         # A tree depends only on the network's shape, so it replays against a second network
@@ -120,6 +127,6 @@ using Test: @test, @testset
         tn2 = tensornetwork(vertices(g)) do v
             return randn(Tuple(map(e -> l[e], incident_edges(g, v))))
         end
-        @test prod_tensors(tn2, tree)[] ≈ prod_tensors(tn2, contraction_tree(tn2))[]
+        @test prod_tensors(tn2, tree)[] ≈ prod_tensors(tn2, Greedy())[]
     end
 end

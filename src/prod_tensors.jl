@@ -2,18 +2,47 @@ using AbstractTrees: nodevalue
 using Combinatorics: combinations
 
 """
+    ContractionTreeAlgorithm
+
+Supertype of the strategies for finding a contraction order. See [`contraction_tree`](@ref).
+"""
+abstract type ContractionTreeAlgorithm <: AbstractAlgorithm end
+
+"""
     prod_tensors(tensors, tree::ContractionTree)
+    prod_tensors(tensors, alg)
+    prod_tensors(tensors)
 
 Contract `tensors` in the pairwise order given by `tree`, whose leaf labels index into
-`tensors`.
+`tensors`. Given an order algorithm instead, find a tree with it first.
 
-`tensors` is anything indexable by those labels, so a `Vector` pairs with a tree over
-positions and a tensor network pairs with a tree over vertices. Separating the order from the
-tensors is what lets one tree be reused across many contractions of the same network shape.
+`tensors` is anything indexable by those labels, so a `Vector` pairs with a tree over positions
+and a tensor network pairs with a tree over vertices. Separating the order from the tensors is
+what lets one tree be reused across many contractions of the same network shape.
+
+With neither, the tensors are folded from the left, the order `*` would take on its own.
 """
+function prod_tensors end
+prod_tensors(tensors) = prod_tensors(tensors, left_associative_tree(keys(tensors)))
 function prod_tensors(tensors, tree::ContractionTree)
     isleaf(tree) && return tensors[nodevalue(tree)]
     return prod_tensors(tensors, tree[1]) * prod_tensors(tensors, tree[2])
+end
+function prod_tensors(tensors, alg::ContractionTreeAlgorithm)
+    return prod_tensors(tensors, contraction_tree(alg, tensors))
+end
+
+"""
+    left_associative_tree(labels)
+
+The tree that folds `labels` from the left, so `(a, b, c)` gives `((a, b), c)`.
+
+Unlike [`contraction_tree`](@ref) this consults nothing but the labels themselves, since the
+order is fixed rather than searched for.
+"""
+function left_associative_tree(labels)
+    isempty(labels) && throw(ArgumentError("No tensors to contract."))
+    return reduce(ContractionTree, map(ContractionTree, labels))
 end
 
 """
@@ -38,20 +67,7 @@ end
 Repeatedly contract the cheapest available pair, measured as the product of the lengths of all
 indices involved. Outer products are taken only once nothing else is left.
 """
-struct Greedy end
-
-"""
-    LeftAssociative
-
-Contract in key order, folding from the left. The order `*` would take on its own.
-"""
-struct LeftAssociative end
-
-function contraction_tree(::LeftAssociative, tensors)
-    ks = collect(keys(tensors))
-    isempty(ks) && throw(ArgumentError("No tensors to contract."))
-    return reduce(ContractionTree, map(ContractionTree, ks))
-end
+struct Greedy <: ContractionTreeAlgorithm end
 
 function contraction_tree(::Greedy, tensors)
     ks = collect(keys(tensors))

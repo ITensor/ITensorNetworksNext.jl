@@ -5,12 +5,12 @@ using GradedArrays: U1, gradedrange, isdual
 using Graphs: AbstractGraph, add_vertex!, dst, edges, has_edge, has_vertex, ne, nv,
     rem_edge!, src, vertices
 using ITensorBase: ITensor, Index, apply, inds, name, noprime, outputnames, prime, state
-using ITensorNetworksNext: ITensorNetworksNext, Exact, Greedy, ITensorNetwork, MessageCache,
-    NormNetwork, SimpleMessageUpdate, StopWhenConverged, beliefpropagation,
-    bethe_free_energy, bethe_free_entropy, bratensor, contract_network, contraction_tree,
+using ITensorNetworksNext: ITensorNetworksNext, ContractionTreeAlgorithm, Greedy,
+    ITensorNetwork, MessageCache, NormNetwork, SimpleMessageUpdate, StopWhenConverged,
+    beliefpropagation, bethe_free_energy, bethe_free_entropy, bratensor, contraction_tree,
     edge_scalar, edge_scalars, factor_tensors, incoming_messages, insertlink!, kettensor,
-    linkaxes, linkinds, message_environment, messagecache, region_scalar, subgraph,
-    tensornetwork, updated_message, vertex_scalar, vertex_scalars
+    linkaxes, linkinds, message_environment, messagecache, prod_tensors, region_scalar,
+    subgraph, tensornetwork, updated_message, vertex_scalar, vertex_scalars
 using LinearAlgebra: LinearAlgebra, norm, tr
 using NamedGraphs: NamedEdge, all_edges, incident_edges, named_comb_tree, named_grid,
     named_path_graph, vertextype
@@ -41,8 +41,8 @@ function spin_ice_tensornetwork(g)
     return ITensorNetwork(ts)
 end
 
-# Records how many operands each `contract_network` call is given, then orders them greedily.
-struct RecordOperands
+# Records how many operands each contraction is given, then orders them greedily.
+struct RecordOperands <: ContractionTreeAlgorithm
     counts::Vector{Int}
 end
 function ITensorNetworksNext.contraction_tree(alg::RecordOperands, tn)
@@ -343,7 +343,7 @@ end
             for (edge, rest) in ((1 => 2, 2:4), (4 => 3, 1:3))
                 layers =
                     [[kettensor(nn, v) for v in rest]; [bratensor(nn, v) for v in rest]]
-                z_rest = contract_network([state(ones[edge]); layers])[]
+                z_rest = prod_tensors([state(ones[edge]); layers], Greedy())[]
                 @test z_rest ≈ norm(prod([network[v] for v in rest]))^2 rtol =
                     eps(real(T))^(1 / 3)
             end
@@ -372,13 +372,11 @@ end
             # A single-layer network's factor is a single operand.
             @test factor_tensors(network, v) == [network[v]]
 
-            # The message update passes the layers to `contract_network` as separate operands, so
-            # the contraction order can interleave the incoming messages between them, and the
-            # result matches contracting the doubled vertex as one operand.
+            # The message update passes the layers as separate operands, so the contraction
+            # order can interleave the incoming messages between them, and the result matches
+            # contracting the doubled vertex as one operand.
             counts = Int[]
-            algorithm = SimpleMessageUpdate(;
-                contraction_alg = Exact(; tree_alg = RecordOperands(counts))
-            )
+            algorithm = SimpleMessageUpdate(; order_alg = RecordOperands(counts))
             cache = message_environment(one, nn)
             edge = NamedEdge(v => (2, 3))
             messages = collect(incoming_messages(cache, edge))
@@ -386,7 +384,7 @@ end
             # `v` has degree 4, so 3 incoming messages plus the ket and bra layers.
             @test only(counts) == 5
             @test message ≈
-                contract_network([messages; [kettensor(nn, v) * bratensor(nn, v)]])
+                prod_tensors([messages; [kettensor(nn, v) * bratensor(nn, v)]], Greedy())
         end
     end
 end
