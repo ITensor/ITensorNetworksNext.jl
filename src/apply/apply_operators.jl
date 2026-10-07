@@ -2,11 +2,48 @@ using .AlgorithmsInterfaceExtensions: AlgorithmsInterfaceExtensions as AIE
 using AlgorithmsInterface: AlgorithmsInterface as AI
 using Base: @kwdef
 using Graphs: dst, src, vertices
-using ITensorBase: AbstractITensor, apply, names, operator, rename
+using ITensorBase: AbstractITensor, AbstractNamedTensor, ITensor, Index, NamedTensor,
+    NamedTensorOperator, apply, inputinds, inputnames, name, names, operator, outputinds,
+    rename, sim, state, uniquename, unnamed
 using LinearAlgebra: norm, normalize!
-using MatrixAlgebraKit: project_hermitian, qr_compact, svd_trunc
+using MatrixAlgebraKit: eigh_full, project_hermitian, qr_compact, svd_trunc
 using NamedGraphs: boundary_edges
-using TensorAlgebra.MatrixAlgebra: sqrth_invsqrth_safe, sqrth_safe
+using TensorAlgebra.MatrixAlgebra: invsqrth_safe, sqrth_safe
+using TensorAlgebra: isdual, matricize, twist!, unmatricize
+
+# Asymmetric (Gram) root of a Hermitian positive semidefinite matrix, as the pair
+# `(root, inv_root)`: `root' * root == m`, and `inv_root * root` is the identity on `m`'s
+# support. `eigh_full` is a square decomposition, so both factors are square.
+function message_gauge(m::AbstractMatrix; kwargs...)
+    d, u = eigh_full(m)
+    return sqrth_safe(d; kwargs...) * u', u * invsqrth_safe(d; kwargs...)
+end
+
+# The same root for a named tensor split into `outinds` and `bondinds`, as the pair `(x, y)`:
+# `x * ψ` absorbs it into a state tensor `ψ` and `y * ·` un-absorbs it.
+#
+# `y` inverts `x` as a matrix, and `contract` is that matrix product plus a twist, so the two
+# have different identity elements. Twisting `y` on its dual bond axes, the same axes `contract`
+# twists, makes it the inverse under `contract`. `twist!` is the identity on storage carrying no
+# sector data, so this is a no-op outside the fermionic case.
+#
+# The message is matricized ket to bra, which keeps the absorbed wavefunction ket-like, and the
+# eigendecomposition hands back the rank space already carrying that orientation.
+function message_gauge(t::AbstractNamedTensor, outinds, bondinds; kwargs...)
+    root, inv_root = message_gauge(matricize(t, outinds, bondinds); kwargs...)
+    rankind = Index(axes(root, 1))
+    y = unmatricize(inv_root, bondinds, (rankind,))
+    twist!(y, filter(isdual, bondinds))
+    return unmatricize(root, (rankind,), bondinds), y
+end
+
+# A message's output names are the bra side and its input names the ket side, which is the split
+# the gauge is taken over. A message is Hermitian only up to numerical noise, and the root needs
+# it exactly so.
+function message_gauge(m::NamedTensorOperator; kwargs...)
+    h = project_hermitian(m)
+    return message_gauge(state(h), Tuple(outputinds(h)), Tuple(inputinds(h)); kwargs...)
+end
 
 # === Top-level user entry point ===
 
@@ -252,14 +289,12 @@ function apply_gate_bp_nsite!(
     v1, v2 = vertices
     edges_in = boundary_edges(state, vertices; dir = :in)
     roots_v1 =
-        [sqrth_invsqrth_safe(project_hermitian(env[e])) for e in edges_in if dst(e) == v1]
+        [message_gauge(env[e]) for e in edges_in if dst(e) == v1]
     roots_v2 =
-        [sqrth_invsqrth_safe(project_hermitian(env[e])) for e in edges_in if dst(e) == v2]
-    sqrt_messages_v1, invsqrt_messages_v1 = first.(roots_v1), last.(roots_v1)
-    sqrt_messages_v2, invsqrt_messages_v2 = first.(roots_v2), last.(roots_v2)
+        [message_gauge(env[e]) for e in edges_in if dst(e) == v2]
 
-    ψ_v1 = foldl((ψ, m) -> apply(m, ψ), sqrt_messages_v1; init = state[v1])
-    ψ_v2 = foldl((ψ, m) -> apply(m, ψ), sqrt_messages_v2; init = state[v2])
+    ψ_v1 = foldl((ψ, (x, _)) -> x * ψ, roots_v1; init = state[v1])
+    ψ_v2 = foldl((ψ, (x, _)) -> x * ψ, roots_v2; init = state[v2])
 
     Q_v1, R_v1 = qr_compact(ψ_v1, setdiff(names(ψ_v1), names(ψ_v2), names(op)))
     Q_v2, R_v2 = qr_compact(ψ_v2, setdiff(names(ψ_v2), names(ψ_v1), names(op)))
@@ -273,8 +308,8 @@ function apply_gate_bp_nsite!(
     R_v1 = rename(U_v1 * sqrt_S, name_v2 => name_v1)
     R_v2 = sqrt_S * U_v2
 
-    dest[v1] = foldl((ψ, m) -> apply(m, ψ), invsqrt_messages_v1; init = Q_v1 * R_v1)
-    dest[v2] = foldl((ψ, m) -> apply(m, ψ), invsqrt_messages_v2; init = Q_v2 * R_v2)
+    dest[v1] = foldl((ψ, (_, y)) -> y * ψ, roots_v1; init = Q_v1 * R_v1)
+    dest[v2] = foldl((ψ, (_, y)) -> y * ψ, roots_v2; init = Q_v2 * R_v2)
 
     env[v1 => v2] = operator(
         rename(conj(R_v1), name_v1 => name_v2) * R_v1, (name_v2,), (name_v1,)
