@@ -3,8 +3,8 @@ using AlgorithmsInterface: AlgorithmsInterface as AI
 using Base: @kwdef
 using Graphs: dst, src, vertices
 using ITensorBase: AbstractITensor, AbstractNamedTensor, ITensor, Index, NamedTensor,
-    NamedTensorOperator, apply, inputinds, inputnames, name, names, operator, outputnames,
-    rename, sim, state, to_inds, uniquename, unnamed
+    NamedTensorOperator, apply, inputinds, inputnames, name, names, operator, outputinds,
+    rename, sim, state, uniquename, unnamed
 using LinearAlgebra: norm, normalize!
 using MatrixAlgebraKit: eigh_full, project_hermitian, qr_compact, svd_trunc
 using NamedGraphs: boundary_edges
@@ -19,7 +19,7 @@ function message_gauge(m::AbstractMatrix; kwargs...)
     return sqrth_safe(d; kwargs...) * u', u * invsqrth_safe(d; kwargs...)
 end
 
-# The same root for a named tensor split into `outnames` and `innames`, as the pair `(x, y)`:
+# The same root for a named tensor split into `outinds` and `bondinds`, as the pair `(x, y)`:
 # `x * ψ` absorbs it into a state tensor `ψ` and `y * ·` un-absorbs it.
 #
 # `y` inverts `x` as a matrix, and `contract` is that matrix product plus a twist, so the two
@@ -29,9 +29,8 @@ end
 #
 # The message is matricized ket to bra, which keeps the absorbed wavefunction ket-like, and the
 # eigendecomposition hands back the rank space already carrying that orientation.
-function message_gauge(t::AbstractNamedTensor, outnames, innames; kwargs...)
-    bondinds = Tuple(conj.(to_inds(t, innames)))
-    root, inv_root = message_gauge(matricize(t, outnames, innames); kwargs...)
+function message_gauge(t::AbstractNamedTensor, outinds, bondinds; kwargs...)
+    root, inv_root = message_gauge(matricize(t, outinds, bondinds); kwargs...)
     rankind = Index(axes(root, 1))
     y = unmatricize(inv_root, bondinds, (rankind,))
     twist!(y, filter(isdual, bondinds))
@@ -43,7 +42,7 @@ end
 # it exactly so.
 function message_gauge(m::NamedTensorOperator; kwargs...)
     h = project_hermitian(m)
-    return message_gauge(state(h), outputnames(h), inputnames(h); kwargs...)
+    return message_gauge(state(h), Tuple(outputinds(h)), Tuple(inputinds(h)); kwargs...)
 end
 
 # === Top-level user entry point ===
