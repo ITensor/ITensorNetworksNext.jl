@@ -38,8 +38,12 @@ function gram_root_invroot(t::AbstractNamedTensor, outnames, innames; kwargs...)
     return unmatricize(root, (rankind,), bondinds), y
 end
 
-function gram_root_invroot(m::NamedTensorOperator; kwargs...)
-    return gram_root_invroot(state(m), outputnames(m), inputnames(m); kwargs...)
+# The gauge a bond message induces: its output names are the bra side and its input names the
+# ket side, which is the split the root is taken over. A message is Hermitian only up to
+# numerical noise, and the root needs it exactly so.
+function message_gauge(m::NamedTensorOperator; kwargs...)
+    h = project_hermitian(m)
+    return gram_root_invroot(state(h), outputnames(h), inputnames(h); kwargs...)
 end
 
 # === Top-level user entry point ===
@@ -286,9 +290,9 @@ function apply_gate_bp_nsite!(
     v1, v2 = vertices
     edges_in = boundary_edges(state, vertices; dir = :in)
     roots_v1 =
-        [gram_root_invroot(project_hermitian(env[e])) for e in edges_in if dst(e) == v1]
+        [message_gauge(env[e]) for e in edges_in if dst(e) == v1]
     roots_v2 =
-        [gram_root_invroot(project_hermitian(env[e])) for e in edges_in if dst(e) == v2]
+        [message_gauge(env[e]) for e in edges_in if dst(e) == v2]
 
     ψ_v1 = foldl((ψ, (x, _)) -> x * ψ, roots_v1; init = state[v1])
     ψ_v2 = foldl((ψ, (x, _)) -> x * ψ, roots_v2; init = state[v2])
