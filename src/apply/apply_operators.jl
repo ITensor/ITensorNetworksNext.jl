@@ -14,7 +14,7 @@ using TensorAlgebra: isdual, matricize, twist!, unmatricize
 # Asymmetric (Gram) root of a Hermitian positive semidefinite matrix, as the pair
 # `(root, inv_root)`: `root' * root == m`, and `inv_root * root` is the identity on `m`'s
 # support. `eigh_full` is a square decomposition, so both factors are square.
-function gram_root_invroot(m::AbstractMatrix; kwargs...)
+function message_gauge(m::AbstractMatrix; kwargs...)
     d, u = eigh_full(m)
     return sqrth_safe(d; kwargs...) * u', u * invsqrth_safe(d; kwargs...)
 end
@@ -29,21 +29,21 @@ end
 #
 # The message is matricized ket to bra, which keeps the absorbed wavefunction ket-like, and the
 # eigendecomposition hands back the rank space already carrying that orientation.
-function gram_root_invroot(t::AbstractNamedTensor, outnames, innames; kwargs...)
+function message_gauge(t::AbstractNamedTensor, outnames, innames; kwargs...)
     bondinds = Tuple(conj.(to_inds(t, innames)))
-    root, inv_root = gram_root_invroot(matricize(t, outnames, innames); kwargs...)
+    root, inv_root = message_gauge(matricize(t, outnames, innames); kwargs...)
     rankind = Index(axes(root, 1))
     y = unmatricize(inv_root, bondinds, (rankind,))
     twist!(y, filter(isdual, bondinds))
     return unmatricize(root, (rankind,), bondinds), y
 end
 
-# The gauge a bond message induces: its output names are the bra side and its input names the
-# ket side, which is the split the root is taken over. A message is Hermitian only up to
-# numerical noise, and the root needs it exactly so.
+# A message's output names are the bra side and its input names the ket side, which is the split
+# the gauge is taken over. A message is Hermitian only up to numerical noise, and the root needs
+# it exactly so.
 function message_gauge(m::NamedTensorOperator; kwargs...)
     h = project_hermitian(m)
-    return gram_root_invroot(state(h), outputnames(h), inputnames(h); kwargs...)
+    return message_gauge(state(h), outputnames(h), inputnames(h); kwargs...)
 end
 
 # === Top-level user entry point ===
