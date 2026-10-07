@@ -1,6 +1,6 @@
 module ITensorNetworksNextOMEinsumContractionOrdersExt
 
-using ITensorBase: name
+using ITensorBase: inds, name
 using ITensorNetworksNext:
     ITensorNetworksNext, ContractionTree, contraction_tree, prod_tensors
 using OMEinsumContractionOrders:
@@ -18,10 +18,10 @@ end
 # `TreeSA`, `KaHyParBipartite`, ...) by forwarding to `optimize_code`.
 function ITensorNetworksNext.contraction_tree(alg::CodeOptimizer, tensors)
     ks = collect(keys(tensors))
-    ixs = [map(name, collect(axes(tensors[k]))) for k in ks]
+    ixs = [map(name, inds(tensors[k])) for k in ks]
     all_inds = reduce(vcat, ixs)
     labels = unique(all_inds)
-    size_dict = Dict(name(ax) => length(ax) for k in ks for ax in axes(tensors[k]))
+    size_dict = Dict(name(i) => length(i) for k in ks for i in inds(tensors[k]))
     # Open indices (appearing on a single tensor) are the output of the network.
     iy = filter(i -> count(==(i), all_inds) == 1, labels)
     code = optimize_code(EinCode(ixs, iy), size_dict, alg)
