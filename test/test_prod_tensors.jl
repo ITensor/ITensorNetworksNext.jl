@@ -1,15 +1,12 @@
 using Graphs: edges, vertices
-using ITensorBase:
-    Greedy, Index, NamedTensorOperator, inputnames, operator, outputnames, state
-using ITensorNetworksNext: Exact, ITensorNetwork, LeftAssociative, contract_network,
-    linkinds, siteinds, tensornetwork
+using ITensorBase: Index, NamedTensorOperator, inputnames, operator, outputnames, state
+using ITensorNetworksNext:
+    Greedy, ITensorNetwork, linkinds, prod_tensors, siteinds, tensornetwork
 using NamedGraphs: incident_edges, named_grid
 using OMEinsumContractionOrders: ExhaustiveSearch, GreedyMethod, TreeSA
 using Test: @test, @testset
 
-@testset "contract_network" begin
-    orderalg = order_alg -> Exact(; order_alg)
-
+@testset "prod_tensors" begin
     @testset "Contract Vectors of ITensors" begin
         i, j, k = Index(2), Index(2), Index(5)
         A = [1.0 1.0; 0.5 1.0][i, j]
@@ -17,11 +14,12 @@ using Test: @test, @testset
         C = [5.0, 1.0][j]
         D = [-2.0, 3.0, 4.0, 5.0, 1.0][k]
 
-        ABCD_1 = contract_network([A, B, C, D]; alg = orderalg(LeftAssociative()))
-        ABCD_2 = contract_network([A, B, C, D]; alg = orderalg(Greedy()))
-        ABCD_3 = contract_network([A, B, C, D]; alg = orderalg(ExhaustiveSearch()))
-        ABCD_4 = contract_network([A, B, C, D]; alg = orderalg(GreedyMethod()))
-        ABCD_5 = contract_network([A, B, C, D]; alg = orderalg(TreeSA()))
+        ts = [A, B, C, D]
+        ABCD_1 = prod_tensors(ts)
+        ABCD_2 = prod_tensors(ts, Greedy())
+        ABCD_3 = prod_tensors(ts, ExhaustiveSearch())
+        ABCD_4 = prod_tensors(ts, GreedyMethod())
+        ABCD_5 = prod_tensors(ts, TreeSA())
         @test ABCD_1 == ABCD_2 == ABCD_3
         @test ABCD_1 ≈ ABCD_4
         @test ABCD_1 ≈ ABCD_5
@@ -37,11 +35,11 @@ using Test: @test, @testset
             return randn(Tuple(is))
         end
 
-        z1 = contract_network(tn; alg = orderalg(LeftAssociative()))[]
-        z2 = contract_network(tn; alg = orderalg(Greedy()))[]
-        z3 = contract_network(tn; alg = orderalg(ExhaustiveSearch()))[]
-        z4 = contract_network(tn; alg = orderalg(GreedyMethod()))[]
-        z5 = contract_network(tn; alg = orderalg(TreeSA()))[]
+        z1 = prod_tensors(tn)[]
+        z2 = prod_tensors(tn, Greedy())[]
+        z3 = prod_tensors(tn, ExhaustiveSearch())[]
+        z4 = prod_tensors(tn, GreedyMethod())[]
+        z5 = prod_tensors(tn, TreeSA())[]
 
         @test abs(z1 - z2) / abs(z1) <= 1.0e3 * eps(Float64)
         @test abs(z1 - z3) / abs(z1) <= 1.0e3 * eps(Float64)
@@ -59,7 +57,7 @@ using Test: @test, @testset
         # A network mixing an operator with plain tensors previously threw a `convert`
         # `MethodError`; it now contracts, stays an operator, and matches the binary product.
         t = randn(2, 2)[j, k]
-        r = contract_network([o, t])
+        r = prod_tensors([o, t])
         @test r isa NamedTensorOperator
         @test state(r) ≈ state(o * t)
         @test outputnames(r) == outputnames(o * t)
@@ -67,18 +65,18 @@ using Test: @test, @testset
 
         # An all-operator network is likewise preserved.
         o2 = operator(randn(2, 2), (j,), (k,))
-        r2 = contract_network([o, o2])
+        r2 = prod_tensors([o, o2])
         @test r2 isa NamedTensorOperator
         @test state(r2) ≈ state(o * o2)
 
         # A fully-contracted operator network reads out as a scalar via `[]`.
         f = randn(2, 2)[i, j]
-        @test contract_network([o, f])[] ≈ (o * f)[]
+        @test prod_tensors([o, f])[] ≈ (o * f)[]
 
         # An all-plain network is unaffected: it is not promoted to an operator.
         a = randn(2, 2)[i, j]
         b = randn(2, 2)[j, k]
-        @test !(contract_network([a, b]) isa NamedTensorOperator)
+        @test !(prod_tensors([a, b]) isa NamedTensorOperator)
 
         # Pairing is order-independent: a branching network with a surviving output/input pair
         # matches the binary product under any fold order (greedy contraction included).
@@ -86,7 +84,7 @@ using Test: @test, @testset
         op = operator(randn(2, 2, 2, 2), (ip, mp), (i, m))
         u = randn(2, 2)[mp, x]
         w = randn(2, 2)[m, x]
-        rb = contract_network([op, u, w])
+        rb = prod_tensors([op, u, w])
         @test outputnames(rb) == outputnames((op * u) * w) == outputnames(op * (u * w))
         @test inputnames(rb) == inputnames((op * u) * w) == inputnames(op * (u * w))
     end

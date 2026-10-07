@@ -1,11 +1,10 @@
 using DataGraphs: is_vertex_assigned
 using Dictionaries: isinsertable, issettable
 using Graphs: edges, vertices
-using ITensorBase:
-    ITensor, Index, IndexName, LazyITensor, conj, inds, name, setname, uniquename
-using ITensorNetworksNext: BraView, ITensorNetwork, KetView, NormNetwork, braname,
-    bratensor, conj_bratensor, contract_network, indmap, kettensor, normnetwork,
-    tensornetwork
+using ITensorBase: ITensor, Index, IndexName, conj, inds, name, setname, uniquename
+using ITensorNetworksNext: BraView, Greedy, ITensorNetwork, KetView, NormNetwork, braname,
+    bratensor, conj_bratensor, contraction_tree, flatten_network, indmap, kettensor,
+    normnetwork, prod_tensors, tensornetwork
 using LinearAlgebra: norm
 using NamedGraphs: NamedEdge, incident_edges, named_grid, named_path_graph
 using Test: @test, @test_throws, @testset
@@ -23,6 +22,10 @@ function random_state(::Type{T}, g; d = 2, χ = 2) where {T}
     return tn, l, s
 end
 
+# A norm network carries no tensor at a vertex, so contracting it goes through the flattened
+# network, whose two layers are separate operands.
+contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
+
 @testset "`NormNetwork`" begin
     @testset "Basics" begin
         g = named_path_graph(3)
@@ -37,8 +40,10 @@ end
         @test issetequal(vertices(nn), vertices(tn))
         @test issetequal(edges(nn), edges(tn))
 
-        # `eltype` is the type of the (lazy double-layer) vertex data.
-        @test eltype(nn) === typeof(nn[1])
+        # The double-layer tensor at a vertex has no representation, so neither indexing nor
+        # `eltype` is defined.
+        @test_throws ErrorException nn[1]
+        @test_throws ErrorException eltype(nn)
 
         # Vertex data is assigned wherever the underlying network is.
         @test is_vertex_assigned(nn, 1)
@@ -126,6 +131,29 @@ end
         @test !isinsertable(bv)
     end
 
+    @testset "`flatten_network`" begin
+        g = named_path_graph(3)
+        tn, l, s = random_state(Float64, g)
+        nn = NormNetwork(tn)
+        flat = flatten_network(nn)
+
+        # One vertex per layer, so the vertex count doubles and each carries its layer's tensor.
+        @test length(vertices(flat)) == 2 * length(vertices(nn))
+        # Each vertex's two layers stay adjacent, in ket-then-bra order.
+        @test collect(vertices(flat)) ==
+            collect(Iterators.flatten(((v, :ket), (v, :bra)) for v in vertices(nn)))
+        @test flat[(2, :ket)] === kettensor(nn, 2)
+        @test flat[(2, :bra)] == bratensor(nn, 2)
+
+        # A norm network carries no tensor at a vertex, so it has to be flattened first.
+        @test_throws ErrorException prod_tensors(nn, Greedy())
+
+        # A tree is keyed by the vertices of the network it was built over, so one built over
+        # the flattened network replays against it.
+        tree = contraction_tree(flat)
+        @test prod_tensors(flat, tree)[] ≈ prod_tensors(flat, Greedy())[]
+    end
+
     @testset "contraction / physics" begin
         @testset "single normalized tensor contracts to 1" begin
             s = Index(3)
@@ -135,7 +163,7 @@ end
             nn = NormNetwork(tn)
 
             # ⟨ψ|ψ⟩ for a single normalized site tensor is 1.
-            @test contract_network(nn)[] ≈ 1
+            @test contract_norm(nn) ≈ 1
         end
 
         @testset "$T" for T in (Float64, ComplexF64)
@@ -143,19 +171,18 @@ end
             tn, l, s = random_state(T, g)
 
             # The norm network contracts to ⟨tn|tn⟩ = ‖prod(tn)‖², a real nonnegative number.
-            z = contract_network(NormNetwork(tn))[]
+            z = contract_norm(NormNetwork(tn))
             @test z ≈ norm(prod(tn))^2
             @test imag(z) ≈ 0 atol = 1.0e-12 * abs(z)
             @test real(z) > 0
 
             # Rescaling a single tensor by 1/√z normalizes the state, so ⟨tn|tn⟩ = 1.
             tn[first(vertices(tn))] = tn[first(vertices(tn))] / sqrt(real(z))
-            @test contract_network(NormNetwork(tn))[] ≈ 1
+            @test contract_norm(NormNetwork(tn)) ≈ 1
 
             # The contracted norm does not depend on the chosen bra-layer name map.
             custom = map(uniquename, keys(tn.dimname_vertices))
-            @test contract_network(normnetwork(tn, custom))[] ≈
-                contract_network(NormNetwork(tn))[]
+            @test contract_norm(normnetwork(tn, custom)) ≈ contract_norm(NormNetwork(tn))
         end
     end
 end

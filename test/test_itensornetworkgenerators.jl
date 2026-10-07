@@ -2,7 +2,7 @@ using DataGraphs: DataGraph
 using Graphs: edges, ne, nv, vertices
 using ITensorBase: Index, inds
 using ITensorNetworksNext.ITensorNetworkGenerators: delta, delta_network, ising_network
-using ITensorNetworksNext: contract_network
+using ITensorNetworksNext: Greedy, prod_tensors
 using NamedGraphs: arranged_edges, incident_edges, named_grid
 using Test: @test, @testset
 
@@ -46,7 +46,7 @@ using Test: @test, @testset
                 @test issetequal(is, inds(tn[v]))
                 @test tn[v] ≠ delta(Float64, Tuple(is))
             end
-            z = contract_network(tn)[]
+            z = prod_tensors(tn, Greedy())[]
             f = -log(z) / (β * nv(g))
             f_analytic = TestUtils.f_1d_ising(β, 4; periodic)
             @test f ≈ f_analytic
@@ -67,7 +67,7 @@ using Test: @test, @testset
                 @test issetequal(is, inds(tn[v]))
                 @test tn[v] ≠ delta(Float64, Tuple(is))
             end
-            z = contract_network(tn)[]
+            z = prod_tensors(tn, Greedy())[]
             f = -log(z) / (β * nv(g))
             f_inf = TestUtils.f_2d_ising(β)
             @test f ≈ f_inf rtol = 1.0e-1

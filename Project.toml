@@ -1,12 +1,13 @@
 name = "ITensorNetworksNext"
 uuid = "302f2e75-49f0-4526-aef7-d8ba550cb06c"
-version = "0.10.10"
+version = "0.11.0"
 authors = ["ITensor developers <support@itensor.org> and contributors"]
 
 [workspace]
 projects = ["benchmark", "dev", "docs", "examples", "test"]
 
 [deps]
+AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 AlgorithmsInterface = "d1e3940c-cd12-4505-8585-b0a4b322527d"
 Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
@@ -30,13 +31,14 @@ OMEinsumContractionOrders = "6f22d1fd-8eed-4bb7-9776-e7d684900715"
 ITensorNetworksNextOMEinsumContractionOrdersExt = "OMEinsumContractionOrders"
 
 [compat]
+AbstractTrees = "0.4.5"
 Adapt = "4.3"
 AlgorithmsInterface = "0.1"
 Combinatorics = "1"
 DataGraphs = "0.6"
 Dictionaries = "0.4.5"
 Graphs = "1.13.1"
-ITensorBase = "0.15.5"
+ITensorBase = "0.16"
 LinearAlgebra = "1.10"
 MacroTools = "0.5.16"
 MatrixAlgebraKit = "0.6"

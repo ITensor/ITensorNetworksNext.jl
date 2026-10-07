@@ -232,16 +232,16 @@ function message_update!(cache, factors, edge; alg = nothing, kwargs...)
     )
 end
 
-@kwdef struct SimpleMessageUpdate{ContractionAlg} <: MessageUpdateAlgorithm
+@kwdef struct SimpleMessageUpdate{OrderAlg} <: MessageUpdateAlgorithm
     normalize::Bool = true
-    contraction_alg::ContractionAlg = Exact()
+    order_alg::OrderAlg = Greedy()
 end
 
-# The tensors making up the factor at `vertex`, as separate operands for `contract_network`. A
-# `NormNetwork`'s factor is a lazy `ket * conj(bra)` product, and the contraction order sees each
-# operand as one node carrying only its outer axes — which hides the physical index the two layers
-# share, forcing the doubled vertex to be formed before any message is absorbed (χ^(2 * degree)
-# rather than the χ^(degree + 1) an interleaved order reaches).
+# The tensors making up the factor at `vertex`, as separate operands to contract. A
+# `NormNetwork`'s factor is the product of its ket and bra layers. Handing that product over as one
+# operand would hide the physical index the two layers share, forcing the doubled vertex to be
+# formed before any message is absorbed (χ^(2 * degree) rather than the χ^(degree + 1) an
+# interleaved order reaches).
 factor_tensors(factors, vertex) = [factors[vertex]]
 function factor_tensors(factors::NormNetwork, vertex)
     return [kettensor(factors, vertex), bratensor(factors, vertex)]
@@ -251,11 +251,8 @@ end
 # `edge`.
 function updated_message(algorithm::SimpleMessageUpdate, cache, factors, edge)
     messages = collect(incoming_messages(cache, edge))
-    # TODO: Remove `factor_tensors` once `contract_network` handles lazy tensors in
-    # contraction sequences properly.
-    return contract_network(
-        [messages; factor_tensors(factors, src(edge))]; alg = algorithm.contraction_alg
-    )
+    tensors = [messages; factor_tensors(factors, src(edge))]
+    return prod_tensors(tensors, algorithm.order_alg)
 end
 
 # Single-layer network: the message is a plain bond vector, normalized by its entrywise sum.

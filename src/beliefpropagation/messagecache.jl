@@ -132,10 +132,8 @@ end
 
 function vertex_scalar(factors, messages, vertex; kwargs...)
     in_messages = incoming_edge_data(messages, [vertex])
-    # TODO: Remove `factor_tensors` once `contract_network` handles lazy tensors in
-    # contraction sequences properly.
     tensors = [factor_tensors(factors, vertex); collect(in_messages)]
-    return contract_network(tensors; kwargs...)[]
+    return prod_tensors(tensors, contraction_tree(tensors; kwargs...))[]
 end
 
 vertex_scalars(factors, messages) = vertex_scalars(factors, messages, keys(factors))
