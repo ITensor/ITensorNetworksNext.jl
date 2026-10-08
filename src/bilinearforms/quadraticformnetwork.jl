@@ -1,5 +1,5 @@
 using Dictionaries: Dictionary
-using ITensorBase: LazyNamedTensor, inputnames, lazy, outputnames, rename, state, uniquename
+using ITensorBase: inputnames, outputnames, rename, state, uniquename
 using ITensorNetworksNext
 
 """
@@ -35,7 +35,11 @@ struct QuadraticFormNetwork{T, V, I, O <: ITensorNetworkOperator} <:
     end
 end
 
-Base.eltype(::Type{<:QuadraticFormNetwork{T, V, I}}) where {T, V, I} = LazyNamedTensor{I, T}
+function Base.eltype(::Type{<:QuadraticFormNetwork})
+    return error(
+        "`eltype` of a `QuadraticFormNetwork` is not defined, since the triple-layer tensor at a vertex has no representation of its own. Use `kettensor`, `operatortensor` and `bratensor` to reach the individual layers."
+    )
+end
 
 function QuadraticFormNetwork(ket::ITensorNetwork, operator::ITensorNetworkOperator)
     return QuadraticFormNetwork(ket, operator, map(uniquename, keys(ket.dimname_vertices)))
@@ -44,11 +48,9 @@ end
 # ==================================== DataGraphs.jl ===================================== #
 
 function DataGraphs.get_vertex_data(qf::QuadraticFormNetwork, vertex)
-    A = kettensor(qf, vertex)
-    O = operatortensor(qf, vertex)
-    B = conj_bratensor(qf, vertex)
-    # TODO: implement and use a lazy `conj` via `LazyNamedDimsArrays` here?
-    return lazy(A) * lazy(O) * lazy(conj(B))
+    return error(
+        "Indexing a `QuadraticFormNetwork` is not defined, since the triple-layer tensor at a vertex has no representation of its own. Use `kettensor`, `operatortensor` and `bratensor` to reach the individual layers."
+    )
 end
 
 function DataGraphs.is_vertex_assigned(qf::QuadraticFormNetwork, vertex)

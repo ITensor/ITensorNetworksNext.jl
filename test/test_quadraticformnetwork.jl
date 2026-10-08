@@ -3,9 +3,10 @@ using Dictionaries: isinsertable, issettable
 using Graphs: edges, vertices
 using ITensorBase: ITensor, Index, IndexName, conj, inds, inputnames, name, names, nametype,
     operator, outputnames, rename, uniquename
-using ITensorNetworksNext: BraView, ITensorNetwork, NormNetwork, QuadraticFormNetwork,
-    braname, branetwork, bratensor, conj_bratensor, contract_network, ketnetwork, kettensor,
-    operatornetwork, operatortensor, quadraticformnetwork, tensornetwork
+using ITensorNetworksNext: BraView, Greedy, ITensorNetwork, NormNetwork,
+    QuadraticFormNetwork, braname, branetwork, bratensor, conj_bratensor, factor_tensors,
+    ketnetwork, kettensor, operatornetwork, operatortensor, prod_tensors,
+    quadraticformnetwork, tensornetwork
 using LinearAlgebra: I, norm
 using NamedGraphs: NamedEdge, incident_edges, named_grid, named_path_graph
 using Test: @test, @test_throws, @testset
@@ -36,6 +37,10 @@ end
 
 identity_operator(g, s; d = 2) = product_operator(v -> Matrix(1.0I, d, d), g, s; d)
 
+function contract(bn)
+    return prod_tensors(reduce(vcat, factor_tensors(bn, v) for v in vertices(bn)), Greedy())
+end
+
 @testset "`QuadraticFormNetwork`" begin
     @testset "Basics" begin
         g = named_path_graph(3)
@@ -52,8 +57,10 @@ identity_operator(g, s; d = 2) = product_operator(v -> Matrix(1.0I, d, d), g, s;
         @test issetequal(vertices(qf), vertices(tn))
         @test issetequal(edges(qf), edges(tn))
 
-        # `eltype` is the type of the (lazy triple-layer) vertex data.
-        @test eltype(qf) === typeof(qf[1])
+        # The triple-layer tensor at a vertex has no representation, so neither indexing nor
+        # `eltype` is defined.
+        @test_throws ErrorException qf[1]
+        @test_throws ErrorException eltype(qf)
 
         # Vertex data is assigned wherever both layers are.
         @test is_vertex_assigned(qf, 1)
@@ -116,6 +123,10 @@ identity_operator(g, s; d = 2) = product_operator(v -> Matrix(1.0I, d, d), g, s;
 
         # Querying the name map with an index name absent from the ket layer errors.
         @test_throws ErrorException braname(qf, name(Index(2)))
+
+        # `factor_tensors` returns the three layers as separate operands.
+        @test factor_tensors(qf, 2) ==
+            [kettensor(qf, 2), operatortensor(qf, 2), bratensor(qf, 2)]
     end
 
     @testset "custom name map" begin
@@ -164,8 +175,8 @@ identity_operator(g, s; d = 2) = product_operator(v -> Matrix(1.0I, d, d), g, s;
             tn, l, s = random_state(Float64, g)
             op = identity_operator(g, s)
 
-            @test contract_network(QuadraticFormNetwork(tn, op))[] ≈
-                contract_network(NormNetwork(tn))[]
+            @test contract(QuadraticFormNetwork(tn, op))[] ≈
+                contract(NormNetwork(tn))[]
         end
 
         @testset "$T" for T in (Float64, ComplexF64)
@@ -186,7 +197,7 @@ identity_operator(g, s; d = 2) = product_operator(v -> Matrix(1.0I, d, d), g, s;
                 gate = ITensor(mats[v], (out, s[v]))
                 ket = rename(gate * ket, name(out) => name(s[v]))
             end
-            @test contract_network(qf)[] ≈ (conj(psi) * ket)[]
+            @test contract(qf)[] ≈ (conj(psi) * ket)[]
         end
 
         @testset "scaled identity" begin
@@ -195,8 +206,8 @@ identity_operator(g, s; d = 2) = product_operator(v -> Matrix(1.0I, d, d), g, s;
             op = product_operator(v -> 2.0 * Matrix(1.0I, 2, 2), g, s)
 
             # A factor of 2 at each of the three vertices scales the norm by 2³.
-            @test contract_network(QuadraticFormNetwork(tn, op))[] ≈
-                8 * contract_network(NormNetwork(tn))[]
+            @test contract(QuadraticFormNetwork(tn, op))[] ≈
+                8 * contract(NormNetwork(tn))[]
         end
     end
 end
