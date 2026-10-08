@@ -1,4 +1,4 @@
-using Dictionaries: Dictionary, dictionary
+using Dictionaries: Dictionary, Indices, dictionary, getindices
 using ITensorBase: similar_operator, uniquename
 using ITensorNetworksNext
 
@@ -16,7 +16,7 @@ struct NormNetwork{T, V, I} <: AbstractBilinearFormNetwork{T, V, I}
             ket::ITensorNetwork{T, V, I},
             map::Dictionary{I, I}
         ) where {T, V, I}
-        return new{T, V, I}(ket, select_branames(ket, map, ()))
+        return new{T, V, I}(ket, getindices(map, Indices{I}(linknames(ket))))
     end
 end
 

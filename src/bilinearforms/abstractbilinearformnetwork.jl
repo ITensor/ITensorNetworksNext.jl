@@ -1,5 +1,5 @@
 using DataGraphs: DataGraphs, get_vertex_data, is_vertex_assigned
-using Dictionaries: Dictionaries, Dictionary, isinsertable, issettable
+using Dictionaries: Dictionaries, isinsertable, issettable
 using Graphs: Graphs, edges, vertices
 using ITensorBase: ITensorBase, conj, inds, nametype, rename
 using NamedGraphs: NamedGraphs, decoded_vertex, encoded_graph, encoded_vertex
@@ -73,17 +73,6 @@ end
 The ket→bra name map, holding a bra name for each ket index name that has a separate bra copy.
 """
 function branamemap end
-
-# A link name, or a name in `acted`, gets its bra name from `map`; every other name has none.
-function select_branames(ket::ITensorNetwork{T, V, I}, map, acted) where {T, V, I}
-    braname = Dictionary{I, I}()
-    for (name, vertices) in pairs(ket.dimname_vertices)
-        if length(vertices) == 2 || name in acted
-            insert!(braname, name, map[name])
-        end
-    end
-    return braname
-end
 
 """
     kettensor(bn::AbstractBilinearFormNetwork, vertex)

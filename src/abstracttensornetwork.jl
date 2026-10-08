@@ -62,6 +62,9 @@ end
 function linknames(tn::AbstractGraph, edge::AbstractEdge)
     return names(tn, src(edge)) ∩ names(tn, dst(edge))
 end
+function linknames(tn::AbstractGraph)
+    return unique(Iterators.flatten(linknames(tn, e) for e in edges(tn)))
+end
 
 function siteinds(tn::AbstractGraph, v)
     s = inds(tn, v)

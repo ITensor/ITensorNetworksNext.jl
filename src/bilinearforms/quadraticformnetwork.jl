@@ -1,4 +1,4 @@
-using Dictionaries: Dictionary
+using Dictionaries: Dictionary, Indices, getindices
 using ITensorBase: inputnames, outputnames, rename, state, uniquename
 using ITensorNetworksNext
 
@@ -30,7 +30,7 @@ struct QuadraticFormNetwork{T, V, I, O <: ITensorNetworkOperator} <:
         if !issubset(inputnames(operator), keys(ket.dimname_vertices))
             error("every operator input name must be an index name of the ket layer.")
         end
-        braname = select_branames(ket, map, Set{I}(inputnames(operator)))
+        braname = getindices(map, Indices{I}(union(linknames(ket), inputnames(operator))))
         return new{T, V, I, typeof(operator)}(ket, operator, braname)
     end
 end
