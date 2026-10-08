@@ -1,7 +1,7 @@
 using DataGraphs: is_vertex_assigned
 using Dictionaries: isinsertable, issettable
 using Graphs: edges, vertices
-using ITensorBase: ITensor, Index, inputnames, name, names, operator, outputnames, state
+using ITensorBase: ITensor, Index, inputnames, name, operator, outputnames, state
 using ITensorNetworksNext:
     ITensorNetwork, ITensorNetworkOperator, operator_support, tensornetwork
 using NamedGraphs: incident_edges, named_path_graph
@@ -58,23 +58,12 @@ end
         @test eltype(op) === typeof(op[first(vertices(g))])
     end
 
-    @testset "a pair may straddle two vertices" begin
-        # A swap: the output at vertex 1 is paired with the input at vertex 2, and vice versa.
+    @testset "a pair must sit on one vertex" begin
+        # A swap pairs the output at vertex 1 with the input at vertex 2, and vice versa.
         a, b = Index(2), Index(2)
         a′, b′ = Index(2), Index(2)
         tn = ITensorNetwork(Dict(1 => randn((a′, a)), 2 => randn((b′, b))))
-        op = operator(tn, [name(a′), name(b′)], [name(b), name(a)])
-
-        @test outputnames(op) == [name(a′), name(b′)]
-        @test inputnames(op) == [name(b), name(a)]
-
-        # Neither pair is local to a vertex, so each vertex wrapper has an empty pairing and
-        # both of its legs stay dangling.
-        for v in (1, 2)
-            @test isempty(outputnames(op[v]))
-            @test isempty(inputnames(op[v]))
-            @test issetequal(names(op[v]), names(state(op)[v]))
-        end
+        @test_throws ArgumentError operator(tn, [name(a′), name(b′)], [name(b), name(a)])
     end
 
     @testset "constructor validation" begin

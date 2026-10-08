@@ -1,6 +1,6 @@
 using Dictionaries: Dictionary
 using ITensorBase:
-    LazyNamedTensor, inputnames, lazy, names, outputnames, rename, state, uniquename
+    LazyNamedTensor, inputnames, lazy, outputnames, rename, state, uniquename
 using ITensorNetworksNext
 
 """
@@ -89,19 +89,15 @@ kettensor(qf::QuadraticFormNetwork, vertex) = qf.ket[vertex]
 ketnetwork(qf::QuadraticFormNetwork) = qf.ket
 operatornetwork(qf::QuadraticFormNetwork) = qf.operator
 
-# Each output name is renamed to the bra name of the input name it is paired with, so the
-# operator's output legs meet the bra layer and its input legs meet the ket layer. The pairing
-# is read from the operator network rather than from `qf.operator[vertex]`, whose wrapper drops
-# a pair whose input sits on another vertex.
+# Each output name is renamed to the bra name of the input it is paired with, so the output legs
+# meet the bra layer and the input legs meet the ket layer.
 function operatortensor(qf::QuadraticFormNetwork, vertex)
-    tensor = state(qf.operator)[vertex]
-    tensor_names = names(tensor)
+    op = qf.operator[vertex]
     replacements = [
         output => braname(qf, input) for
-            (output, input) in zip(outputnames(qf.operator), inputnames(qf.operator))
-            if output in tensor_names
+            (output, input) in zip(outputnames(op), inputnames(op))
     ]
-    return rename(tensor, replacements...)
+    return rename(state(op), replacements...)
 end
 
 """
