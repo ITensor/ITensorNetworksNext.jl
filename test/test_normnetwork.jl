@@ -1,7 +1,7 @@
 using DataGraphs: is_vertex_assigned
 using Dictionaries: isinsertable, issettable
 using Graphs: edges, vertices
-using ITensorBase: ITensor, Index, IndexName, inds, name, uniquename
+using ITensorBase: ITensor, Index, IndexName, inds, name, nametype, uniquename
 using ITensorNetworksNext: BraView, Greedy, ITensorNetwork, NormNetwork, braname,
     branetwork, bratensor, conj_bratensor, contraction_tree, flatten_network, ketnetwork,
     kettensor, normnetwork, prod_tensors, tensornetwork
@@ -44,6 +44,7 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
         # `eltype` is defined.
         @test_throws ErrorException nn[1]
         @test_throws ErrorException eltype(nn)
+        @test nametype(nn) === nametype(tn) === IndexName
 
         # Vertex data is assigned wherever the underlying network is.
         @test is_vertex_assigned(nn, 1)

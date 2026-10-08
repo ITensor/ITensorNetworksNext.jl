@@ -1,7 +1,7 @@
 using DataGraphs: DataGraphs, get_vertex_data, is_vertex_assigned
 using Dictionaries: Dictionaries, Dictionary, isinsertable, issettable
 using Graphs: Graphs, edges, vertices
-using ITensorBase: conj, rename
+using ITensorBase: ITensorBase, conj, nametype, rename
 using NamedGraphs: NamedGraphs, decoded_vertex, encoded_graph, encoded_vertex
 
 """
@@ -44,6 +44,14 @@ Dictionaries.issettable(::AbstractBilinearFormNetwork) = false
 Dictionaries.isinsertable(::AbstractBilinearFormNetwork) = false
 
 # ====================================== interface ======================================= #
+
+# The name type of the indices, the same as the ket network's.
+function ITensorBase.nametype(
+        ::Type{<:AbstractBilinearFormNetwork{T, V, I}}
+    ) where {T, V, I}
+    return I
+end
+ITensorBase.nametype(bn::AbstractBilinearFormNetwork) = nametype(typeof(bn))
 
 """
     braname(bn::AbstractBilinearFormNetwork, name)

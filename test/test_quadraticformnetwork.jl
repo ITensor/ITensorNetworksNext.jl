@@ -1,8 +1,8 @@
 using DataGraphs: is_vertex_assigned
 using Dictionaries: isinsertable, issettable
 using Graphs: edges, vertices
-using ITensorBase: ITensor, Index, IndexName, conj, inds, inputnames, name, names, operator,
-    outputnames, rename, uniquename
+using ITensorBase: ITensor, Index, IndexName, conj, inds, inputnames, name, names, nametype,
+    operator, outputnames, rename, uniquename
 using ITensorNetworksNext: BraView, ITensorNetwork, NormNetwork, QuadraticFormNetwork,
     braname, branetwork, bratensor, conj_bratensor, contract_network, ketnetwork, kettensor,
     operatornetwork, operatortensor, quadraticformnetwork, tensornetwork
@@ -46,6 +46,7 @@ identity_operator(g, s; d = 2) = product_operator(v -> Matrix(1.0I, d, d), g, s;
         # `quadraticformnetwork` is the public constructor and agrees with the type.
         @test quadraticformnetwork(tn, op) isa QuadraticFormNetwork
         @test qf isa QuadraticFormNetwork
+        @test nametype(qf) === nametype(tn) === IndexName
 
         # The quadratic form shares the graph structure of the ket layer.
         @test issetequal(vertices(qf), vertices(tn))
