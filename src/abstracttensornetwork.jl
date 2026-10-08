@@ -87,7 +87,7 @@ end
 
 # Return the non-link vertices associated with an dim name
 function dimnamevertices(tn::AbstractGraph, name)
-    sites = vertextype(tn)[]
+    sites = Set{vertextype(tn)}()
 
     for v in vertices(tn)
         if name ∈ names(tn, v)

@@ -197,7 +197,7 @@ Graphs.add_edge!(::ITensorNetwork, _edge) = false
 
 # PERF: fast lookup compared to `AbstractITensorNetwork` fallback.
 function dimnamevertices(tn::ITensorNetwork, name)
-    return get(tn.dimname_vertices, name, Set{vertextype(tn)}())
+    return copy(get(tn.dimname_vertices, name, Set{vertextype(tn)}()))
 end
 
 # PERF: fast lookup compared to `AbstractITensorNetwork` fallback.
