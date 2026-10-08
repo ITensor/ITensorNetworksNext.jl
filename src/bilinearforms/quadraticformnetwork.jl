@@ -27,6 +27,9 @@ struct QuadraticFormNetwork{T, V, I, O <: ITensorNetworkOperator} <:
         if !issetequal(vertices(operator), vertices(ket))
             error("the operator layer must be defined on every vertex of the ket layer.")
         end
+        if !issubset(inputnames(operator), keys(ket.dimname_vertices))
+            error("every operator input name must be an index name of the ket layer.")
+        end
         braname = select_branames(ket, map, Set{I}(inputnames(operator)))
         return new{T, V, I, typeof(operator)}(ket, operator, braname)
     end

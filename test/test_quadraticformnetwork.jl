@@ -68,6 +68,16 @@ identity_operator(g, s; d = 2) = product_operator(v -> Matrix(1.0I, d, d), g, s;
         @test_throws ErrorException QuadraticFormNetwork(tn, identity_operator(g4, s4))
     end
 
+    @testset "operator input outside the ket network" begin
+        g = named_path_graph(2)
+        tn, l, s = random_state(Float64, g)
+        stray = Index(2)
+        out1, out2 = Index(2), Index(2)
+        optn = ITensorNetwork(Dict(1 => randn((out1, stray)), 2 => randn((out2, s[2]))))
+        op = operator(optn, [name(out1), name(out2)], [name(stray), name(s[2])])
+        @test_throws ErrorException QuadraticFormNetwork(tn, op)
+    end
+
     @testset "layer tensors and the name map" begin
         g = named_path_graph(3)
         tn, l, s = random_state(Float64, g)
