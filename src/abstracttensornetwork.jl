@@ -37,8 +37,8 @@ end
 
 # ====================================== interface ======================================= #
 
-ITensorBase.inds(tn::AbstractGraph, v) = inds(tn[v])
-ITensorBase.names(tn::AbstractGraph, v) = name.(inds(tn, v))
+ITensorBase.inds(tn::AbstractITensorNetwork, v) = inds(tn[v])
+ITensorBase.names(tn::AbstractITensorNetwork, v) = name.(inds(tn, v))
 
 linkinds(tn::AbstractGraph, edge::Pair) = linkinds(tn, edgetype(tn)(edge))
 # Pick the link indices from the `src` side, identified by name match with `dst`.
