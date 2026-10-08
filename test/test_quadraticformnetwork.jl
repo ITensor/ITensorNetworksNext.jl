@@ -2,10 +2,10 @@ using DataGraphs: is_vertex_assigned
 using Dictionaries: isinsertable, issettable
 using Graphs: edges, vertices
 using ITensorBase: ITensor, Index, IndexName, conj, inds, inputnames, name, names, operator,
-    outputnames, rename, setname, uniquename
+    outputnames, rename, uniquename
 using ITensorNetworksNext: BraView, ITensorNetwork, NormNetwork, QuadraticFormNetwork,
-    braname, branetwork, bratensor, conj_bratensor, contract_network, indmap, ketnetwork,
-    kettensor, operatornetwork, operatortensor, quadraticformnetwork, tensornetwork
+    braname, branetwork, bratensor, conj_bratensor, contract_network, ketnetwork, kettensor,
+    operatornetwork, operatortensor, quadraticformnetwork, tensornetwork
 using LinearAlgebra: I, norm
 using NamedGraphs: NamedEdge, incident_edges, named_grid, named_path_graph
 using Test: @test, @test_throws, @testset
@@ -102,11 +102,6 @@ identity_operator(g, s; d = 2) = product_operator(v -> Matrix(1.0I, d, d), g, s;
         # `bratensor` is the elementwise conjugate of `conj_bratensor` and carries the same
         # indices.
         @test inds(bratensor(qf, 2)) == inds(conj_bratensor(qf, 2))
-
-        # `indmap` conjugates an index and renames it according to the name map.
-        ind = only(i for i in inds(kettensor(qf, 2)) if name(i) == lname)
-        @test name(indmap(qf, ind)) == braname(qf, name(ind))
-        @test indmap(qf, ind) == setname(conj(ind), braname(qf, name(ind)))
 
         # Querying the name map with an index name absent from the ket layer errors.
         @test_throws ErrorException braname(qf, name(Index(2)))

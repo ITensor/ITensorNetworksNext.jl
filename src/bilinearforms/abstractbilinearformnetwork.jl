@@ -1,7 +1,7 @@
 using DataGraphs: DataGraphs, get_vertex_data, is_vertex_assigned
-using Dictionaries: Dictionaries, isinsertable, issettable
+using Dictionaries: Dictionaries, Dictionary, isinsertable, issettable
 using Graphs: Graphs, edges, vertices
-using ITensorBase: conj, name, rename, setname
+using ITensorBase: conj, rename
 using NamedGraphs: NamedGraphs, decoded_vertex, encoded_graph, encoded_vertex
 
 """
@@ -10,13 +10,33 @@ using NamedGraphs: NamedGraphs, decoded_vertex, encoded_graph, encoded_vertex
 Supertype of the lazy multi-layer networks built from a ket layer of type
 `ITensorNetwork{T, V, I}` and a ket→bra index name mapping.
 
-A subtype supplies its own graph structure and implements [`braname`](@ref) together with one
-accessor per layer: [`kettensor`](@ref), [`bratensor`](@ref) and, where the subtype has an
-operator layer, [`operatortensor`](@ref). `bratensor` has a default built from `kettensor`
-and `braname`. The layers as whole networks are returned by [`ketnetwork`](@ref),
+A subtype implements [`ketnetwork`](@ref) and [`branamemap`](@ref), from which the graph
+structure, [`braname`](@ref), [`kettensor`](@ref) and [`bratensor`](@ref) are defined, and,
+where it has an operator layer, [`operatornetwork`](@ref) and [`operatortensor`](@ref). The layers as whole networks are returned by [`ketnetwork`](@ref),
 [`branetwork`](@ref) and [`operatornetwork`](@ref).
 """
 abstract type AbstractBilinearFormNetwork{T, V, I} <: AbstractITensorNetwork{T, V} end
+
+# ====================================== Graphs.jl ======================================= #
+
+Graphs.edges(bn::AbstractBilinearFormNetwork) = edges(ketnetwork(bn))
+Graphs.vertices(bn::AbstractBilinearFormNetwork) = vertices(ketnetwork(bn))
+
+# ==================================== NamedGraphs.jl ==================================== #
+
+function NamedGraphs.encoded_vertex(bn::AbstractBilinearFormNetwork, vertex)
+    return encoded_vertex(ketnetwork(bn), vertex)
+end
+function NamedGraphs.decoded_vertex(bn::AbstractBilinearFormNetwork, code::Integer)
+    return decoded_vertex(ketnetwork(bn), code)
+end
+NamedGraphs.encoded_graph(bn::AbstractBilinearFormNetwork) = encoded_graph(ketnetwork(bn))
+
+# ==================================== DataGraphs.jl ===================================== #
+
+function DataGraphs.is_vertex_assigned(bn::AbstractBilinearFormNetwork, vertex)
+    return isassigned(ketnetwork(bn), vertex)
+end
 
 # =================================== Dictionaries.jl ==================================== #
 
@@ -30,14 +50,39 @@ Dictionaries.isinsertable(::AbstractBilinearFormNetwork) = false
 
 The bra-layer index name corresponding to the ket-layer index name `name`.
 """
-function braname end
+function braname(bn::AbstractBilinearFormNetwork, name)
+    if !has_dimname(ketnetwork(bn), name)
+        error("index name $name not found underlying tensor network.")
+    end
+    # A name absent from the map has no separate bra copy and maps to itself: a site index of a
+    # norm network, or a site index a quadratic form's operator does not act on.
+    return get(branamemap(bn), name, name)
+end
+
+"""
+    branamemap(bn::AbstractBilinearFormNetwork)
+
+The ket→bra name map, holding a bra name for each ket index name that has a separate bra copy.
+"""
+function branamemap end
+
+# A link name, or a name in `acted`, gets its bra name from `map`; every other name has none.
+function select_branames(ket::ITensorNetwork{T, V, I}, map, acted) where {T, V, I}
+    braname = Dictionary{I, I}()
+    for (name, vertices) in pairs(ket.dimname_vertices)
+        if length(vertices) == 2 || name in acted
+            insert!(braname, name, map[name])
+        end
+    end
+    return braname
+end
 
 """
     kettensor(bn::AbstractBilinearFormNetwork, vertex)
 
 The ket-layer tensor at `vertex`.
 """
-function kettensor end
+kettensor(bn::AbstractBilinearFormNetwork, vertex) = ketnetwork(bn)[vertex]
 
 """
     operatortensor(bn::AbstractBilinearFormNetwork, vertex)
@@ -79,8 +124,6 @@ The bra-layer network of `bn`. Unless a subtype stores its bra layer as a networ
 `BraView`, whose tensors are built by [`bratensor`](@ref) when accessed.
 """
 branetwork(bn::AbstractBilinearFormNetwork) = BraView(bn)
-
-indmap(bn::AbstractBilinearFormNetwork, ind) = setname(conj(ind), braname(bn, name(ind)))
 
 """
     struct BraView{T, V, I, P <: AbstractBilinearFormNetwork{T, V, I}} <: AbstractITensorNetwork{T, V}

@@ -1,9 +1,9 @@
 using DataGraphs: is_vertex_assigned
 using Dictionaries: isinsertable, issettable
 using Graphs: edges, vertices
-using ITensorBase: ITensor, Index, IndexName, conj, inds, name, setname, uniquename
-using ITensorNetworksNext: BraView, Greedy, ITensorNetwork, NormNetwork, braname, branetwork,
-    bratensor, conj_bratensor, contraction_tree, flatten_network, indmap, ketnetwork,
+using ITensorBase: ITensor, Index, IndexName, inds, name, uniquename
+using ITensorNetworksNext: BraView, Greedy, ITensorNetwork, NormNetwork, braname,
+    branetwork, bratensor, conj_bratensor, contraction_tree, flatten_network, ketnetwork,
     kettensor, normnetwork, prod_tensors, tensornetwork
 using LinearAlgebra: norm
 using NamedGraphs: NamedEdge, incident_edges, named_grid, named_path_graph
@@ -78,11 +78,6 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
 
         # `bra` is the elementwise conjugate of `conj_bratensor` and carries the same indices.
         @test inds(bratensor(nn, 2)) == inds(conj_bratensor(nn, 2))
-
-        # `indmap` conjugates an index and renames it according to the name map.
-        ind = only(i for i in inds(kettensor(nn, 2)) if name(i) == lname)
-        @test name(indmap(nn, ind)) == braname(nn, name(ind))
-        @test indmap(nn, ind) == setname(conj(ind), braname(nn, name(ind)))
 
         # Querying the name map with an index name absent from the network errors.
         @test_throws ErrorException braname(nn, name(Index(2)))
