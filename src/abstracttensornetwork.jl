@@ -3,8 +3,8 @@ using DataGraphs: DataGraphs, AbstractDataGraph, AbstractVertexDataGraph, edge_d
     set_vertex_data!, underlying_graph, underlying_graph_type, vertex_data
 using Graphs: Graphs, AbstractEdge, AbstractGraph, add_edge!, add_vertex!, dst, edges,
     edgetype, ne, neighbors, nv, rem_edge!, src, vertices
-using ITensorBase: ITensorOperator, NamedUnitRange, inds, inputnames, name, names, nametype,
-    prime, uniquename, unnamedtype
+using ITensorBase: ITensorBase, ITensorOperator, NamedUnitRange, inds, inputnames, name, names,
+    nametype, prime, uniquename, unnamedtype
 using LinearAlgebra: LinearAlgebra
 using MacroTools: @capture
 using NamedGraphs:
@@ -37,13 +37,16 @@ end
 
 # ====================================== interface ======================================= #
 
+ITensorBase.inds(tn::AbstractITensorNetwork, v) = inds(tn[v])
+ITensorBase.names(tn::AbstractITensorNetwork, v) = name.(inds(tn, v))
+
 linkinds(tn::AbstractGraph, edge::Pair) = linkinds(tn, edgetype(tn)(edge))
 # Pick the link indices from the `src` side, identified by name match with `dst`.
 # A range-strict intersection (`inds(src) ∩ inds(dst)`) would drop graded links
 # whose two endpoints carry dual-related ranges.
 function linkinds(tn::AbstractGraph, edge::AbstractEdge)
     ln = linknames(tn, edge)
-    return [i for i in inds(tn[src(edge)]) if name(i) in ln]
+    return [i for i in inds(tn, src(edge)) if name(i) in ln]
 end
 
 function linkaxes(tn::AbstractGraph, edge::Pair)
@@ -51,43 +54,46 @@ function linkaxes(tn::AbstractGraph, edge::Pair)
 end
 function linkaxes(tn::AbstractGraph, edge::AbstractEdge)
     ln = linknames(tn, edge)
-    return [ax for ax in axes(tn[src(edge)]) if name(ax) in ln]
+    return [ax for ax in inds(tn, src(edge)) if name(ax) in ln]
 end
 function linknames(tn::AbstractGraph, edge::Pair)
     return linknames(tn, edgetype(tn)(edge))
 end
 function linknames(tn::AbstractGraph, edge::AbstractEdge)
-    return names(tn[src(edge)]) ∩ names(tn[dst(edge)])
+    return names(tn, src(edge)) ∩ names(tn, dst(edge))
+end
+function linknames(tn::AbstractGraph)
+    return unique(Iterators.flatten(linknames(tn, e) for e in edges(tn)))
 end
 
 function siteinds(tn::AbstractGraph, v)
-    s = inds(tn[v])
+    s = inds(tn, v)
     for v′ in neighbors(tn, v)
-        s = setdiff(s, inds(tn[v′]))
+        s = setdiff(s, inds(tn, v′))
     end
     return s
 end
 function siteaxes(tn::AbstractGraph, v)
-    s = axes(tn[v])
+    s = Tuple(inds(tn, v))
     for v′ in neighbors(tn, v)
-        s = setdiff(s, axes(tn[v′]))
+        s = setdiff(s, inds(tn, v′))
     end
     return s
 end
 function sitenames(tn::AbstractGraph, v)
-    s = names(tn[v])
+    s = names(tn, v)
     for v′ in neighbors(tn, v)
-        s = setdiff(s, names(tn[v′]))
+        s = setdiff(s, names(tn, v′))
     end
     return s
 end
 
 # Return the non-link vertices associated with an dim name
 function dimnamevertices(tn::AbstractGraph, name)
-    sites = vertextype(tn)[]
+    sites = Set{vertextype(tn)}()
 
     for v in vertices(tn)
-        if name ∈ names(tn[v])
+        if name ∈ names(tn, v)
             push!(sites, v)
         end
     end
@@ -97,7 +103,7 @@ end
 
 function has_dimname(tn::AbstractGraph, name)
     for v in vertices(tn)
-        if name ∈ names(tn[v])
+        if name ∈ names(tn, v)
             return true
         end
     end
@@ -107,7 +113,7 @@ end
 has_ind(tn::AbstractGraph, ind) = has_dimname(tn, name(ind))
 
 function insertlink!(tn::AbstractGraph, e)
-    T = eltype(inds(tn[src(e)]))
+    T = eltype(inds(tn, src(e)))
 
     linkind = NamedUnitRange(trivialrange(unnamedtype(T)), uniquename(nametype(T)))
 
@@ -121,9 +127,15 @@ function insertlink!(tn::AbstractGraph, e)
 end
 
 function operator_support(tn::AbstractGraph, op::ITensorOperator)
+    return operator_support_names(tn, inputnames(op))
+end
+
+# Shared with the `ITensorNetworkOperator` method, which is defined alongside that type
+# because it is not yet known at this point in the include order.
+function operator_support_names(tn::AbstractGraph, opnames)
     support = Indices{vertextype(tn)}()
 
-    for name in inputnames(op)
+    for name in opnames
         vertices = dimnamevertices(tn, name)
 
         if length(vertices) > 1

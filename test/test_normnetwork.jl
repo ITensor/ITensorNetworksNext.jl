@@ -1,10 +1,10 @@
 using DataGraphs: is_vertex_assigned
 using Dictionaries: isinsertable, issettable
 using Graphs: edges, vertices
-using ITensorBase: ITensor, Index, IndexName, conj, inds, name, setname, uniquename
-using ITensorNetworksNext: BraView, Greedy, ITensorNetwork, KetView, NormNetwork, braname,
-    bratensor, conj_bratensor, contraction_tree, flatten_network, indmap, kettensor,
-    normnetwork, prod_tensors, tensornetwork
+using ITensorBase: ITensor, Index, IndexName, inds, name, nametype, uniquename
+using ITensorNetworksNext: BraView, Greedy, ITensorNetwork, NormNetwork, braname,
+    branetwork, bratensor, conj_bratensor, contraction_tree, flatten_network, ketnetwork,
+    kettensor, normnetwork, prod_tensors, tensornetwork
 using LinearAlgebra: norm
 using NamedGraphs: NamedEdge, incident_edges, named_grid, named_path_graph
 using Test: @test, @test_throws, @testset
@@ -44,6 +44,7 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
         # `eltype` is defined.
         @test_throws ErrorException nn[1]
         @test_throws ErrorException eltype(nn)
+        @test nametype(nn) === nametype(tn) === IndexName
 
         # Vertex data is assigned wherever the underlying network is.
         @test is_vertex_assigned(nn, 1)
@@ -79,11 +80,6 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
         # `bra` is the elementwise conjugate of `conj_bratensor` and carries the same indices.
         @test inds(bratensor(nn, 2)) == inds(conj_bratensor(nn, 2))
 
-        # `indmap` conjugates an index and renames it according to the name map.
-        ind = only(i for i in inds(kettensor(nn, 2)) if name(i) == lname)
-        @test name(indmap(nn, ind)) == braname(nn, name(ind))
-        @test indmap(nn, ind) == setname(conj(ind), braname(nn, name(ind)))
-
         # Querying the name map with an index name absent from the network errors.
         @test_throws ErrorException braname(nn, name(Index(2)))
     end
@@ -101,32 +97,25 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
         @test braname(nn, lname) in name.(inds(conj_bratensor(nn, 2)))
     end
 
-    @testset "`KetView` / `BraView`" begin
+    @testset "`ketnetwork` / `branetwork`" begin
         g = named_path_graph(3)
         tn, l, s = random_state(Float64, g)
         nn = NormNetwork(tn)
 
-        kv = KetView(nn)
-        bv = BraView(nn)
+        # The ket layer is the network the norm network was built from.
+        @test ketnetwork(nn) === tn
 
-        # Views share the graph structure of the underlying network.
-        @test issetequal(vertices(kv), vertices(tn))
+        # The bra layer is not stored, so it is a view sharing the ket layer's graph structure.
+        bv = branetwork(nn)
+        @test bv isa BraView
         @test issetequal(vertices(bv), vertices(tn))
-        @test issetequal(edges(kv), edges(tn))
         @test issetequal(edges(bv), edges(tn))
-
-        # The ket view exposes the bare ket tensors; the bra view exposes the bra tensors.
         for v in vertices(tn)
-            @test kv[v] === kettensor(nn, v)
             @test inds(bv[v]) == inds(bratensor(nn, v))
         end
-
-        @test is_vertex_assigned(kv, 1)
         @test is_vertex_assigned(bv, 1)
 
-        # Views inherit the (non-)mutability of their parent norm network.
-        @test !issettable(kv)
-        @test !isinsertable(kv)
+        # The view inherits the (non-)mutability of its parent norm network.
         @test !issettable(bv)
         @test !isinsertable(bv)
     end
