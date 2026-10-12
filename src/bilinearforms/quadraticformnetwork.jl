@@ -30,7 +30,11 @@ struct QuadraticFormNetwork{T, V, I, O <: ITensorNetworkOperator} <:
         if !issubset(inputnames(operator), keys(ket.dimname_vertices))
             error("every operator input name must be an index name of the ket layer.")
         end
-        braname = getindices(map, Indices{I}(union(linknames(ket), inputnames(operator))))
+        names_bra = union(
+            linknames(ket), inputnames(operator),
+            filter(in(keys(map)), keys(ket.dimname_vertices))
+        )
+        braname = getindices(map, Indices{I}(names_bra))
         return new{T, V, I, typeof(operator)}(ket, operator, braname)
     end
 end
@@ -42,7 +46,8 @@ function Base.eltype(::Type{<:QuadraticFormNetwork})
 end
 
 function QuadraticFormNetwork(ket::ITensorNetwork, operator::ITensorNetworkOperator)
-    return QuadraticFormNetwork(ket, operator, map(uniquename, keys(ket.dimname_vertices)))
+    names_bra = Indices(union(linknames(ket), inputnames(operator)))
+    return QuadraticFormNetwork(ket, operator, map(uniquename, names_bra))
 end
 
 # ==================================== DataGraphs.jl ===================================== #

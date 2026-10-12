@@ -16,7 +16,8 @@ struct NormNetwork{T, V, I} <: AbstractBilinearFormNetwork{T, V, I}
             ket::ITensorNetwork{T, V, I},
             map::Dictionary{I, I}
         ) where {T, V, I}
-        return new{T, V, I}(ket, getindices(map, Indices{I}(linknames(ket))))
+        names_bra = union(linknames(ket), filter(in(keys(map)), keys(ket.dimname_vertices)))
+        return new{T, V, I}(ket, getindices(map, Indices{I}(names_bra)))
     end
 end
 
@@ -27,7 +28,7 @@ function Base.eltype(::Type{<:NormNetwork})
 end
 
 function NormNetwork(tn::ITensorNetwork)
-    return NormNetwork(tn, map(uniquename, keys(tn.dimname_vertices)))
+    return NormNetwork(tn, map(uniquename, Indices(linknames(tn))))
 end
 
 # ==================================== DataGraphs.jl ===================================== #

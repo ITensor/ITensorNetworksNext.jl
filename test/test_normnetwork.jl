@@ -1,10 +1,10 @@
 using DataGraphs: is_vertex_assigned
-using Dictionaries: isinsertable, issettable
+using Dictionaries: Indices, isinsertable, issettable
 using Graphs: edges, vertices
 using ITensorBase: ITensor, Index, IndexName, inds, name, nametype, uniquename
 using ITensorNetworksNext: BraView, Greedy, ITensorNetwork, NormNetwork, braname,
     branetwork, bratensor, conj_bratensor, contraction_tree, flatten_network, ketnetwork,
-    kettensor, normnetwork, prod_tensors, tensornetwork
+    kettensor, linknames, normnetwork, prod_tensors, tensornetwork
 using LinearAlgebra: norm
 using NamedGraphs: NamedEdge, incident_edges, named_grid, named_path_graph
 using Test: @test, @test_throws, @testset
@@ -89,12 +89,28 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
         tn, l, s = random_state(Float64, g)
 
         # A user-supplied map dictates the bra-layer name for each link.
-        custom = map(uniquename, keys(tn.dimname_vertices))
+        custom = map(uniquename, Indices(linknames(tn)))
         nn = normnetwork(tn, custom)
 
         lname = name(l[NamedEdge(1 => 2)])
         @test braname(nn, lname) == custom[lname]
         @test braname(nn, lname) in name.(inds(conj_bratensor(nn, 2)))
+    end
+
+    @testset "bond to a vertex outside the network" begin
+        g = named_path_graph(3)
+        tn, l, s = random_state(Float64, g)
+
+        # The part of `tn` on vertices 1 and 2, as one rank of a distributed network holds it.
+        part = ITensorNetwork(Dict(v => tn[v] for v in (1, 2)))
+        nn = normnetwork(part, map(uniquename, Indices(linknames(tn))))
+
+        # The bond to vertex 3 is not a link of `part`, but it is in the map, so it gets its
+        # own bra name and the two layers at vertex 2 share only the site index.
+        lname = name(l[NamedEdge(2 => 3)])
+        @test braname(nn, lname) != lname
+        shared = intersect(name.(inds(kettensor(nn, 2))), name.(inds(conj_bratensor(nn, 2))))
+        @test issetequal(shared, [name(s[2])])
     end
 
     @testset "`ketnetwork` / `branetwork`" begin
@@ -170,7 +186,7 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
             @test contract_norm(NormNetwork(tn)) ≈ 1
 
             # The contracted norm does not depend on the chosen bra-layer name map.
-            custom = map(uniquename, keys(tn.dimname_vertices))
+            custom = map(uniquename, Indices(linknames(tn)))
             @test contract_norm(normnetwork(tn, custom)) ≈ contract_norm(NormNetwork(tn))
         end
     end
