@@ -2,10 +2,10 @@ using DataGraphs: is_vertex_assigned
 using Dictionaries: isinsertable, issettable
 using Graphs: edges, vertices
 using ITensorBase: ITensor, Index, IndexName, conj, inds, inputnames, name, names, nametype,
-    operator, outputnames, rename, uniquename
+    operator, outputnames, rename, setname, uniquename
 using ITensorNetworksNext: BraView, Greedy, ITensorNetwork, NormNetwork,
-    QuadraticFormNetwork, braname, branetwork, bratensor, conj_bratensor, factor_tensors,
-    ketnetwork, kettensor, operatornetwork, operatortensor, prod_tensors,
+    QuadraticFormNetwork, braname, branetwork, bratensor, conj_bratensor, derivedname,
+    factor_tensors, ketnetwork, kettensor, operatornetwork, operatortensor, prod_tensors,
     quadraticformnetwork, tensornetwork
 using LinearAlgebra: I, norm
 using NamedGraphs: NamedEdge, incident_edges, named_grid, named_path_graph
@@ -82,6 +82,19 @@ end
         out1, out2 = Index(2), Index(2)
         optn = ITensorNetwork(Dict(1 => randn((out1, stray)), 2 => randn((out2, s[2]))))
         op = operator(optn, [name(out1), name(out2)], [name(stray), name(s[2])])
+        @test_throws ErrorException QuadraticFormNetwork(tn, op)
+    end
+
+    @testset "a default bra name equal to an operator name" begin
+        g = named_path_graph(3)
+        tn, l, s = random_state(Float64, g)
+
+        # Each operator output takes the name the default map would derive for its input.
+        out = Dict(v => setname(Index(2), derivedname(name(s[v]), :bra)) for v in vertices(g))
+        optn = tensornetwork(v -> ITensor(Matrix(1.0I, 2, 2), (out[v], s[v])), vertices(g))
+        vs = collect(vertices(g))
+        op = operator(optn, [name(out[v]) for v in vs], [name(s[v]) for v in vs])
+
         @test_throws ErrorException QuadraticFormNetwork(tn, op)
     end
 

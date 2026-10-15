@@ -1,5 +1,5 @@
-using Dictionaries: Dictionary, Indices, dictionary, getindices
-using ITensorBase: similar_operator, uniquename
+using Dictionaries: Dictionary, dictionary
+using ITensorBase: similar_operator
 using ITensorNetworksNext
 
 """
@@ -16,19 +16,36 @@ struct NormNetwork{T, V, I} <: AbstractBilinearFormNetwork{T, V, I}
             ket::ITensorNetwork{T, V, I},
             map::Dictionary{I, I}
         ) where {T, V, I}
-        names_bra = union(linknames(ket), filter(in(keys(map)), keys(ket.dimname_vertices)))
-        return new{T, V, I}(ket, getindices(map, Indices{I}(names_bra)))
+        check_input(NormNetwork, ket, map)
+        return new{T, V, I}(ket, map)
     end
+end
+
+function NormNetwork(
+        f::Function, tn::ITensorNetwork, linknames = ITensorNetworksNext.linknames(tn)
+    )
+    return NormNetwork(tn, Dictionary(linknames, map(f, linknames)))
+end
+function NormNetwork(tn::ITensorNetwork, linknames = ITensorNetworksNext.linknames(tn))
+    return NormNetwork(name -> derivedname(name, "bra"), tn, linknames)
+end
+
+function check_input(::Type{<:NormNetwork}, ket, braname)
+    if !allunique(braname)
+        error("the bra names of a bilinear-form network must be distinct.")
+    end
+    for name in braname
+        if has_dimname(ket, name)
+            error("bra name $name is already an index name of another layer.")
+        end
+    end
+    return nothing
 end
 
 function Base.eltype(::Type{<:NormNetwork})
     return error(
         "`eltype` of a `NormNetwork` is not defined, since the double-layer tensor at a vertex has no representation of its own. Use `kettensor` and `bratensor` to reach the individual layers."
     )
-end
-
-function NormNetwork(tn::ITensorNetwork)
-    return NormNetwork(tn, map(uniquename, Indices(linknames(tn))))
 end
 
 # ==================================== DataGraphs.jl ===================================== #
@@ -63,12 +80,13 @@ function flatten_network(nn::NormNetwork)
 end
 
 """
-    normnetwork(tn::ITensorNetwork, [braname]) -> NormNetwork
+    normnetwork([f::Function], tn::ITensorNetwork, [linknames]) -> NormNetwork
+    normnetwork(tn::ITensorNetwork, braname::Dictionary) -> NormNetwork
 
-Build the double-layer norm network `⟨tn|tn⟩`, represented lazily as a `NomnNetwork` object.
-The optional second argument `braname` should implement `braname[ketdimname] = bradimname` for
-every link dimension name `ketdimname` in `tn`. If this is not specified, then a name is
-generated via the `ITensorBase.uniquename` function.
+Build the double-layer norm network `⟨tn|tn⟩`, represented lazily as a `NormNetwork` object.
+Each ket index name in `linknames` (by default `linknames(tn)`) gets the bra name `f(name)`,
+where `f` defaults to `name -> derivedname(name, "bra")`. Alternatively pass the ket→bra name
+map `braname` directly. Either way an error is thrown if two bra names coincide or a bra name
+is already an index name of `tn`.
 """
-normnetwork(tn::ITensorNetwork) = NormNetwork(tn)
-normnetwork(tn::ITensorNetwork, braname) = NormNetwork(tn, braname)
+normnetwork(args...) = NormNetwork(args...)

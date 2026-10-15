@@ -1,10 +1,11 @@
 using DataGraphs: is_vertex_assigned
 using Dictionaries: Indices, isinsertable, issettable
 using Graphs: edges, vertices
-using ITensorBase: ITensor, Index, IndexName, inds, name, nametype, uniquename
+using ITensorBase: ITensor, Index, IndexName, inds, name, nametype, plev, prime, setname,
+    tags, uniquename
 using ITensorNetworksNext: BraView, Greedy, ITensorNetwork, NormNetwork, braname,
-    branetwork, bratensor, conj_bratensor, contraction_tree, flatten_network, ketnetwork,
-    kettensor, linknames, normnetwork, prod_tensors, tensornetwork
+    branetwork, bratensor, conj_bratensor, contraction_tree, derivedname, flatten_network,
+    ketnetwork, kettensor, linknames, normnetwork, prod_tensors, tensornetwork
 using LinearAlgebra: norm
 using NamedGraphs: NamedEdge, incident_edges, named_grid, named_path_graph
 using Test: @test, @test_throws, @testset
@@ -95,6 +96,34 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
         lname = name(l[NamedEdge(1 => 2)])
         @test braname(nn, lname) == custom[lname]
         @test braname(nn, lname) in name.(inds(conj_bratensor(nn, 2)))
+    end
+
+    @testset "`derivedname`" begin
+        n = prime(name(Index(2; tags = "Link")))
+
+        # The derived name depends only on the name and key, and keeps the decoration.
+        @test derivedname(n, :bra) == derivedname(n, :bra)
+        @test derivedname(n, :bra) != n
+        @test derivedname(n, :bra) != derivedname(n, :other)
+        @test derivedname(n, :bra) != prime(n)
+        @test tags(derivedname(n, :bra)) == tags(n)
+        @test plev(derivedname(n, :bra)) == plev(n)
+    end
+
+    @testset "default and function name maps" begin
+        g = named_path_graph(3)
+        tn, l, s = random_state(Float64, g)
+        lname = name(l[NamedEdge(1 => 2)])
+
+        # Two independently constructed norm networks agree on every bra name.
+        @test braname(NormNetwork(tn), lname) == derivedname(lname, :bra)
+        @test braname(normnetwork(tn), lname) == braname(NormNetwork(tn), lname)
+        @test braname(normnetwork(prime, tn), lname) == prime(lname)
+
+        # A bra name that is already an index name of the network is rejected.
+        taken = setname(Index(2), derivedname(lname, :bra))
+        tn[1] = tn[1] * ITensor(ones(2), (taken,))
+        @test_throws ErrorException NormNetwork(tn)
     end
 
     @testset "bond to a vertex outside the network" begin
