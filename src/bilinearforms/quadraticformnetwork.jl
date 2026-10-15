@@ -1,4 +1,4 @@
-using Dictionaries: Dictionary
+using Dictionaries: Dictionary, Indices
 using ITensorBase: inputnames, outputnames, rename, state
 using ITensorNetworksNext
 
@@ -36,7 +36,7 @@ function QuadraticFormNetwork(
         linknames = ITensorNetworksNext.linknames(ket)
     )
     names = union(linknames, inputnames(operator))
-    return QuadraticFormNetwork(ket, operator, Dictionary(names, map(f, names)))
+    return QuadraticFormNetwork(ket, operator, narrow_map(f, Indices(names)))
 end
 function QuadraticFormNetwork(
         ket::ITensorNetwork,

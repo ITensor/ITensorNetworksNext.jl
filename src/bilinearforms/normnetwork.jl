@@ -1,4 +1,4 @@
-using Dictionaries: Dictionary, dictionary
+using Dictionaries: Dictionary, Indices, dictionary
 using ITensorBase: similar_operator
 using ITensorNetworksNext
 
@@ -24,7 +24,7 @@ end
 function NormNetwork(
         f::Function, tn::ITensorNetwork, linknames = ITensorNetworksNext.linknames(tn)
     )
-    return NormNetwork(tn, Dictionary(linknames, map(f, linknames)))
+    return NormNetwork(tn, narrow_map(f, Indices(linknames)))
 end
 function NormNetwork(tn::ITensorNetwork, linknames = ITensorNetworksNext.linknames(tn))
     return NormNetwork(name -> derivedname(name, "bra"), tn, linknames)
