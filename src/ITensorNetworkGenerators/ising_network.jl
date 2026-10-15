@@ -1,6 +1,6 @@
 using ..ITensorNetworksNext
 using Graphs: degree, dst, edges, src
-using ITensorBase: NamedTensor, name, uniquename
+using ITensorBase: NamedTensor, inds, name, uniquename
 using LinearAlgebra: Diagonal, eigen
 using NamedGraphs: vertextype
 
@@ -33,7 +33,7 @@ function ising_network(
     fp(e) = get(() -> l̃[reverse(e)], l̃, e)
     tn = delta_network(fp, elt, g)
     for v in sz_vertices
-        tn[v] = diagonaltensor(elt[1, -1], axes(tn[v]))
+        tn[v] = diagonaltensor(elt[1, -1], Tuple(inds(tn, v)))
     end
 
     for e in edges(g)

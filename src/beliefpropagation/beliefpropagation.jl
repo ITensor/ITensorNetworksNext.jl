@@ -246,6 +246,12 @@ factor_tensors(factors, vertex) = [factors[vertex]]
 function factor_tensors(factors::NormNetwork, vertex)
     return [kettensor(factors, vertex), bratensor(factors, vertex)]
 end
+function factor_tensors(factors::QuadraticFormNetwork, vertex)
+    return [
+        kettensor(factors, vertex), operatortensor(factors, vertex),
+        bratensor(factors, vertex),
+    ]
+end
 
 # Contract the incoming messages into the source factor to form the (unnormalized) new message on
 # `edge`.
@@ -272,9 +278,9 @@ end
 # the message is positive semidefinite and its trace is a positive normalization.
 function message_update!(algorithm::SimpleMessageUpdate, cache, factors::NormNetwork, edge)
     new_tensor = updated_message(algorithm, cache, factors, edge)
-    new_message = operator(
-        new_tensor, linknames(BraView(factors), edge), linknames(KetView(factors), edge)
-    )
+    branames = linknames(branetwork(factors), edge)
+    ketnames = linknames(ketnetwork(factors), edge)
+    new_message = operator(new_tensor, branames, ketnames)
     if algorithm.normalize
         message_norm = tr(new_message)
         iszero(message_norm) || (new_message /= message_norm)

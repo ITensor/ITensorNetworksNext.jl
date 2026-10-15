@@ -146,7 +146,7 @@ function DataGraphs.set_vertex_data!(tn::ITensorNetwork, tensor, vertex)
 end
 
 function update_tensornetwork_metadata!(tn, vertex, tensor)
-    oldnames = isassigned(tn, vertex) ? names(tn[vertex]) : Set{nametype(tn)}()
+    oldnames = isassigned(tn, vertex) ? names(tn, vertex) : Set{nametype(tn)}()
     newnames = names(tensor)
 
     update_tensornetwork_metadata!(tn, vertex, oldnames, newnames)
@@ -197,11 +197,16 @@ Graphs.add_edge!(::ITensorNetwork, _edge) = false
 
 # PERF: fast lookup compared to `AbstractITensorNetwork` fallback.
 function dimnamevertices(tn::ITensorNetwork, name)
-    return get(tn.dimname_vertices, name, Set{vertextype(tn)}())
+    return copy(get(tn.dimname_vertices, name, Set{vertextype(tn)}()))
 end
 
 # PERF: fast lookup compared to `AbstractITensorNetwork` fallback.
 has_dimname(tn::ITensorNetwork, name) = haskey(tn.dimname_vertices, name)
+
+# PERF: fast lookup compared to `AbstractITensorNetwork` fallback.
+function linknames(tn::ITensorNetwork)
+    return [name for (name, vertices) in pairs(tn.dimname_vertices) if length(vertices) == 2]
+end
 
 function NamedGraphs.similar_graph(
         T::Type{<:ITensorNetwork},
