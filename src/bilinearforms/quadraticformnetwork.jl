@@ -53,15 +53,10 @@ function check_input(::Type{<:QuadraticFormNetwork}, ket, operator, braname)
     if !issubset(inputnames(operator), keys(ket.dimname_vertices))
         error("every operator input name must be an index name of the ket layer.")
     end
-    if !allunique(braname)
-        error("the bra names of a bilinear-form network must be distinct.")
+    if !issubset(inputnames(operator), keys(braname))
+        error("every operator input name must have a bra name.")
     end
-    for name in braname
-        if has_dimname(ket, name) || has_dimname(state(operator), name)
-            error("bra name $name is already an index name of another layer.")
-        end
-    end
-    return nothing
+    return check_branamemap(ket, braname, state(operator))
 end
 
 function Base.eltype(::Type{<:QuadraticFormNetwork})
@@ -110,7 +105,9 @@ end
 Build the triple-layer network `⟨tn|op|tn⟩`, represented lazily as a `QuadraticFormNetwork`
 object. Each ket index name in `linknames` (by default `linknames(tn)`) and each input name of
 `op` gets the bra name `f(name)`, where `f` defaults to `name -> derivedname(name, "bra")`.
-Alternatively pass the ket→bra name map `braname` directly. Either way an error is thrown if
-two bra names coincide or a bra name is already an index name of `tn` or `op`.
+Alternatively pass the ket→bra name map `braname` directly. Either way the names mapped must
+include every link name of `tn` and every input name of `op` and may include others, and an
+error is thrown if one is missing, two bra names coincide or a bra name is already an index
+name of `tn` or `op`.
 """
 quadraticformnetwork(args...) = QuadraticFormNetwork(args...)

@@ -31,15 +31,7 @@ function NormNetwork(tn::ITensorNetwork, linknames = ITensorNetworksNext.linknam
 end
 
 function check_input(::Type{<:NormNetwork}, ket, braname)
-    if !allunique(braname)
-        error("the bra names of a bilinear-form network must be distinct.")
-    end
-    for name in braname
-        if has_dimname(ket, name)
-            error("bra name $name is already an index name of another layer.")
-        end
-    end
-    return nothing
+    return check_branamemap(ket, braname)
 end
 
 function Base.eltype(::Type{<:NormNetwork})
@@ -86,7 +78,8 @@ end
 Build the double-layer norm network `⟨tn|tn⟩`, represented lazily as a `NormNetwork` object.
 Each ket index name in `linknames` (by default `linknames(tn)`) gets the bra name `f(name)`,
 where `f` defaults to `name -> derivedname(name, "bra")`. Alternatively pass the ket→bra name
-map `braname` directly. Either way an error is thrown if two bra names coincide or a bra name
-is already an index name of `tn`.
+map `braname` directly. Either way the names mapped must include every link name of `tn` and
+may include others, and an error is thrown if a link name is missing, two bra names coincide
+or a bra name is already an index name of `tn`.
 """
 normnetwork(args...) = NormNetwork(args...)

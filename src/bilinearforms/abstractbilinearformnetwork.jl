@@ -17,6 +17,23 @@ where it has an operator layer, [`operatornetwork`](@ref) and [`operatortensor`]
 """
 abstract type AbstractBilinearFormNetwork{T, V, I} <: AbstractITensorNetwork{T, V} end
 
+# The checks on a ket→bra name map shared by the bilinear-form constructors; `layers` are the
+# networks other than `ket` whose index names a bra name must not reuse.
+function check_branamemap(ket, braname, layers...)
+    if !issubset(linknames(ket), keys(braname))
+        error("every link name of the ket layer must have a bra name.")
+    end
+    if !allunique(braname)
+        error("the bra names of a bilinear-form network must be distinct.")
+    end
+    for name in braname
+        if has_dimname(ket, name) || any(layer -> has_dimname(layer, name), layers)
+            error("bra name $name is already an index name of another layer.")
+        end
+    end
+    return nothing
+end
+
 # ====================================== Graphs.jl ======================================= #
 
 Graphs.edges(bn::AbstractBilinearFormNetwork) = edges(ketnetwork(bn))
