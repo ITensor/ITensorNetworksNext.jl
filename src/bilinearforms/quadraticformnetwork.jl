@@ -66,8 +66,8 @@ end
 
 function Base.eltype(::Type{<:QuadraticFormNetwork})
     return error(
-        "`eltype` of a `QuadraticFormNetwork` is not defined, since the triple-layer tensor \\
-        at a vertex has no representation of its own. Use `kettensor`, `operatortensor` and \\ 
+        "`eltype` of a `QuadraticFormNetwork` is not defined, since the triple-layer tensor \
+        at a vertex has no representation of its own. Use `kettensor`, `operatortensor` and \
         `bratensor` to reach the individual layers."
     )
 end
@@ -76,8 +76,8 @@ end
 
 function DataGraphs.get_vertex_data(qf::QuadraticFormNetwork, vertex)
     return error(
-        "Indexing a `QuadraticFormNetwork` is not defined, since the triple-layer tensor at \\
-        a vertex has no representation of its own. Use `kettensor`, `operatortensor` and \\ 
+        "Indexing a `QuadraticFormNetwork` is not defined, since the triple-layer tensor at \
+        a vertex has no representation of its own. Use `kettensor`, `operatortensor` and \
         `bratensor` to reach the individual layers."
     )
 end
