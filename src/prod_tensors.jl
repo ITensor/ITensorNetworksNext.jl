@@ -64,10 +64,11 @@ struct Greedy <: ContractionTreeAlgorithm end
 function contraction_tree(::Greedy, tensors)
     ks = collect(keys(tensors))
     isempty(ks) && throw(ArgumentError("No tensors to contract."))
+    # Function barrier, since `inds` is not type stable.
+    return _contraction_tree_greedy(ks, [inds(tensors[k]) for k in ks])
+end
+function _contraction_tree_greedy(ks, is)
     trees = map(ContractionTree, ks)
-    # The inds of each pending operand. An intermediate never materializes, so its inds are
-    # tracked here rather than read off a tensor.
-    is = [inds(tensors[k]) for k in ks]
     # Indices are matched by name with linear scans rather than `Set`s: operands carry only a
     # few indices, and hashing an index can be expensive (it may hash a whole graded axis).
     # Index equality is also by name (plus the ungraded length), so a bond matches its dual.
