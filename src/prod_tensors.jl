@@ -1,6 +1,6 @@
 using AbstractTrees: nodevalue
 using Combinatorics: combinations
-using ITensorBase: inds
+using ITensorBase: inds, name
 
 """
     ContractionTreeAlgorithm
@@ -64,26 +64,38 @@ struct Greedy <: ContractionTreeAlgorithm end
 function contraction_tree(::Greedy, tensors)
     ks = collect(keys(tensors))
     isempty(ks) && throw(ArgumentError("No tensors to contract."))
+    # Function barrier, since `inds` is not type stable.
+    return _contraction_tree_greedy(ks, [inds(tensors[k]) for k in ks])
+end
+function _contraction_tree_greedy(ks, is)
     trees = map(ContractionTree, ks)
-    # The inds of each pending operand. An intermediate never materializes, so its inds are
-    # tracked here rather than read off a tensor.
-    is = [inds(tensors[k]) for k in ks]
+    # Indices are matched by name with linear scans rather than `Set`s: operands carry only a
+    # few indices, and hashing an index can be expensive (it may hash a whole graded axis).
+    # Index equality is also by name (plus the ungraded length), so a bond matches its dual.
+    hasname(js, i) = any(j -> name(j) == name(i), js)
     while length(trees) > 1
         i1, i2 = argmin(combinations(eachindex(trees), 2)) do (i, j)
             # Defer outer products: with nothing contracted they cost the full product of both
             # operands, and taking one early inflates every contraction that follows.
-            isdisjoint(is[i], is[j]) && return typemax(Int)
+            any(k -> hasname(is[j], k), is[i]) || return typemax(Int)
             # Every index on either operand is iterated once, shared ones counted once.
-            return prod(length, union(is[i], is[j]); init = 1)
+            unique_j = (k for k in is[j] if !hasname(is[i], k))
+            return prod(length, is[i]; init = 1) * prod(length, unique_j; init = 1)
         end
         # Shared indices are summed over, so the result carries the symmetric difference.
-        contracted = symdiff(is[i1], is[i2])
+        contracted = [
+            filter(k -> !hasname(is[i2], k), is[i1]);
+            filter(k -> !hasname(is[i1], k), is[i2])
+        ]
         tree = ContractionTree(trees[i1], trees[i2])
         # Remove the pair by position. Removing it by value would also drop any other operand
         # equal to it, silently losing a tensor from a network with repeated tensors.
-        keep = [i for i in eachindex(trees) if i ∉ (i1, i2)]
-        trees = [trees[keep]; [tree]]
-        is = [is[keep]; [contracted]]
+        # Updating in place rather than rebinding also keeps `is`, captured by the closures above,
+        # from being boxed.
+        deleteat!(trees, (i1, i2))
+        push!(trees, tree)
+        deleteat!(is, (i1, i2))
+        push!(is, contracted)
     end
     return only(trees)
 end
