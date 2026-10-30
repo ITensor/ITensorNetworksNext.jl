@@ -1,13 +1,15 @@
 using DataGraphs: is_vertex_assigned
-using Dictionaries: Indices, isinsertable, issettable
-using Graphs: edges, vertices
+using Dictionaries: Dictionary, Indices, isinsertable, issettable
+using Graphs: edges, neighbors, vertices
 using ITensorBase:
     ITensor, Index, IndexName, inds, name, nametype, plev, prime, setname, tags, uniquename
 using ITensorNetworksNext: BraView, Greedy, ITensorNetwork, NormNetwork, braname,
-    branetwork, bratensor, conj_bratensor, contraction_tree, derivedname, flatten_network,
-    ketnetwork, kettensor, linknames, normnetwork, prod_tensors, tensornetwork
+    branetwork, bratensor, conj_bratensor, contraction_tree, derivedname, dimnamevertices,
+    flatten_network, has_dimname, ketnetwork, kettensor, linknames, normnetwork,
+    prod_tensors, sitenames, tensornetwork
 using LinearAlgebra: norm
-using NamedGraphs: NamedEdge, incident_edges, named_grid, named_path_graph
+using NamedGraphs: NamedEdge, decoded_vertex, encoded_graph, encoded_vertex, incident_edges,
+    named_grid, named_path_graph
 using Test: @test, @test_throws, @testset
 
 # Build a random `ITensorNetwork` state on the graph `g` with site dimension `d` and
@@ -127,6 +129,23 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
         @test_throws ErrorException NormNetwork(tn)
     end
 
+    @testset "rejected name maps" begin
+        g = named_path_graph(3)
+        tn, l, s = random_state(Float64, g)
+        l12 = name(l[NamedEdge(1 => 2)])
+        l23 = name(l[NamedEdge(2 => 3)])
+
+        # A map without a bra name for the link 2 => 3 is rejected.
+        @test_throws ErrorException normnetwork(tn, Dictionary([l12], [uniquename(l12)]))
+
+        # Two links sharing a bra name would join two separate bonds in the bra layer.
+        shared = uniquename(l12)
+        @test_throws ErrorException normnetwork(
+            tn,
+            Dictionary([l12, l23], [shared, shared])
+        )
+    end
+
     @testset "bond to a vertex outside the network" begin
         g = named_path_graph(3)
         tn, l, s = random_state(Float64, g)
@@ -165,6 +184,43 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
         # The view inherits the (non-)mutability of its parent norm network.
         @test !issettable(bv)
         @test !isinsertable(bv)
+    end
+
+    @testset "`BraView` index lookups" begin
+        g = named_path_graph(3)
+        tn, l, s = random_state(Float64, g)
+        nn = NormNetwork(tn)
+        bv = branetwork(nn)
+        lname = name(l[NamedEdge(1 => 2)])
+        bname = braname(nn, lname)
+
+        # The generic lookups read the bra-layer names through `inds(bv, v)`, so the bra link
+        # name sits on both ends of the bond and the ket link name is absent.
+        @test inds(bv, 2) == inds(bv[2])
+        @test dimnamevertices(bv, bname) == Set([1, 2])
+        @test dimnamevertices(bv, name(s[2])) == Set([2])
+        @test isempty(dimnamevertices(bv, lname))
+        @test has_dimname(bv, bname)
+        @test !has_dimname(bv, lname)
+        @test issetequal(linknames(bv), [braname(nn, name(l[e])) for e in edges(g)])
+        @test sitenames(bv, 2) == [name(s[2])]
+    end
+
+    @testset "vertex encoding" begin
+        g = named_grid((2, 3))
+        tn, l, s = random_state(Float64, g)
+        nn = NormNetwork(tn)
+        bv = branetwork(nn)
+
+        # The norm network and its bra view number the grid vertices as the ket layer does.
+        @test encoded_graph(nn) == encoded_graph(tn)
+        @test encoded_graph(bv) == encoded_graph(tn)
+        for net in (nn, bv), v in vertices(g)
+            code = encoded_vertex(net, v)
+            @test code == encoded_vertex(tn, v)
+            @test decoded_vertex(net, code) == v
+            @test issetequal(neighbors(net, v), neighbors(g, v))
+        end
     end
 
     @testset "`flatten_network`" begin
