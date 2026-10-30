@@ -1,15 +1,15 @@
 using Dictionaries: Dictionary, Indices, dictionary
-using ITensorBase: ITensorBase, conj, nametype, rename, similar_operator
+using ITensorBase: similar_operator
 using ITensorNetworksNext
 
 """
-    struct NormNetwork{T, V, I} <: AbstractITensorNetwork{T, V}
+    struct NormNetwork{T, V, I} <: AbstractBilinearFormNetwork{T, V, I}
 
 Lazy wrapper representing the norm `⟨tn|tn⟩` of `tn::ITensorNetwork{T, V, I}`,
 together with a per-edge ket→bra name mapping that, for each index in the ket layer, defines
 the name of the corresponding index in the bra layer.
 """
-struct NormNetwork{T, V, I} <: AbstractITensorNetwork{T, V}
+struct NormNetwork{T, V, I} <: AbstractBilinearFormNetwork{T, V, I}
     ket::ITensorNetwork{T, V, I}
     braname::Dictionary{I, I}
     function NormNetwork(
@@ -31,18 +31,7 @@ function NormNetwork(tn::ITensorNetwork, linknames = ITensorNetworksNext.linknam
 end
 
 function check_input(::Type{<:NormNetwork}, ket, braname)
-    if !issubset(linknames(ket), keys(braname))
-        error("every link name of the ket layer must have a bra name.")
-    end
-    if !allunique(braname)
-        error("the bra names of a norm network must be distinct.")
-    end
-    for name in braname
-        if has_dimname(ket, name)
-            error("bra name $name is already an index name of the ket layer.")
-        end
-    end
-    return nothing
+    return check_branamemap(ket, braname)
 end
 
 function Base.eltype(::Type{<:NormNetwork})
@@ -50,21 +39,6 @@ function Base.eltype(::Type{<:NormNetwork})
         "`eltype` of a `NormNetwork` is not defined, since the double-layer tensor at a vertex has no representation of its own. Use `kettensor` and `bratensor` to reach the individual layers."
     )
 end
-
-# ====================================== Graphs.jl ======================================= #
-
-Graphs.edges(nn::NormNetwork) = edges(ketnetwork(nn))
-Graphs.vertices(nn::NormNetwork) = vertices(ketnetwork(nn))
-
-# ==================================== NamedGraphs.jl ==================================== #
-
-function NamedGraphs.encoded_vertex(nn::NormNetwork, vertex)
-    return encoded_vertex(ketnetwork(nn), vertex)
-end
-function NamedGraphs.decoded_vertex(nn::NormNetwork, code::Integer)
-    return decoded_vertex(ketnetwork(nn), code)
-end
-NamedGraphs.encoded_graph(nn::NormNetwork) = encoded_graph(ketnetwork(nn))
 
 # ==================================== DataGraphs.jl ===================================== #
 
@@ -74,73 +48,10 @@ function DataGraphs.get_vertex_data(nn::NormNetwork, vertex)
     )
 end
 
-function DataGraphs.is_vertex_assigned(nn::NormNetwork, vertex)
-    return isassigned(ketnetwork(nn), vertex)
-end
-
-# =================================== Dictionaries.jl ==================================== #
-
-Dictionaries.issettable(::NormNetwork) = false
-Dictionaries.isinsertable(::NormNetwork) = false
-
 # ====================================== interface ======================================= #
 
-# The name type of the indices, the same as the ket network's.
-ITensorBase.nametype(::Type{<:NormNetwork{T, V, I}}) where {T, V, I} = I
-ITensorBase.nametype(nn::NormNetwork) = nametype(typeof(nn))
-
-"""
-    ketnetwork(nn::NormNetwork)
-
-The ket-layer network of `nn`.
-"""
 ketnetwork(nn::NormNetwork) = nn.ket
-
-"""
-    branetwork(nn::NormNetwork)
-
-The bra-layer network of `nn`, a `BraView` whose tensors are built by [`bratensor`](@ref) when
-accessed.
-"""
-branetwork(nn::NormNetwork) = BraView(nn)
-
-"""
-    branamemap(nn::NormNetwork)
-
-The ket→bra name map, holding a bra name for each ket index name that has a separate bra copy.
-"""
 branamemap(nn::NormNetwork) = nn.braname
-
-"""
-    braname(nn::NormNetwork, name)
-
-The bra-layer index name corresponding to the ket-layer index name `name`.
-"""
-function braname(nn::NormNetwork, name)
-    if !has_dimname(ketnetwork(nn), name)
-        error("index name $name not found underlying tensor network.")
-    end
-    # The names absent from the map are the site indices, which map to themselves.
-    return get(branamemap(nn), name, name)
-end
-
-"""
-    kettensor(nn::NormNetwork, vertex)
-
-The ket-layer tensor at `vertex`.
-"""
-kettensor(nn::NormNetwork, vertex) = ketnetwork(nn)[vertex]
-
-function conj_bratensor(nn::NormNetwork, vertex)
-    return rename(n -> braname(nn, n), kettensor(nn, vertex))
-end
-
-"""
-    bratensor(nn::NormNetwork, vertex)
-
-The bra-layer tensor at `vertex`.
-"""
-bratensor(nn::NormNetwork, vertex) = conj(conj_bratensor(nn, vertex))
 
 """
     flatten_network(nn::NormNetwork) -> ITensorNetwork
