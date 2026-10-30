@@ -11,13 +11,15 @@ Supertype of the lazy multi-layer networks built from a ket layer of type
 `ITensorNetwork{T, V, I}` and a ket→bra index name mapping.
 
 A subtype implements [`ketnetwork`](@ref) and [`branamemap`](@ref), from which the graph
-structure, [`braname`](@ref), [`kettensor`](@ref) and [`bratensor`](@ref) are defined. The
-layers as whole networks are returned by [`ketnetwork`](@ref) and [`branetwork`](@ref).
+structure, [`braname`](@ref), [`kettensor`](@ref) and [`bratensor`](@ref) are defined, and,
+where it has an operator layer, [`operatornetwork`](@ref) and [`operatortensor`](@ref). The layers as whole networks are returned by [`ketnetwork`](@ref),
+[`branetwork`](@ref) and [`operatornetwork`](@ref).
 """
 abstract type AbstractBilinearFormNetwork{T, V, I} <: AbstractITensorNetwork{T, V} end
 
-# The checks on a ket→bra name map shared by the bilinear-form constructors.
-function check_branamemap(ket, braname)
+# The checks on a ket→bra name map shared by the bilinear-form constructors; `layers` are the
+# networks other than `ket` whose index names a bra name must not reuse.
+function check_branamemap(ket, braname, layers...)
     if !issubset(linknames(ket), keys(braname))
         error("every link name of the ket layer must have a bra name.")
     end
@@ -25,8 +27,8 @@ function check_branamemap(ket, braname)
         error("the bra names of a bilinear-form network must be distinct.")
     end
     for name in braname
-        if has_dimname(ket, name)
-            error("bra name $name is already an index name of the ket layer.")
+        if has_dimname(ket, name) || any(layer -> has_dimname(layer, name), layers)
+            error("bra name $name is already an index name of another layer.")
         end
     end
     return nothing
@@ -96,6 +98,14 @@ The ket-layer tensor at `vertex`.
 """
 kettensor(bn::AbstractBilinearFormNetwork, vertex) = ketnetwork(bn)[vertex]
 
+"""
+    operatortensor(bn::AbstractBilinearFormNetwork, vertex)
+
+The operator-layer tensor at `vertex`, with its index names renamed so that its input legs
+meet the ket layer and its output legs meet the bra layer.
+"""
+function operatortensor end
+
 function conj_bratensor(bn::AbstractBilinearFormNetwork, vertex)
     return rename(n -> braname(bn, n), kettensor(bn, vertex))
 end
@@ -113,6 +123,13 @@ bratensor(bn::AbstractBilinearFormNetwork, vertex) = conj(conj_bratensor(bn, ver
 The ket-layer network of `bn`.
 """
 function ketnetwork end
+
+"""
+    operatornetwork(bn::AbstractBilinearFormNetwork)
+
+The operator-layer network of `bn`, for a subtype that has an operator layer.
+"""
+function operatornetwork end
 
 """
     branetwork(bn::AbstractBilinearFormNetwork)
