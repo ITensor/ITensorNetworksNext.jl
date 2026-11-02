@@ -21,15 +21,6 @@ struct NormNetwork{T, V, I} <: AbstractITensorNetwork{T, V}
     end
 end
 
-function NormNetwork(
-        f::Function, tn::ITensorNetwork, linknames = ITensorNetworksNext.linknames(tn)
-    )
-    return NormNetwork(tn, narrow_map(f, Indices(linknames)))
-end
-function NormNetwork(tn::ITensorNetwork, linknames = ITensorNetworksNext.linknames(tn))
-    return NormNetwork(name -> derivedname(name, "bra"), tn, linknames)
-end
-
 function check_input(::Type{<:NormNetwork}, ket, braname)
     if !issubset(linknames(ket), keys(braname))
         error("every link name of the ket layer must have a bra name.")
@@ -161,14 +152,20 @@ function flatten_network(nn::NormNetwork)
 end
 
 """
-    normnetwork([f::Function], tn::ITensorNetwork, [linknames]) -> NormNetwork
+    normnetwork([f::Function], tn::ITensorNetwork, [dangling]) -> NormNetwork
     normnetwork(tn::ITensorNetwork, braname::Dictionary) -> NormNetwork
 
 Build the double-layer norm network `⟨tn|tn⟩`, represented lazily as a `NormNetwork` object.
-Each ket index name in `linknames` (by default `linknames(tn)`) gets the bra name `f(name)`,
-where `f` defaults to `name -> derivedname(name, "bra")`. Alternatively pass the ket→bra name
-map `braname` directly. Either way the names mapped must include every link name of `tn` and
-may include others, and an error is thrown if a link name is missing, two bra names coincide
-or a bra name is already an index name of `tn`.
+Each ket index name in `union(dangling, linknames(tn))` gets the bra name `f(name)`,
+where `f` defaults to `name -> derivedname(name, "bra")`, and `dangling` is empty by default.
+Alternatively pass the ket→bra name map `braname` directly, which must include every link
+name of `tn` and may include others. Either way an error is thrown if a link name is missing,
+two bra names coincide or a bra name is already an index name of `tn`.
 """
-normnetwork(args...) = NormNetwork(args...)
+normnetwork(tn::ITensorNetwork, braname::Dictionary) = NormNetwork(tn, braname)
+function normnetwork(f::Function, tn::ITensorNetwork, dangling = nametype(tn)[])
+    return normnetwork(tn, narrow_map(f, Indices(union(linknames(tn), dangling))))
+end
+function normnetwork(tn::ITensorNetwork, dangling = nametype(tn)[])
+    return normnetwork(name -> derivedname(name, "bra"), tn, dangling)
+end

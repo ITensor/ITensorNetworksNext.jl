@@ -32,10 +32,7 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
     @testset "Basics" begin
         g = named_path_graph(3)
         tn, l, s = random_state(Float64, g)
-        nn = NormNetwork(tn)
-
-        # `normnetwork` is the public constructor and agrees with `NormNetwork`.
-        @test normnetwork(tn) isa NormNetwork
+        nn = normnetwork(tn)
         @test nn isa NormNetwork
 
         # The norm network shares the graph structure of the underlying network.
@@ -59,7 +56,7 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
     @testset "kettensor / bratensor / conj_bratensor and the name map" begin
         g = named_path_graph(3)
         tn, l, s = random_state(Float64, g)
-        nn = NormNetwork(tn)
+        nn = normnetwork(tn)
 
         # `kettensor` returns the underlying tensor untouched.
         @test kettensor(nn, 2) === tn[2]
@@ -118,14 +115,14 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
         lname = name(l[NamedEdge(1 => 2)])
 
         # Two independently constructed norm networks agree on every bra name.
-        @test braname(NormNetwork(tn), lname) == derivedname(lname, :bra)
-        @test braname(normnetwork(tn), lname) == braname(NormNetwork(tn), lname)
+        @test braname(normnetwork(tn), lname) == derivedname(lname, :bra)
+        @test braname(normnetwork(tn), lname) == braname(normnetwork(tn), lname)
         @test braname(normnetwork(prime, tn), lname) == prime(lname)
 
         # A bra name that is already an index name of the network is rejected.
         taken = setname(Index(2), derivedname(lname, :bra))
         tn[1] = tn[1] * ITensor(ones(2), (taken,))
-        @test_throws ErrorException NormNetwork(tn)
+        @test_throws ErrorException normnetwork(tn)
     end
 
     @testset "rejected name maps" begin
@@ -165,7 +162,7 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
     @testset "`ketnetwork` / `branetwork`" begin
         g = named_path_graph(3)
         tn, l, s = random_state(Float64, g)
-        nn = NormNetwork(tn)
+        nn = normnetwork(tn)
 
         # The ket layer is the network the norm network was built from.
         @test ketnetwork(nn) === tn
@@ -188,7 +185,7 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
     @testset "`BraView` index lookups" begin
         g = named_path_graph(3)
         tn, l, s = random_state(Float64, g)
-        nn = NormNetwork(tn)
+        nn = normnetwork(tn)
         bv = branetwork(nn)
         lname = name(l[NamedEdge(1 => 2)])
         bname = braname(nn, lname)
@@ -207,7 +204,7 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
     @testset "graph structure on a grid" begin
         g = named_grid((2, 3))
         tn, l, s = random_state(Float64, g)
-        nn = NormNetwork(tn)
+        nn = normnetwork(tn)
         bv = branetwork(nn)
 
         # The norm network and its bra layer have the same neighbors and edges as the grid.
@@ -223,7 +220,7 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
     @testset "`flatten_network`" begin
         g = named_path_graph(3)
         tn, l, s = random_state(Float64, g)
-        nn = NormNetwork(tn)
+        nn = normnetwork(tn)
         flat = flatten_network(nn)
 
         # One vertex per layer, so the vertex count doubles and each carries its layer's tensor.
@@ -249,7 +246,7 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
             v = randn(s)
             v = v / norm(v)
             tn = ITensorNetwork(Dict(1 => v))
-            nn = NormNetwork(tn)
+            nn = normnetwork(tn)
 
             # ⟨ψ|ψ⟩ for a single normalized site tensor is 1.
             @test contract_norm(nn) ≈ 1
@@ -260,18 +257,18 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
             tn, l, s = random_state(T, g)
 
             # The norm network contracts to ⟨tn|tn⟩ = ‖prod(tn)‖², a real nonnegative number.
-            z = contract_norm(NormNetwork(tn))
+            z = contract_norm(normnetwork(tn))
             @test z ≈ norm(prod(tn))^2
             @test imag(z) ≈ 0 atol = 1.0e-12 * abs(z)
             @test real(z) > 0
 
             # Rescaling a single tensor by 1/√z normalizes the state, so ⟨tn|tn⟩ = 1.
             tn[first(vertices(tn))] = tn[first(vertices(tn))] / sqrt(real(z))
-            @test contract_norm(NormNetwork(tn)) ≈ 1
+            @test contract_norm(normnetwork(tn)) ≈ 1
 
             # The contracted norm does not depend on the chosen bra-layer name map.
             custom = map(uniquename, Indices(linknames(tn)))
-            @test contract_norm(normnetwork(tn, custom)) ≈ contract_norm(NormNetwork(tn))
+            @test contract_norm(normnetwork(tn, custom)) ≈ contract_norm(normnetwork(tn))
         end
     end
 end
