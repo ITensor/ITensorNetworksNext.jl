@@ -114,15 +114,15 @@ using Test: @test, @test_throws, @testset
         @test linkinds(tn, 1 => 2) == [l[E(1 => 2)]]
         @test linkinds(tn, E(1 => 2)) == [l[E(1 => 2)]]
 
-        @test linkaxes(tn, 1 => 2) == [l[E(1 => 2)]]
-        @test linkaxes(tn, E(1 => 2)) == [l[E(1 => 2)]]
+        @test linkaxes(tn, 1 => 2) == (l[E(1 => 2)],)
+        @test linkaxes(tn, E(1 => 2)) == (l[E(1 => 2)],)
 
         @test linknames(tn, 1 => 2) == [name(l[E(1 => 2)])]
         @test linknames(tn, E(1 => 2)) == [name(l[E(1 => 2)])]
         @test issetequal(linknames(tn), [name(l[e]) for e in edges(g)])
 
         @test siteinds(tn, 1) == [s[1]]
-        @test siteaxes(tn, 2) == [s[2]]
+        @test siteaxes(tn, 2) == (s[2],)
         @test sitenames(tn, 3) == [name(s[3])]
     end
 

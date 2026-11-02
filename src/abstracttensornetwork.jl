@@ -55,7 +55,7 @@ function linkaxes(tn::AbstractGraph, edge::Pair)
 end
 function linkaxes(tn::AbstractGraph, edge::AbstractEdge)
     ln = linknames(tn, edge)
-    return [ax for ax in axes(tn, src(edge)) if name(ax) in ln]
+    return Tuple(ax for ax in axes(tn, src(edge)) if name(ax) in ln)
 end
 function linknames(tn::AbstractGraph, edge::Pair)
     return linknames(tn, edgetype(tn)(edge))
@@ -79,7 +79,7 @@ function siteaxes(tn::AbstractGraph, v)
     for v′ in neighbors(tn, v)
         s = setdiff(s, axes(tn, v′))
     end
-    return s
+    return Tuple(s)
 end
 function sitenames(tn::AbstractGraph, v)
     s = names(tn, v)
@@ -91,15 +91,7 @@ end
 
 # Return the non-link vertices associated with an dim name
 function dimnamevertices(tn::AbstractGraph, name)
-    sites = Set{vertextype(tn)}()
-
-    for v in vertices(tn)
-        if name ∈ names(tn, v)
-            push!(sites, v)
-        end
-    end
-
-    return sites
+    return Indices(filter(v -> name ∈ names(tn, v), vertices(tn)))
 end
 
 function has_dimname(tn::AbstractGraph, name)

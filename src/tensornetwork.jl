@@ -11,11 +11,11 @@ using SplitApplyCombine: mapview
 
 struct ITensorNetwork{T, V, I} <: AbstractITensorNetwork{T, V}
     tensors::Dictionary{V, T}
-    dimname_vertices::Dictionary{I, Set{V}}
+    dimname_vertices::Dictionary{I, Indices{V}}
     underlying_graph::NamedGraph{V}
     function ITensorNetwork{T, V, I}(::UndefInitializer, vertices) where {T, V, I}
         tensors = Dictionary{V, T}()
-        dimname_vertices = Dictionary{I, Set{V}}()
+        dimname_vertices = Dictionary{I, Indices{V}}()
         underlying_graph = NamedGraph(vertices)
         return new{T, V, I}(tensors, dimname_vertices, underlying_graph)
     end
@@ -118,7 +118,7 @@ DataGraphs.get_vertex_data(tn::ITensorNetwork, v) = tn.tensors[v]
 
 function check_input(::typeof(set_vertex_data!), tn, tensor, vertex)
     for name in names(tensor)
-        vertices = get(tn.dimname_vertices, name, Set())
+        vertices = get(tn.dimname_vertices, name, Indices{vertextype(tn)}())
         if length(setdiff(vertices, Set([vertex]))) > 1
             throw(
                 ArgumentError(
@@ -165,7 +165,7 @@ function update_tensornetwork_metadata!(tn, vertex, oldnames, newnames)
 
         # Now `name` must be a new index that's not in `oldinds`
 
-        vertex_list = get!(tn.dimname_vertices, name, Set())
+        vertex_list = get!(tn.dimname_vertices, name, Indices{vertextype(tn)}())
         if length(vertex_list) > 1
             throw(
                 ArgumentError(
@@ -173,7 +173,7 @@ function update_tensornetwork_metadata!(tn, vertex, oldnames, newnames)
                 )
             )
         end
-        push!(vertex_list, vertex)
+        insert!(vertex_list, vertex)
 
         # Add an edge if the index is now shared between two vertices.
         if length(vertex_list) == 2
@@ -197,7 +197,7 @@ Graphs.add_edge!(::ITensorNetwork, _edge) = false
 
 # PERF: fast lookup compared to `AbstractITensorNetwork` fallback.
 function dimnamevertices(tn::ITensorNetwork, name)
-    return copy(get(tn.dimname_vertices, name, Set{vertextype(tn)}()))
+    return copy(get(tn.dimname_vertices, name, Indices{vertextype(tn)}()))
 end
 
 # PERF: fast lookup compared to `AbstractITensorNetwork` fallback.

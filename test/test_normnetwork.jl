@@ -192,8 +192,8 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
 
         # The bra layer has the bra link names and the same site names as the ket layer.
         @test inds(bv, 2) == inds(bv[2])
-        @test dimnamevertices(bv, bname) == Set([1, 2])
-        @test dimnamevertices(bv, name(s[2])) == Set([2])
+        @test issetequal(dimnamevertices(bv, bname), [1, 2])
+        @test issetequal(dimnamevertices(bv, name(s[2])), [2])
         @test isempty(dimnamevertices(bv, lname))
         @test has_dimname(bv, bname)
         @test !has_dimname(bv, lname)
