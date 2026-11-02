@@ -1,6 +1,6 @@
 using DataGraphs: is_vertex_assigned
 using Dictionaries: Dictionary, Indices, isinsertable, issettable
-using Graphs: edges, neighbors, vertices
+using Graphs: edges, has_edge, neighbors, vertices
 using ITensorBase:
     ITensor, Index, IndexName, inds, name, nametype, plev, prime, setname, tags, uniquename
 using ITensorNetworksNext: BraView, Greedy, ITensorNetwork, NormNetwork, braname,
@@ -8,8 +8,7 @@ using ITensorNetworksNext: BraView, Greedy, ITensorNetwork, NormNetwork, braname
     flatten_network, has_dimname, ketnetwork, kettensor, linknames, normnetwork,
     prod_tensors, sitenames, tensornetwork
 using LinearAlgebra: norm
-using NamedGraphs: NamedEdge, decoded_vertex, encoded_graph, encoded_vertex, incident_edges,
-    named_grid, named_path_graph
+using NamedGraphs: NamedEdge, incident_edges, named_grid, named_path_graph
 using Test: @test, @test_throws, @testset
 
 # Build a random `ITensorNetwork` state on the graph `g` with site dimension `d` and
@@ -135,10 +134,10 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
         l12 = name(l[NamedEdge(1 => 2)])
         l23 = name(l[NamedEdge(2 => 3)])
 
-        # A map without a bra name for the link 2 => 3 is rejected.
+        # A map missing the bra name of the link 2 => 3 is rejected.
         @test_throws ErrorException normnetwork(tn, Dictionary([l12], [uniquename(l12)]))
 
-        # Two links sharing a bra name would join two separate bonds in the bra layer.
+        # A map giving two links the same bra name is rejected.
         shared = uniquename(l12)
         @test_throws ErrorException normnetwork(
             tn,
@@ -194,8 +193,7 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
         lname = name(l[NamedEdge(1 => 2)])
         bname = braname(nn, lname)
 
-        # The generic lookups read the bra-layer names through `inds(bv, v)`, so the bra link
-        # name sits on both ends of the bond and the ket link name is absent.
+        # The bra layer has the bra link names and the same site names as the ket layer.
         @test inds(bv, 2) == inds(bv[2])
         @test dimnamevertices(bv, bname) == Set([1, 2])
         @test dimnamevertices(bv, name(s[2])) == Set([2])
@@ -206,21 +204,20 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
         @test sitenames(bv, 2) == [name(s[2])]
     end
 
-    @testset "vertex encoding" begin
+    @testset "graph structure on a grid" begin
         g = named_grid((2, 3))
         tn, l, s = random_state(Float64, g)
         nn = NormNetwork(tn)
         bv = branetwork(nn)
 
-        # The norm network and its bra view number the grid vertices as the ket layer does.
-        @test encoded_graph(nn) == encoded_graph(tn)
-        @test encoded_graph(bv) == encoded_graph(tn)
-        for net in (nn, bv), v in vertices(g)
-            code = encoded_vertex(net, v)
-            @test code == encoded_vertex(tn, v)
-            @test decoded_vertex(net, code) == v
-            @test issetequal(neighbors(net, v), neighbors(g, v))
+        # The norm network and its bra layer have the same neighbors and edges as the grid.
+        for v in vertices(g)
+            @test issetequal(neighbors(nn, v), neighbors(g, v))
+            @test issetequal(neighbors(bv, v), neighbors(g, v))
         end
+        @test has_edge(nn, (1, 1) => (1, 2))
+        @test has_edge(bv, (1, 1) => (1, 2))
+        @test !has_edge(nn, (1, 1) => (2, 2))
     end
 
     @testset "`flatten_network`" begin
