@@ -61,7 +61,8 @@ function linknames(tn::AbstractGraph, edge::Pair)
     return linknames(tn, edgetype(tn)(edge))
 end
 function linknames(tn::AbstractGraph, edge::AbstractEdge)
-    return names(tn, src(edge)) ∩ names(tn, dst(edge))
+    dstnames = names(tn, dst(edge))
+    return [n for n in names(tn, src(edge)) if n in dstnames]
 end
 eachlinkname(tn::AbstractGraph) = Iterators.flatten(linknames(tn, e) for e in edges(tn))
 

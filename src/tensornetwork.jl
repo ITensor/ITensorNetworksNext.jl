@@ -203,7 +203,7 @@ end
 # PERF: fast lookup compared to `AbstractITensorNetwork` fallback.
 has_dimname(tn::ITensorNetwork, name) = haskey(tn.dimname_vertices, name)
 
-# PERF: still linear compared to generic method, but in practice order of magnitudes faster.
+# PERF: still linear compared to generic method, but in practice 5x faster
 function eachlinkname(tn::ITensorNetwork)
     return (
         name for (name, vertices) in pairs(tn.dimname_vertices) if length(vertices) == 2
