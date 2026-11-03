@@ -22,7 +22,7 @@ struct NormNetwork{T, V, I} <: AbstractITensorNetwork{T, V}
 end
 
 function check_input(::Type{<:NormNetwork}, ket, braname)
-    if !issubset(linknames(ket), keys(braname))
+    if !issubset(eachlinkname(ket), keys(braname))
         error("every link name of the ket layer must have a bra name.")
     end
     if !allunique(braname)
@@ -156,7 +156,7 @@ end
     normnetwork(tn::ITensorNetwork, braname::Dictionary) -> NormNetwork
 
 Build the double-layer norm network `⟨tn|tn⟩`, represented lazily as a `NormNetwork` object.
-Each ket index name in `union(dangling, linknames(tn))` gets the bra name `f(name)`,
+Each ket index name in `union(dangling, eachlinkname(tn))` gets the bra name `f(name)`,
 where `f` defaults to `name -> derivedname(name, "bra")`, and `dangling` is empty by default.
 Alternatively pass the ket→bra name map `braname` directly, which must include every link
 name of `tn` and may include others. Either way an error is thrown if a link name is missing,
@@ -164,7 +164,8 @@ two bra names coincide or a bra name is already an index name of `tn`.
 """
 normnetwork(tn::ITensorNetwork, braname::Dictionary) = NormNetwork(tn, braname)
 function normnetwork(f::Function, tn::ITensorNetwork, dangling = nametype(tn)[])
-    return normnetwork(tn, narrow_map(f, Indices(union(linknames(tn), dangling))))
+    names = Indices{nametype(tn)}(union(eachlinkname(tn), dangling))
+    return normnetwork(tn, narrow_map(f, names))
 end
 function normnetwork(tn::ITensorNetwork, dangling = nametype(tn)[])
     return normnetwork(name -> derivedname(name, "bra"), tn, dangling)

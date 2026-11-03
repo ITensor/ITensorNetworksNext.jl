@@ -3,8 +3,8 @@ using DataGraphs:
 using Graphs: add_edge!, add_vertex!, dst, edges, edgetype, has_edge, has_vertex,
     is_directed, ne, nv, rem_edge!, rem_vertex!, src, vertices
 using ITensorBase: Index, inds, name, operator
-using ITensorNetworksNext: ITensorNetwork, has_ind, linkaxes, linkinds, linknames,
-    operator_support, siteaxes, siteinds, sitenames, tensornetwork
+using ITensorNetworksNext: ITensorNetwork, eachlinkname, has_ind, linkaxes, linkinds,
+    linknames, operator_support, siteaxes, siteinds, sitenames, tensornetwork
 using NamedGraphs: convert_vertextype, incident_edges, named_grid, named_path_graph,
     similar_graph, subgraph, vertextype
 using Test: @test, @test_throws, @testset
@@ -119,7 +119,7 @@ using Test: @test, @test_throws, @testset
 
         @test linknames(tn, 1 => 2) == [name(l[E(1 => 2)])]
         @test linknames(tn, E(1 => 2)) == [name(l[E(1 => 2)])]
-        @test issetequal(linknames(tn), [name(l[e]) for e in edges(g)])
+        @test issetequal(eachlinkname(tn), [name(l[e]) for e in edges(g)])
 
         @test siteinds(tn, 1) == [s[1]]
         @test siteaxes(tn, 2) == (s[2],)

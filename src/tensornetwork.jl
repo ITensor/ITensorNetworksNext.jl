@@ -203,11 +203,11 @@ end
 # PERF: fast lookup compared to `AbstractITensorNetwork` fallback.
 has_dimname(tn::ITensorNetwork, name) = haskey(tn.dimname_vertices, name)
 
-# PERF: fast lookup compared to `AbstractITensorNetwork` fallback.
-function linknames(tn::ITensorNetwork)
-    return [
+# PERF: still linear compared to generic method, but in practice order of magnitudes faster.
+function eachlinkname(tn::ITensorNetwork)
+    return (
         name for (name, vertices) in pairs(tn.dimname_vertices) if length(vertices) == 2
-    ]
+    )
 end
 
 function NamedGraphs.similar_graph(

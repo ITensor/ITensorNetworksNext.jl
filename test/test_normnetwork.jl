@@ -5,7 +5,7 @@ using ITensorBase:
     ITensor, Index, IndexName, inds, name, nametype, plev, prime, setname, tags, uniquename
 using ITensorNetworksNext: BraView, Greedy, ITensorNetwork, NormNetwork, braname,
     branetwork, bratensor, conj_bratensor, contraction_tree, derivedname, dimnamevertices,
-    flatten_network, has_dimname, ketnetwork, kettensor, linknames, normnetwork,
+    eachlinkname, flatten_network, has_dimname, ketnetwork, kettensor, normnetwork,
     prod_tensors, sitenames, tensornetwork
 using LinearAlgebra: norm
 using NamedGraphs: NamedEdge, incident_edges, named_grid, named_path_graph
@@ -88,7 +88,7 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
         tn, l, s = random_state(Float64, g)
 
         # A user-supplied map dictates the bra-layer name for each link.
-        custom = map(uniquename, Indices(linknames(tn)))
+        custom = map(uniquename, Indices(eachlinkname(tn)))
         nn = normnetwork(tn, custom)
 
         lname = name(l[NamedEdge(1 => 2)])
@@ -148,7 +148,7 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
 
         # The part of `tn` on vertices 1 and 2, as one rank of a distributed network holds it.
         part = ITensorNetwork(Dict(v => tn[v] for v in (1, 2)))
-        nn = normnetwork(part, map(uniquename, Indices(linknames(tn))))
+        nn = normnetwork(part, map(uniquename, Indices(eachlinkname(tn))))
 
         # The bond to vertex 3 is not a link of `part`, but it is in the map, so it gets its
         # own bra name and the two layers at vertex 2 share only the site index.
@@ -197,7 +197,7 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
         @test isempty(dimnamevertices(bv, lname))
         @test has_dimname(bv, bname)
         @test !has_dimname(bv, lname)
-        @test issetequal(linknames(bv), [braname(nn, name(l[e])) for e in edges(g)])
+        @test issetequal(eachlinkname(bv), [braname(nn, name(l[e])) for e in edges(g)])
         @test sitenames(bv, 2) == [name(s[2])]
     end
 
@@ -267,7 +267,7 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
             @test contract_norm(normnetwork(tn)) ≈ 1
 
             # The contracted norm does not depend on the chosen bra-layer name map.
-            custom = map(uniquename, Indices(linknames(tn)))
+            custom = map(uniquename, Indices(eachlinkname(tn)))
             @test contract_norm(normnetwork(tn, custom)) ≈ contract_norm(normnetwork(tn))
         end
     end
