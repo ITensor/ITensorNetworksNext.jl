@@ -115,6 +115,9 @@ function braname(nn::NormNetwork, name)
     return get(branamemap(nn), name, name)
 end
 
+# The default ket→bra name map
+derive_braname(name) = prime(name)
+
 """
     kettensor(nn::NormNetwork, vertex)
 
@@ -157,7 +160,8 @@ end
 
 Build the double-layer norm network `⟨tn|tn⟩`, represented lazily as a `NormNetwork` object.
 Each ket index name in `union(dangling, eachlinkname(tn))` gets the bra name `f(name)`,
-where `f` defaults to `name -> derivedname(name, "bra")`, and `dangling` is empty by default.
+where `f` defaults to `derive_braname`, which primes the name, and `dangling` is empty by
+default.
 Alternatively pass the ket→bra name map `braname` directly, which must include every link
 name of `tn` and may include others. Either way an error is thrown if a link name is missing,
 two bra names coincide or a bra name is already an index name of `tn`.
@@ -168,5 +172,5 @@ function normnetwork(f::Function, tn::ITensorNetwork, dangling = nametype(tn)[])
     return normnetwork(tn, narrow_map(f, names))
 end
 function normnetwork(tn::ITensorNetwork, dangling = nametype(tn)[])
-    return normnetwork(name -> derivedname(name, "bra"), tn, dangling)
+    return normnetwork(derive_braname, tn, dangling)
 end

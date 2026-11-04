@@ -115,12 +115,13 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
         lname = name(l[NamedEdge(1 => 2)])
 
         # Two independently constructed norm networks agree on every bra name.
-        @test braname(normnetwork(tn), lname) == derivedname(lname, :bra)
+        @test braname(normnetwork(tn), lname) == prime(lname)
         @test braname(normnetwork(tn), lname) == braname(normnetwork(tn), lname)
-        @test braname(normnetwork(prime, tn), lname) == prime(lname)
+        f = n -> derivedname(n, :bra)
+        @test braname(normnetwork(f, tn), lname) == derivedname(lname, :bra)
 
         # A bra name that is already an index name of the network is rejected.
-        taken = setname(Index(2), derivedname(lname, :bra))
+        taken = setname(Index(2), prime(lname))
         tn[1] = tn[1] * ITensor(ones(2), (taken,))
         @test_throws ErrorException normnetwork(tn)
     end
