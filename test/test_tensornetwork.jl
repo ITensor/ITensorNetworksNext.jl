@@ -2,9 +2,9 @@ using DataGraphs:
     DataGraph, assigned_edge_data, assigned_vertex_data, underlying_graph, vertex_data
 using Graphs: add_edge!, add_vertex!, dst, edges, edgetype, has_edge, has_vertex,
     is_directed, ne, nv, rem_edge!, rem_vertex!, src, vertices
-using ITensorBase: Index, inds, operator
-using ITensorNetworksNext: ITensorNetwork, has_ind, linkaxes, linkinds, linknames,
-    operator_support, siteaxes, siteinds, sitenames, tensornetwork
+using ITensorBase: Index, inds, name, operator
+using ITensorNetworksNext: ITensorNetwork, eachlinkname, has_ind, linkaxes, linkinds,
+    linknames, operator_support, siteaxes, siteinds, sitenames, tensornetwork
 using NamedGraphs: convert_vertextype, incident_edges, named_grid, named_path_graph,
     similar_graph, subgraph, vertextype
 using Test: @test, @test_throws, @testset
@@ -114,15 +114,16 @@ using Test: @test, @test_throws, @testset
         @test linkinds(tn, 1 => 2) == [l[E(1 => 2)]]
         @test linkinds(tn, E(1 => 2)) == [l[E(1 => 2)]]
 
-        @test linkaxes(tn, 1 => 2) == [l[E(1 => 2)]]
-        @test linkaxes(tn, E(1 => 2)) == [l[E(1 => 2)]]
+        @test linkaxes(tn, 1 => 2) == (l[E(1 => 2)],)
+        @test linkaxes(tn, E(1 => 2)) == (l[E(1 => 2)],)
 
-        @test linknames(tn, 1 => 2) == [l[E(1 => 2)].name]
-        @test linknames(tn, E(1 => 2)) == [l[E(1 => 2)].name]
+        @test linknames(tn, 1 => 2) == [name(l[E(1 => 2)])]
+        @test linknames(tn, E(1 => 2)) == [name(l[E(1 => 2)])]
+        @test issetequal(eachlinkname(tn), [name(l[e]) for e in edges(g)])
 
         @test siteinds(tn, 1) == [s[1]]
-        @test siteaxes(tn, 2) == [s[2]]
-        @test sitenames(tn, 3) == [s[3].name]
+        @test siteaxes(tn, 2) == (s[2],)
+        @test sitenames(tn, 3) == [name(s[3])]
     end
 
     @testset "`operator_support`" begin

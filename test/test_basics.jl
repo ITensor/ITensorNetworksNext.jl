@@ -18,6 +18,7 @@ using Test: @test, @testset
         @test issetequal(vertices(tn), vertices(g))
         for v in vertices(tn)
             @test issetequal(siteinds(tn, v), [s[v]])
+            @test axes(tn, v) == (s[v],)
         end
     end
     @testset "Construct ITensorNetwork partition function" begin
@@ -35,6 +36,8 @@ using Test: @test, @testset
         @test issetequal(arranged_edges(tn), arranged_edges(g))
         for v in vertices(tn)
             @test isempty(siteinds(tn, v))
+            @test axes(tn, v) == axes(tn[v])
+            @test issetequal(axes(tn, v), [l[e] for e in incident_edges(g, v)])
         end
         for v1 in vertices(tn)
             for v2 in vertices(tn)
