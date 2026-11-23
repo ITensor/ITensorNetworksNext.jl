@@ -6,10 +6,10 @@ using Graphs: AbstractGraph, add_vertex!, dst, edges, has_edge, has_vertex, ne, 
     rem_edge!, src, vertices
 using ITensorBase: ITensor, Index, apply, inds, name, noprime, outputnames, prime, state
 using ITensorNetworksNext: ITensorNetworksNext, ContractionTreeAlgorithm, Greedy,
-    ITensorNetwork, MessageCache, NormNetwork, SimpleMessageUpdate, StopWhenConverged,
-    beliefpropagation, bethe_free_energy, bethe_free_entropy, bratensor, contraction_tree,
-    edge_scalar, edge_scalars, factor_tensors, incoming_messages, insertlink!, kettensor,
-    linkaxes, linkinds, message_environment, messagecache, prod_tensors, region_scalar,
+    ITensorNetwork, MessageCache, SimpleMessageUpdate, StopWhenConverged, beliefpropagation,
+    bethe_free_energy, bethe_free_entropy, bratensor, contraction_tree, edge_scalar,
+    edge_scalars, factor_tensors, incoming_messages, insertlink!, kettensor, linkaxes,
+    linkinds, message_environment, messagecache, normnetwork, prod_tensors, region_scalar,
     subgraph, tensornetwork, updated_message, vertex_scalar, vertex_scalars
 using LinearAlgebra: LinearAlgebra, norm, tr
 using NamedGraphs: NamedEdge, all_edges, incident_edges, named_comb_tree, named_grid,
@@ -312,7 +312,7 @@ end
             for edge in edges(g)
                 insertlink!(network, edge)
             end
-            nn = NormNetwork(network)
+            nn = normnetwork(network)
 
             cache = beliefpropagation(
                 nn, message_environment(one, nn);
@@ -364,7 +364,7 @@ end
             for edge in edges(g)
                 insertlink!(network, edge)
             end
-            nn = NormNetwork(network)
+            nn = normnetwork(network)
             v = (2, 2)
 
             # A doubled vertex splits into its two layers.

@@ -51,6 +51,24 @@ using Test: @test, @testset
             f_analytic = TestUtils.f_1d_ising(β, 4; periodic)
             @test f ≈ f_analytic
         end
+        @testset "1D Ising spin correlator" begin
+            N = 6
+            β = 0.4
+            g = named_grid((N,); periodic = true)
+            ldict = DataGraph(g)
+            for e in edges(g)
+                ldict[e] = Index(2)
+            end
+            l = e -> ldict[e]
+            z = prod_tensors(ising_network(l, β, g), Greedy())[]
+
+            # On a periodic chain ⟨σᵢσᵢ₊d⟩ = (tᵈ + tᴺ⁻ᵈ) / (1 + tᴺ) with t = tanh(β).
+            t = tanh(β)
+            for d in 1:3
+                tn = ising_network(l, β, g; sz_vertices = [(1,), (1 + d,)])
+                @test prod_tensors(tn, Greedy())[] / z ≈ (t^d + t^(N - d)) / (1 + t^N)
+            end
+        end
         @testset "2D Ising" begin
             dims = (4, 4)
             β = TestUtils.βc_2d_ising()
