@@ -154,6 +154,12 @@ function flatten_network(nn::NormNetwork)
     )
 end
 
+function linknamespair(nn::NormNetwork, edge)
+    ketnames = linknames(ketnetwork(nn), edge)
+    branames = map(Base.Fix1(braname, nn), ketnames)
+    return ketnames => branames
+end
+
 """
     normnetwork([f::Function], tn::ITensorNetwork, [dangling]) -> NormNetwork
     normnetwork(tn::ITensorNetwork, braname::Dictionary) -> NormNetwork

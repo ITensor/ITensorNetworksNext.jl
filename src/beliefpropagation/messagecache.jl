@@ -194,8 +194,8 @@ function similar_message_environment(nn::NormNetwork)
             bra = branetwork(nn)
             ket = ketnetwork(nn)
 
-            ketnames = linknames(ket, edge)
-            branames = linknames(bra, edge)
+            ketnames, branames = linknamespair(nn, edge)
+
             braaxis = unnamed.(linkaxes(bra, edge))
 
             # Bra leg = operator output, ket leg = input, the bipartition in which the message

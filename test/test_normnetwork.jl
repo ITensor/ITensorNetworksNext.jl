@@ -1,12 +1,12 @@
 using DataGraphs: is_vertex_assigned
 using Dictionaries: Dictionary, Indices, isinsertable, issettable
-using Graphs: edges, has_edge, neighbors, vertices
-using ITensorBase:
-    ITensor, Index, IndexName, inds, name, nametype, prime, setname, uniquename
+using Graphs: dst, edges, has_edge, neighbors, src, vertices
+using ITensorBase: ITensor, Index, IndexName, inds, inputnames, name, names, nametype,
+    outputnames, prime, setname, uniquename
 using ITensorNetworksNext: BraView, Greedy, ITensorNetwork, NormNetwork, braname,
     branetwork, bratensor, conj_bratensor, contraction_tree, dimnamevertices, eachlinkname,
-    flatten_network, has_dimname, ketnetwork, kettensor, normnetwork, prod_tensors,
-    sitenames, tensornetwork
+    flatten_network, has_dimname, ketnetwork, kettensor, linknames, linknamespair,
+    normnetwork, prod_tensors, similar_message_environment, sitenames, tensornetwork
 using LinearAlgebra: norm
 using NamedGraphs: NamedEdge, incident_edges, named_grid, named_path_graph
 using Test: @test, @test_throws, @testset
@@ -179,6 +179,7 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
 
         # The bra layer has the bra link names and the same site names as the ket layer.
         @test inds(bv, 2) == inds(bv[2])
+        @test names(bv, 2) == names(bv[2])
         @test issetequal(dimnamevertices(bv, bname), [1, 2])
         @test issetequal(dimnamevertices(bv, name(s[2])), [2])
         @test isempty(dimnamevertices(bv, lname))
@@ -186,6 +187,33 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
         @test !has_dimname(bv, lname)
         @test issetequal(eachlinkname(bv), [braname(nn, name(l[e])) for e in edges(g)])
         @test sitenames(bv, 2) == [name(s[2])]
+    end
+
+    @testset "`linknamespair`" begin
+        # Two link indices per edge, so a misaligned ket/bra pairing changes the result.
+        g = named_grid((2, 3))
+        l = Dict(e => [Index(2), Index(3)] for e in edges(g))
+        l = merge(l, Dict(reverse(e) => l[e] for e in edges(g)))
+        s = Dict(v => Index(2) for v in vertices(g))
+        tn = tensornetwork(vertices(g)) do v
+            return randn((s[v], reduce(vcat, (l[e] for e in incident_edges(g, v)))...))
+        end
+        nn = normnetwork(tn)
+        env = similar_message_environment(nn)
+
+        for e in [collect(edges(g)); reverse.(edges(g))]
+            ketnames, branames = linknamespair(nn, e)
+            @test ketnames == linknames(tn, e)
+            @test branames == [braname(nn, n) for n in ketnames]
+            # Read from the bra tensors themselves, not through the `BraView` name lookup.
+            bra_src, bra_dst = names(bratensor(nn, src(e))), names(bratensor(nn, dst(e)))
+            @test branames == [n for n in bra_src if n in bra_dst]
+            @test linknamespair(nn, e) == (linknames(tn, e) => linknames(branetwork(nn), e))
+
+            # The initial message pairs each bra leg with the ket leg of the same bond.
+            @test outputnames(env[e]) == branames
+            @test inputnames(env[e]) == ketnames
+        end
     end
 
     @testset "graph structure on a grid" begin

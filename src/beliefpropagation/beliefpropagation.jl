@@ -272,8 +272,9 @@ end
 # the message is positive semidefinite and its trace is a positive normalization.
 function message_update!(algorithm::SimpleMessageUpdate, cache, factors::NormNetwork, edge)
     new_tensor = updated_message(algorithm, cache, factors, edge)
-    branames = linknames(branetwork(factors), edge)
-    ketnames = linknames(ketnetwork(factors), edge)
+
+    ketnames, branames = linknamespair(factors, edge)
+
     new_message = operator(new_tensor, branames, ketnames)
     if algorithm.normalize
         message_norm = tr(new_message)
