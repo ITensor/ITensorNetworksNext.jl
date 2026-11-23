@@ -1,8 +1,8 @@
 using GradedArrays: U1
 using Graphs: dst, edges, src, vertices
 using ITensorBase: Index, apply, inds, operator, prime
-using ITensorNetworksNext: NormNetwork, apply_operator, apply_operators, insertlink!,
-    message_environment, tensornetwork
+using ITensorNetworksNext: apply_operator, apply_operators, insertlink!,
+    message_environment, normnetwork, tensornetwork
 using NamedGraphs: named_comb_tree, named_cycle_graph
 using TensorAlgebra: project, project_aux
 using TensorKitSectors: FermionNumber
@@ -71,7 +71,7 @@ function bp_evolve(sector, g, occupied, bonds)
     for e in edges(g)
         insertlink!(ψ, e)
     end
-    env = message_environment(one, NormNetwork(ψ))
+    env = message_environment(one, normnetwork(ψ))
     for v in occupied
         ψ, env = apply_operator(cdag(sites[v]), ψ, env)
     end
