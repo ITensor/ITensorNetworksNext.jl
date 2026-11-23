@@ -29,6 +29,11 @@ function ITensorBase.inds(nnv::BraView, vertex)
     return conj.(inds(conj_bratensor(parent(nnv), vertex)))
 end
 
+function ITensorBase.names(nnv::BraView, vertex)
+    nn = parent(nnv)
+    return map(Base.Fix1(braname, nn), names(ketnetwork(nn), vertex))
+end
+
 # ====================================== Graphs.jl ======================================= #
 
 Graphs.edges(nnv::BraView) = edges(parent(nnv))
