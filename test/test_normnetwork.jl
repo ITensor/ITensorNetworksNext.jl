@@ -2,11 +2,11 @@ using DataGraphs: is_vertex_assigned
 using Dictionaries: Dictionary, Indices, isinsertable, issettable
 using Graphs: edges, has_edge, neighbors, vertices
 using ITensorBase:
-    ITensor, Index, IndexName, inds, name, nametype, plev, prime, setname, tags, uniquename
+    ITensor, Index, IndexName, inds, name, nametype, prime, setname, uniquename
 using ITensorNetworksNext: BraView, Greedy, ITensorNetwork, NormNetwork, braname,
-    branetwork, bratensor, conj_bratensor, contraction_tree, derivedname, dimnamevertices,
-    eachlinkname, flatten_network, has_dimname, ketnetwork, kettensor, normnetwork,
-    prod_tensors, sitenames, tensornetwork
+    branetwork, bratensor, conj_bratensor, contraction_tree, dimnamevertices, eachlinkname,
+    flatten_network, has_dimname, ketnetwork, kettensor, normnetwork, prod_tensors,
+    sitenames, tensornetwork
 using LinearAlgebra: norm
 using NamedGraphs: NamedEdge, incident_edges, named_grid, named_path_graph
 using Test: @test, @test_throws, @testset
@@ -96,19 +96,6 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
         @test braname(nn, lname) in name.(inds(conj_bratensor(nn, 2)))
     end
 
-    @testset "`derivedname`" begin
-        n = prime(name(Index(2; tags = "Link")))
-
-        # The derived name depends only on the name and key, keeps the decoration and is tagged
-        # with the key.
-        @test derivedname(n, :bra) == derivedname(n, :bra)
-        @test derivedname(n, :bra) != n
-        @test derivedname(n, :bra) != derivedname(n, :other)
-        @test derivedname(n, :bra) != prime(n)
-        @test tags(derivedname(n, :bra)) == merge(tags(n), Dict("bra" => ""))
-        @test plev(derivedname(n, :bra)) == plev(n)
-    end
-
     @testset "default and function name maps" begin
         g = named_path_graph(3)
         tn, l, s = random_state(Float64, g)
@@ -117,8 +104,7 @@ contract_norm(nn) = prod_tensors(flatten_network(nn), Greedy())[]
         # Two independently constructed norm networks agree on every bra name.
         @test braname(normnetwork(tn), lname) == prime(lname)
         @test braname(normnetwork(tn), lname) == braname(normnetwork(tn), lname)
-        f = n -> derivedname(n, :bra)
-        @test braname(normnetwork(f, tn), lname) == derivedname(lname, :bra)
+        @test braname(normnetwork(prime ∘ prime, tn), lname) == prime(prime(lname))
 
         # A bra name that is already an index name of the network is rejected.
         taken = setname(Index(2), prime(lname))
