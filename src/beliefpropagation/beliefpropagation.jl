@@ -246,6 +246,12 @@ factor_tensors(factors, vertex) = [factors[vertex]]
 function factor_tensors(factors::NormNetwork, vertex)
     return [kettensor(factors, vertex), bratensor(factors, vertex)]
 end
+function factor_tensors(factors::QuadraticFormNetwork, vertex)
+    return [
+        kettensor(factors, vertex), operatortensor(factors, vertex),
+        bratensor(factors, vertex),
+    ]
+end
 
 # Contract the incoming messages into the source factor to form the (unnormalized) new message on
 # `edge`.
